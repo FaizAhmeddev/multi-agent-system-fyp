@@ -2,10 +2,10 @@
 # Office Automation Agents Pro — FYP v7.0
 # ============================================================
 
-# Core AI
+# Core AI - FIXED VERSIONS FOR COMPATIBILITY
 openai>=1.55.0
-langchain-openai==0.3.8
-langchain-core>=1.3.0,<2
+langchain-openai>=0.3.0
+langchain-core>=0.3.0,<1.0.0
 langgraph>=0.2.0
 
 # Streamlit UI
