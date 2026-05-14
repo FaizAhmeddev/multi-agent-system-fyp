@@ -300,15 +300,40 @@ else:
     except Exception:
         st.session_state.mcp_running = False
 
-# ── Monitor logs ──────────────────────────────────────────────────────────────
-try:
-    from tools.gmail_auto_reply_monitor import get_pending_logs, is_running, start_monitor, stop_monitor
-    for lg in get_pending_logs():
-        st.session_state.monitor_log.append(lg)
-except Exception:
-    def is_running(): return False
-    def start_monitor(): pass
-    def stop_monitor(): pass
+# ── Monitor logs (skip heavy IMAP stack on hosted — not usable headless anyway) ─
+if is_hosted_deploy():
+
+    def get_pending_logs():
+        return []
+
+    def is_running():
+        return False
+
+    def start_monitor():
+        pass
+
+    def stop_monitor():
+        pass
+
+else:
+    try:
+        from tools.gmail_auto_reply_monitor import get_pending_logs, is_running, start_monitor, stop_monitor
+
+        for lg in get_pending_logs():
+            st.session_state.monitor_log.append(lg)
+    except Exception:
+
+        def get_pending_logs():
+            return []
+
+        def is_running():
+            return False
+
+        def start_monitor():
+            pass
+
+        def stop_monitor():
+            pass
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN PAGE

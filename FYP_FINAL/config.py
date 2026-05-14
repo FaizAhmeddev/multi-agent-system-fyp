@@ -70,9 +70,30 @@ DEMO_MODE = _env("DEMO_MODE", "false").lower() in ("1", "true", "yes")
 def is_hosted_deploy() -> bool:
     if _env("FYP_HOSTED", "").lower() in ("1", "true", "yes"):
         return True
+    if _env("FYP_HOSTED", "").lower() in ("0", "false", "no"):
+        return False
     # Some Streamlit Community Cloud runtimes set this (when present, skip in-process MCP).
     if _env("STREAMLIT_SHARING_MODE", "").lower() == "streamlit":
         return True
+    # Legacy Community Cloud mount path (still seen on some runners).
+    try:
+        if _os.path.isdir("/mount/src"):
+            return True
+    except Exception:
+        pass
+    # Public app URL sometimes appears in Streamlit-related env vars on hosted tiers.
+    for _k, _v in _os.environ.items():
+        if not _k.upper().startswith("STREAMLIT"):
+            continue
+        if "streamlit.app" in str(_v).lower():
+            return True
+    try:
+        import getpass
+
+        if getpass.getuser() == "appuser":
+            return True
+    except Exception:
+        pass
     return False
 
 # ─── Login Users (passwords overridable via env for production) ─

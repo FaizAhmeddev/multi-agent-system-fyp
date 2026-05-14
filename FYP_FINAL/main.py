@@ -77,5 +77,29 @@ def run():
         env=child_env,
     )
 
+def _launched_as_streamlit_script() -> bool:
+    """
+    True when this file is executed via `streamlit run .../main.py` (e.g. Streamlit Cloud).
+
+    In that case we must NOT spawn a nested `streamlit run` subprocess — it blocks this
+    process forever and the browser shows perpetual "Running".
+    """
+    return bool(os.environ.get("STREAMLIT_SERVER_PORT"))
+
+
 if __name__ == "__main__":
-    run()
+    if _launched_as_streamlit_script():
+        # Same interpreter / event loop as Streamlit — load the real UI module.
+        _root = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, _root)
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        import importlib.util
+
+        _ui = os.path.join(_root, "ui", "app.py")
+        _spec = importlib.util.spec_from_file_location("_fyp_streamlit_ui", _ui)
+        if _spec is None or _spec.loader is None:
+            raise RuntimeError(f"Cannot load UI spec: {_ui}")
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+    else:
+        run()
