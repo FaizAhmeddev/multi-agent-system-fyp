@@ -1,0 +1,11 @@
+﻿
+Name            Source                                                           
+----            ------                                                           
+python.exe      C:\Users\user\AppData\Local\Microsoft\WindowsApps\python.exe     
+python3.11.exe  C:\Users\user\AppData\Local\Microsoft\WindowsApps\python3.11.exe 
+python3.exe     C:\Users\user\AppData\Local\Microsoft\WindowsApps\python3.exe    
+pythonw.exe     C:\Users\user\AppData\Local\Microsoft\WindowsApps\pythonw.exe    
+pythonw3.11.exe C:\Users\user\AppData\Local\Microsoft\WindowsApps\pythonw3.11.exe
+pythonw3.exe    C:\Users\user\AppData\Local\Microsoft\WindowsApps\pythonw3.exe   
+
+

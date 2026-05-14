@@ -1,0 +1,49 @@
+# ============================================================
+# Office Automation Agents Pro — FYP v7.0
+# Install: pip install -r requirements.txt
+# ============================================================
+
+# Core AI — keep these in sync: LangGraph 1.x needs langchain-core>=1.3 (RemoveMessage, etc.).
+# openai>=1.55 avoids "proxies" errors with httpx 0.28+.
+openai>=1.55.0
+langchain-core>=1.3.0,<2
+langchain-openai>=0.3.0
+langgraph>=0.2.0
+
+# Streamlit UI
+streamlit>=1.32.0
+
+# Database
+sqlalchemy>=2.0.0
+chromadb>=0.5.0
+# Chroma default embeddings use ONNX MiniLM (avoids PyTorch + transformers startup issues).
+onnxruntime>=1.16.0
+# Optional fallback if ONNX fails: pip install sentence-transformers
+# If you use sentence-transformers, optional: pip install torchvision  (quiets transformers image warnings)
+
+# WhatsApp / Twilio
+twilio>=9.0.0
+flask>=3.0.0
+
+# Google APIs
+google-auth>=2.29.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.126.0
+
+# File Parsing
+pdfplumber>=0.11.0
+PyPDF2>=3.0.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+pandas>=2.0.0
+plotly>=5.18.0
+
+# Export
+fpdf2>=2.7.0
+reportlab>=4.0.0
+
+# Utils
+python-dotenv>=1.0.0
+requests>=2.31.0
+numpy>=1.26.0
