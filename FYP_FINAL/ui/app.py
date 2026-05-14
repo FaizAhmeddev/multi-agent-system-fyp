@@ -33,12 +33,47 @@ for _lg in (
 
 import streamlit as st
 
-from config import get_visible_tabs_for_role, get_role_orchestrator_allowlist, ROLE_PORTAL_BANNERS
-
 st.set_page_config(
     page_title="Office Automation Agents Pro",
     layout="wide", page_icon=None,
     initial_sidebar_state="collapsed",
+)
+
+
+def _hydrate_streamlit_secrets_into_environ() -> None:
+    """
+    On Streamlit Community Cloud, secrets live in st.secrets, not os.environ.
+    config.py reads API keys from the environment (and .env locally), so copy flat
+    secret entries into os.environ before importing config.
+    """
+    try:
+        sec = st.secrets
+        items = sec.items()
+    except Exception:
+        return
+    for key, val in items:
+        if val is None or not key or str(key).startswith("_"):
+            continue
+        if isinstance(val, dict):
+            continue
+        if isinstance(val, (list, tuple)):
+            continue
+        k = str(key).strip()
+        if os.environ.get(k):
+            continue
+        s = str(val).strip()
+        if s:
+            os.environ[k] = s
+
+
+_hydrate_streamlit_secrets_into_environ()
+
+from config import (
+    get_visible_tabs_for_role,
+    get_role_orchestrator_allowlist,
+    ROLE_PORTAL_BANNERS,
+    is_hosted_deploy,
+    OPENAI_API_KEY,
 )
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -251,15 +286,19 @@ try:
 except Exception:
     pass
 
-# ── MCP auto-start ────────────────────────────────────────────────────────────
-try:
-    from mcp_server import start_mcp_server, is_mcp_running
-    from config import MCP_SERVER_HOST, MCP_SERVER_PORT
-    if not is_mcp_running():
-        start_mcp_server(MCP_SERVER_HOST, MCP_SERVER_PORT)
-    st.session_state.mcp_running = True
-except Exception:
+# ── MCP auto-start (local only; skip on Streamlit Cloud — set FYP_HOSTED=true in Secrets) ─
+if is_hosted_deploy():
     st.session_state.mcp_running = False
+else:
+    try:
+        from mcp_server import start_mcp_server, is_mcp_running
+        from config import MCP_SERVER_HOST, MCP_SERVER_PORT
+
+        if not is_mcp_running():
+            start_mcp_server(MCP_SERVER_HOST, MCP_SERVER_PORT)
+        st.session_state.mcp_running = True
+    except Exception:
+        st.session_state.mcp_running = False
 
 # ── Monitor logs ──────────────────────────────────────────────────────────────
 try:
@@ -308,6 +347,15 @@ if not st.session_state.logged_in:
         finance / finance123 &nbsp;|&nbsp; it / it123<br>
         assistant / assistant123 &nbsp;|&nbsp; demo / demo123
         </div>""", unsafe_allow_html=True)
+        if is_hosted_deploy():
+            if not (OPENAI_API_KEY or "").strip():
+                st.warning(
+                    "Hosted deploy: add **OPENAI_API_KEY** to Streamlit **Secrets** (same names as `.env.example`). "
+                    "Secrets are applied before the app loads."
+                )
+            st.caption(
+                "Tip: in Streamlit Cloud **Secrets**, set **FYP_HOSTED** = `true` to disable the local MCP HTTP server."
+            )
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════

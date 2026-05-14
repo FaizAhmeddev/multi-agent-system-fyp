@@ -64,6 +64,17 @@ except ValueError:
 # ─── Demo Mode ─────────────────────────────────────────────
 DEMO_MODE = _env("DEMO_MODE", "false").lower() in ("1", "true", "yes")
 
+# ─── Hosted deploy (Streamlit Community Cloud, etc.) ────────
+# Set FYP_HOSTED=true in `.env` locally or in Streamlit **Secrets** (flat key) so the UI
+# skips starting the in-process MCP HTTP server (often unnecessary or unreliable when hosted).
+def is_hosted_deploy() -> bool:
+    if _env("FYP_HOSTED", "").lower() in ("1", "true", "yes"):
+        return True
+    # Some Streamlit Community Cloud runtimes set this (when present, skip in-process MCP).
+    if _env("STREAMLIT_SHARING_MODE", "").lower() == "streamlit":
+        return True
+    return False
+
 # ─── Login Users (passwords overridable via env for production) ─
 USERS = {
     "admin": {
