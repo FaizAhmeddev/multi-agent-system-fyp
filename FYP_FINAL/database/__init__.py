@@ -3,6 +3,7 @@ from .sqlite_db import (
     log_candidate, log_it_ticket, log_finance, log_whatsapp,
     add_notification, get_dashboard_stats, get_task_history,
     get_notifications, mark_notifications_read,
+    log_login_event, get_login_history,
 )
 from .vector_db import (
     embed_documents, semantic_search, rag_answer,
@@ -15,6 +16,7 @@ __all__ = [
     "log_it_ticket", "log_finance", "log_whatsapp",
     "add_notification", "get_dashboard_stats", "get_task_history",
     "get_notifications", "mark_notifications_read",
+    "log_login_event", "get_login_history",
     "embed_documents", "semantic_search", "rag_answer",
     "collection_stats", "clear_collection", "is_available",
 ]

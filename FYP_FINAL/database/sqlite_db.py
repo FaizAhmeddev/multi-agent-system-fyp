@@ -7,7 +7,8 @@ Tables:
   users, tasks, agent_logs, messages, emails,
   candidates, hr_queries, finance_records,
   documents_meta, it_tickets, notifications, whatsapp_logs,
-  recruitment_workflows, recruitment_audit_logs, hr_gmail_shortlist_batches
+  recruitment_workflows, recruitment_audit_logs, hr_gmail_shortlist_batches,
+  login_history
 """
 
 import os
@@ -194,6 +195,20 @@ class RecruitmentAuditLog(Base):
     success      = Column(Boolean, default=True)
     elapsed_ms   = Column(Integer, default=0)
     detail_json  = Column(Text)   # small JSON; avoid full PII dumps
+
+
+class LoginHistory(Base):
+    """User sign-in and sign-out events (audit trail)."""
+    __tablename__ = "login_history"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp    = Column(DateTime, default=datetime.utcnow, index=True)
+    username     = Column(String(100), index=True)
+    display_name = Column(String(200))
+    role         = Column(String(80))
+    event        = Column(String(20))   # login | logout
+    session_id   = Column(String(64), default="")
+    ip_address   = Column(String(64), default="")
+    user_agent   = Column(String(500), default="")
 
 
 class HRGmailShortlistBatch(Base):
@@ -433,6 +448,60 @@ def get_dashboard_stats() -> dict:
                 "total_finance": 0, "total_whatsapp": 0,
                 "unread_notifs": 0, "recent_tasks": [],
                 "recent_tickets": [], "agent_usage": {}}
+
+
+def log_login_event(
+    username: str,
+    display_name: str,
+    role: str,
+    event: str,
+    session_id: str = "",
+    ip_address: str = "",
+    user_agent: str = "",
+) -> bool:
+    """Record login or logout in login_history table."""
+    try:
+        s = get_session()
+        s.add(LoginHistory(
+            username=(username or "")[:100],
+            display_name=(display_name or "")[:200],
+            role=(role or "")[:80],
+            event=(event or "login")[:20],
+            session_id=(session_id or "")[:64],
+            ip_address=(ip_address or "")[:64],
+            user_agent=(user_agent or "")[:500],
+        ))
+        s.commit()
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_login_history(limit: int = 100, username: str | None = None) -> list:
+    """Return recent login/logout rows, optionally filtered by username."""
+    try:
+        s = get_session()
+        q = s.query(LoginHistory).order_by(LoginHistory.timestamp.desc())
+        if username:
+            q = q.filter(LoginHistory.username == username)
+        rows = q.limit(limit).all()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r.id,
+                "time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if r.timestamp else "",
+                "username": r.username or "",
+                "display_name": r.display_name or "",
+                "role": r.role or "",
+                "event": r.event or "",
+                "session_id": r.session_id or "",
+                "ip_address": r.ip_address or "",
+            })
+        s.close()
+        return result
+    except Exception:
+        return []
 
 
 def get_task_history(limit: int = 50) -> list:

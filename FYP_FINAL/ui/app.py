@@ -10,6 +10,19 @@ if ROOT not in sys.path:
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# Local dev: load FYP_FINAL/.env before Streamlit / config read credentials
+try:
+    from config import load_local_env
+    load_local_env()
+except Exception:
+    try:
+        from dotenv import load_dotenv
+        _env_file = os.path.join(ROOT, ".env")
+        if os.path.isfile(_env_file):
+            load_dotenv(_env_file)
+    except Exception:
+        pass
+
 import logging
 import warnings
 
@@ -49,6 +62,9 @@ def _hydrate_streamlit_secrets_into_environ() -> None:
     try:
         sec = st.secrets
         items = sec.items()
+    except FileNotFoundError:
+        # No secrets.toml — normal for local dev when using .env instead
+        return
     except Exception:
         return
     for key, val in items:
@@ -73,13 +89,30 @@ from config import (
     get_role_orchestrator_allowlist,
     ROLE_PORTAL_BANNERS,
     is_hosted_deploy,
+    is_gmail_configured,
+    gmail_setup_hint,
+    refresh_config_from_env,
     OPENAI_API_KEY,
 )
+
+refresh_config_from_env()
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-* { font-family: 'Inter', sans-serif !important; }
+/* Inter for text only — do NOT override Streamlit Material icon fonts (fixes upload/arrow/checkbox glitches) */
+.stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, .stTextInput label, .stTextArea label,
+.stSelectbox label, .stCheckbox label, .stButton button, .stForm label, .stCaption, .stAlert,
+[data-testid="stWidgetLabel"], input, textarea, select {
+    font-family: 'Inter', sans-serif !important;
+}
+[data-testid="stIconMaterial"], .material-symbols-rounded, .material-icons {
+    font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    white-space: nowrap !important;
+}
 .main { padding-top: 0.3rem; background: #f8fafc; }
 .stApp { background: #f8fafc; }
 
@@ -209,7 +242,27 @@ st.markdown("""<style>
 .chat-agent { float: left; }
 div[data-testid="column"] { min-width: 0; }
 
-div[data-testid="stForm"] { border:none !important; padding:0 !important; }
+div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
+[data-testid="stFileUploader"] section[data-testid="stFileUploadDropzone"] {
+    border: 1.5px dashed #cbd5e1; border-radius: 12px; background: #fff;
+}
+[data-testid="stFileUploader"] section button {
+    background: #f8fafc !important; border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important; min-height: 2.75rem;
+}
+[data-testid="stFileUploader"] section button p { font-size: 14px !important; line-height: 1.4 !important; }
+[data-testid="stCheckbox"] label { gap: 0.5rem !important; align-items: center !important; }
+[data-testid="stCheckbox"] label p { line-height: 1.4 !important; margin: 0 !important; }
+[data-testid="stExpander"] summary { font-weight: 600 !important; }
+.email-detail-box {
+    background: white; border: 1px solid #e2e8f0; border-radius: 14px;
+    padding: 20px 22px; margin-top: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.email-body-full {
+    white-space: pre-wrap; line-height: 1.65; font-size: 14px; color: #334155;
+    max-height: 420px; overflow-y: auto; padding: 12px; background: #f8fafc;
+    border-radius: 8px; border: 1px solid #e2e8f0;
+}
 </style>""", unsafe_allow_html=True)
 
 # ── Session defaults ──────────────────────────────────────────────────────────
@@ -226,6 +279,9 @@ _defs = {
     "hr_gmail_last": None,
     "pending_hr_gmail_batch_id": None,
     "orch_finance_export_files": None,
+    "auth_session_id": "",
+    "inbox_emails": [],
+    "selected_inbox_idx": None,
 }
 for k, v in _defs.items():
     if k not in st.session_state:
@@ -278,6 +334,71 @@ def _extract_text_from_uploaded_file(f) -> str:
             return f.read().decode("utf-8", errors="ignore")
         except Exception:
             return ""
+
+
+def _new_auth_session_id() -> str:
+    import uuid
+    return str(uuid.uuid4())
+
+
+def _record_login_event(username: str, display_name: str, role: str, event: str) -> None:
+    try:
+        from database.sqlite_db import log_login_event
+        log_login_event(
+            username=username,
+            display_name=display_name,
+            role=role,
+            event=event,
+            session_id=st.session_state.get("auth_session_id") or "",
+        )
+    except Exception:
+        pass
+
+
+def _render_inbox_email_detail(em: dict) -> None:
+    from html import escape as _esc
+    import base64
+
+    fn = _esc(em.get("from_name", "") or "")
+    fe = _esc(em.get("from_email", "") or "")
+    subj = _esc(em.get("subject", "") or "")
+    date_s = _esc(em.get("date", "") or "")
+    body = _esc(em.get("body", "") or "(No body)")
+
+    header_html = (
+        '<div class="email-detail-box">'
+        + f"<h4 style='margin:0 0 12px 0;color:#0f172a'>{subj}</h4>"
+        + f"<p style='margin:0 0 6px 0;font-size:13px;color:#64748b'>"
+        + f"<b>From:</b> {fn} &lt;{fe}&gt;<br><b>Date:</b> {date_s}</p>"
+        + "</div>"
+    )
+    st.markdown(header_html, unsafe_allow_html=True)
+    st.markdown('<div class="email-body-full">' + body + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    attachments = em.get("attachments") or []
+    if attachments:
+        st.markdown("**Attachments**")
+        cols = st.columns(min(3, len(attachments)))
+        for i, att in enumerate(attachments):
+            with cols[i % len(cols)]:
+                try:
+                    data = base64.b64decode(att.get("data_b64") or "")
+                except Exception:
+                    data = b""
+                size_kb = (att.get("size") or len(data)) / 1024.0
+                st.download_button(
+                    label="Download " + str(att.get("filename", "file")),
+                    data=data,
+                    file_name=att.get("filename") or "attachment",
+                    mime=att.get("content_type") or "application/octet-stream",
+                    key=f"inbox_att_{em.get('uid', i)}_{i}",
+                    use_container_width=True,
+                )
+                st.caption(f"{size_kb:.1f} KB")
+    else:
+        st.caption("No attachments in this message.")
 
 # ── DB init ───────────────────────────────────────────────────────────────────
 try:
@@ -358,11 +479,13 @@ if not st.session_state.logged_in:
                 st.session_state.username   = username
                 st.session_state.user_role  = USERS[username]["role"]
                 st.session_state.user_name  = USERS[username]["name"]
-                try:
-                    from database.sqlite_db import add_notification
-                    add_notification(f"{USERS[username]['name']} logged in", f"Role: {USERS[username]['role']}", "info", "System")
-                except Exception:
-                    pass
+                st.session_state.auth_session_id = _new_auth_session_id()
+                _record_login_event(
+                    username=username,
+                    display_name=USERS[username]["name"],
+                    role=USERS[username]["role"],
+                    event="login",
+                )
                 st.rerun()
             else:
                 st.error("Invalid username or password")
@@ -410,7 +533,13 @@ with c1:
     )
 with c3:
     if st.button("Logout", use_container_width=True):
-        for k in ["logged_in","username","user_role","user_name"]:
+        _record_login_event(
+            username=st.session_state.username,
+            display_name=st.session_state.user_name,
+            role=st.session_state.user_role,
+            event="logout",
+        )
+        for k in ["logged_in", "username", "user_role", "user_name", "auth_session_id"]:
             st.session_state[k] = "" if k != "logged_in" else False
         st.rerun()
 
@@ -1153,30 +1282,54 @@ if _ti is not None:
                     st.error(f"Error: {e}")
 
         st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">📥 Read Inbox</div>', unsafe_allow_html=True)
-        if st.button("📬 Fetch Latest Emails", key="fetch_emails"):
+        if not is_gmail_configured():
+            st.warning("**Gmail not configured.** " + gmail_setup_hint())
+            st.caption(
+                "Streamlit Cloud uses **Secrets** in the dashboard; local terminal uses **FYP_FINAL/.env** — they are separate."
+            )
+        inbox_count = st.number_input("How many emails to fetch", min_value=1, max_value=30, value=10, key="inbox_fetch_n")
+        if st.button("📬 Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
             with st.spinner("Connecting to Gmail..."):
                 try:
                     from tools.gmail_read import read_emails
-                    result = read_emails({})
-                    for em in result.get("emails", []):
-                        from html import escape as _esc
-
-                        fn = _esc(em.get("from_name", "") or "")
-                        fe = _esc(em.get("from_email", "") or "")
-                        subj = _esc(em.get("subject", "") or "")
-                        body_snip = _esc((em.get("body") or "")[:200])
-                        st.markdown(
-                            f'<div class="hist-row">'
-                            f"<b>From:</b> {fn} &lt;{fe}&gt;&nbsp;&nbsp;"
-                            f"<b>Subject:</b> {subj}<br>"
-                            f'<small style="color:#64748b">{body_snip}...</small>'
-                            f"</div>",
-                            unsafe_allow_html=True,
-                        )
-                    if not result.get("emails"):
-                        st.info(f"📭 {result.get('email_error','No emails found.')}")
+                    result = read_emails({"max_emails": int(inbox_count)})
+                    st.session_state.inbox_emails = result.get("emails", [])
+                    st.session_state.selected_inbox_idx = 0 if st.session_state.inbox_emails else None
+                    if not st.session_state.inbox_emails:
+                        err = result.get("email_error", "No emails found.")
+                        if "not configured" in str(err).lower() or "not enough arguments" in str(err).lower():
+                            st.error(err)
+                        else:
+                            st.info(f"📭 {err}")
+                    else:
+                        st.success(f"Loaded **{len(st.session_state.inbox_emails)}** email(s). Select one below to read the full message.")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
+
+        if st.session_state.inbox_emails:
+            st.caption("Select an email to view the full message and download attachments.")
+            list_col, detail_col = st.columns([1, 1.4])
+            with list_col:
+                labels = []
+                for em in st.session_state.inbox_emails:
+                    att_n = em.get("attachment_count") or 0
+                    att_tag = f" 📎{att_n}" if att_n else ""
+                    labels.append(
+                        f"{em.get('date', '')} | {em.get('from_name', '?')[:28]}{att_tag}\n{em.get('subject', '')[:55]}"
+                    )
+                picked = st.radio(
+                    "Inbox",
+                    options=list(range(len(labels))),
+                    format_func=lambda i: labels[i],
+                    index=st.session_state.selected_inbox_idx or 0,
+                    key="inbox_pick_radio",
+                    label_visibility="collapsed",
+                )
+                st.session_state.selected_inbox_idx = picked
+            with detail_col:
+                sel_em = st.session_state.inbox_emails[st.session_state.selected_inbox_idx or 0]
+                _render_inbox_email_detail(sel_em)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — HR
@@ -2314,4 +2467,32 @@ if _ti is not None:
                 st.info("No task history yet. Use the **Assistant** tab to send tasks.")
         except Exception as e:
             st.error(f"History error: {e}")
+
+        st.divider()
+        st.markdown('<div class="sec-hdr">🔐 Login History (database)</div>', unsafe_allow_html=True)
+        try:
+            from database.sqlite_db import get_login_history
+            if st.session_state.user_role == "Admin":
+                login_rows = get_login_history(limit=200)
+                st.caption("All users — stored in SQLite `login_history` table.")
+            else:
+                login_rows = get_login_history(limit=100, username=st.session_state.username)
+                st.caption("Your sign-in / sign-out events only.")
+            if login_rows:
+                for row in login_rows:
+                    ev = (row.get("event") or "").lower()
+                    badge = "badge-green" if ev == "login" else "badge-orange"
+                    st.markdown(
+                        f'<div class="hist-row">'
+                        f'<span class="badge {badge}">{(row.get("event") or "").upper()}</span> '
+                        f'<b>{row.get("display_name", "")}</b> '
+                        f'<span style="color:#64748b">({row.get("username", "")} · {row.get("role", "")})</span><br>'
+                        f'<small style="color:#94a3b8">{row.get("time", "")}</small>'
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info("No login history yet. Sign in and out to record events.")
+        except Exception as e:
+            st.error(f"Login history error: {e}")
 

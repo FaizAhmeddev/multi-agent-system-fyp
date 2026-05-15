@@ -18,13 +18,26 @@ def _env(name: str, default: str = "") -> str:
     return s if s else default
 
 
-# Load `.env` from project root (optional file; not committed)
-try:
-    from dotenv import load_dotenv
+def load_local_env() -> bool:
+    """Load FYP_FINAL/.env into os.environ (safe to call multiple times)."""
+    path = _os.path.join(_PROJECT_ROOT, ".env")
+    if not _os.path.isfile(path):
+        return False
+    try:
+        from dotenv import load_dotenv
 
-    load_dotenv(_os.path.join(_PROJECT_ROOT, ".env"))
-except ImportError:
-    pass
+        load_dotenv(path, override=True)
+        # True if at least one common secret key is present
+        return bool(
+            _os.environ.get("OPENAI_API_KEY")
+            or _os.environ.get("GMAIL_EMAIL")
+            or _os.environ.get("GMAIL_APP_PASSWORD")
+        )
+    except ImportError:
+        return False
+
+
+load_local_env()
 
 # ─── OpenAI ────────────────────────────────────────────────
 OPENAI_API_KEY = _env("OPENAI_API_KEY")
@@ -32,6 +45,91 @@ OPENAI_API_KEY = _env("OPENAI_API_KEY")
 # ─── Gmail ─────────────────────────────────────────────────
 GMAIL_EMAIL = _env("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
+
+
+class GmailNotConfiguredError(RuntimeError):
+    """Raised when GMAIL_EMAIL / GMAIL_APP_PASSWORD are missing."""
+
+
+def refresh_config_from_env() -> None:
+    """Reload secrets from os.environ (after .env or Streamlit Secrets hydration)."""
+    global OPENAI_API_KEY, GMAIL_EMAIL, GMAIL_APP_PASSWORD
+    global TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO, TWILIO_CONTENT_SID
+    global GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, DEMO_MODE, USERS
+
+    OPENAI_API_KEY = _env("OPENAI_API_KEY")
+    GMAIL_EMAIL = _env("GMAIL_EMAIL")
+    GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
+
+    TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_FROM = _env("TWILIO_WHATSAPP_FROM")
+    TWILIO_WHATSAPP_TO = _env("TWILIO_WHATSAPP_TO")
+    TWILIO_CONTENT_SID = _env("TWILIO_CONTENT_SID")
+
+    _gcf = _env("GOOGLE_CREDENTIALS_FILE", "credentials.json")
+    GOOGLE_CREDENTIALS_FILE = _gcf if _os.path.isabs(_gcf) else _os.path.join(_PROJECT_ROOT, _gcf)
+    _gtf = _env("GOOGLE_TOKEN_FILE", "token.json")
+    GOOGLE_TOKEN_FILE = _gtf if _os.path.isabs(_gtf) else _os.path.join(_PROJECT_ROOT, _gtf)
+
+    DEMO_MODE = _env("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+
+    USERS = {
+        "admin": {"password": _env("FYP_PASSWORD_ADMIN", "admin123"), "role": "Admin", "name": "System Admin"},
+        "hr": {"password": _env("FYP_PASSWORD_HR", "hr123"), "role": "HR Manager", "name": "HR Manager"},
+        "finance": {"password": _env("FYP_PASSWORD_FINANCE", "finance123"), "role": "Finance Manager", "name": "Finance Manager"},
+        "it": {"password": _env("FYP_PASSWORD_IT", "it123"), "role": "IT Staff", "name": "IT Support"},
+        "demo": {"password": _env("FYP_PASSWORD_DEMO", "demo123"), "role": "Admin", "name": "Demo User"},
+        "assistant": {"password": _env("FYP_PASSWORD_ASSISTANT", "assistant123"), "role": "Assistant", "name": "Office Assistant"},
+    }
+
+
+def is_gmail_configured() -> bool:
+    email = (_env("GMAIL_EMAIL") or GMAIL_EMAIL or "").strip()
+    pwd = (_env("GMAIL_APP_PASSWORD") or GMAIL_APP_PASSWORD or "").replace(" ", "")
+    return bool(email and pwd)
+
+
+def gmail_setup_hint() -> str:
+    """Human-readable reason Gmail is not ready (for UI warnings)."""
+    env_path = _os.path.join(_PROJECT_ROOT, ".env")
+    has_file = _os.path.isfile(env_path)
+    email = (_env("GMAIL_EMAIL") or GMAIL_EMAIL or "").strip()
+    pwd = (_env("GMAIL_APP_PASSWORD") or GMAIL_APP_PASSWORD or "").replace(" ", "")
+    if has_file and (not email or not pwd):
+        missing = []
+        if not email:
+            missing.append("`GMAIL_EMAIL`")
+        if not pwd:
+            missing.append("`GMAIL_APP_PASSWORD`")
+        return (
+            f"Your **FYP_FINAL/.env** file exists but {', '.join(missing)} "
+            f"{'is' if len(missing) == 1 else 'are'} **empty**. "
+            "Open that file, paste your Gmail address and App Password, save, then restart the app "
+            "(Ctrl+C in terminal, run `python main.py` again)."
+        )
+    if not has_file:
+        return (
+            "No **FYP_FINAL/.env** file found. Copy `.env.example` to `.env`, "
+            "fill `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD`, then restart."
+        )
+    return "Gmail credentials missing. Check FYP_FINAL/.env or Streamlit Secrets."
+
+
+def gmail_credentials() -> tuple[str, str]:
+    """Return (email, app_password) or raise GmailNotConfiguredError with setup hints."""
+    email = (_env("GMAIL_EMAIL") or GMAIL_EMAIL or "").strip()
+    pwd = (_env("GMAIL_APP_PASSWORD") or GMAIL_APP_PASSWORD or "").replace(" ", "")
+    if not email or not pwd:
+        raise GmailNotConfiguredError(
+            "Gmail is not configured (IMAP LOGIN needs email + app password).\n\n"
+            "Local terminal:\n"
+            "  1. Copy FYP_FINAL/.env.example → FYP_FINAL/.env\n"
+            "  2. Set GMAIL_EMAIL and GMAIL_APP_PASSWORD (Google Account → App passwords)\n"
+            "     OR copy FYP_FINAL/.streamlit/secrets.toml.example → secrets.toml and fill keys.\n\n"
+            "Streamlit Cloud: App settings → Secrets → same keys as .env.example"
+        )
+    return email, pwd
 
 # ─── Google Drive OAuth ────────────────────────────────────
 _gcf = _env("GOOGLE_CREDENTIALS_FILE", "credentials.json")

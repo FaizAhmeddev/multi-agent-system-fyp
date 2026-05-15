@@ -1,17 +1,78 @@
 """
 MAIN.PY — Entry Point — FYP v7.0
+Run from this folder:  python main.py
 """
-import subprocess, sys, os, webbrowser, time, threading
+import os
+import subprocess
+import sys
+import threading
+import time
+import webbrowser
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _ROOT)
+
+
+def _configure_windows_console() -> None:
+    """Avoid UnicodeEncodeError on Windows cmd/PowerShell (cp1252)."""
+    if sys.platform != "win32":
+        return
+    os.environ.setdefault("PYTHONUTF8", "1")
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+def _log(msg: str) -> None:
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        print(msg.encode("ascii", errors="replace").decode("ascii"), flush=True)
+
+
+def _ensure_env_file() -> bool:
+    """Create .env from .env.example if missing (user must still add keys)."""
+    env_path = os.path.join(_ROOT, ".env")
+    example = os.path.join(_ROOT, ".env.example")
+    if os.path.isfile(env_path):
+        return True
+    if not os.path.isfile(example):
+        return False
+    try:
+        with open(example, "r", encoding="utf-8") as src:
+            data = src.read()
+        with open(env_path, "w", encoding="utf-8") as dst:
+            dst.write(data)
+        _log("  [i] Created .env from .env.example — add your API keys, then restart.")
+        return True
+    except Exception as e:
+        _log(f"  [!] Could not create .env: {e}")
+        return False
+
+
+def _load_secrets() -> bool:
+    try:
+        from config import load_local_env
+        return load_local_env()
+    except Exception as e:
+        _log(f"  [!] .env load error: {e}")
+        return False
+
 
 def open_browser():
     time.sleep(3)
     webbrowser.open("http://localhost:8501")
 
+
 def run():
-    # Reduce tokenizer fork warnings; set before Chroma / embedding imports (via data_loader).
+    _configure_windows_console()
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+    _ensure_env_file()
+    has_env = _load_secrets()
+
     import logging
 
     for _lg in (
@@ -34,68 +95,82 @@ def run():
         warnings.filterwarnings("ignore", category=LangChainPendingDeprecationWarning)
     warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 
-    print("=" * 65)
-    print("  Office Automation Agents Pro — FYP v7.0")
-    print("  Agents: Unified Assistant → IT · Email · HR · Recruitment · Finance · Documents · WhatsApp")
-    print("  Stack:  LangGraph · OpenAI · MCP · A2A · ChromaDB · SQLite")
-    print("=" * 65)
+    _log("=" * 65)
+    _log("  Office Automation Agents Pro - FYP v7.0")
+    _log("  Agents: Assistant | IT | Email | HR | Recruitment | Finance | Documents | WhatsApp")
+    _log("  Stack:  LangGraph | OpenAI | MCP | A2A | ChromaDB | SQLite")
+    _log("=" * 65)
 
-    # Init DB
+    if has_env:
+        _log("  [ok] Loaded FYP_FINAL/.env")
+    else:
+        _log("  [!] No secrets in .env yet — copy .env.example -> .env and fill GMAIL_* / OPENAI_API_KEY")
+
     try:
         from database.sqlite_db import init_db
         init_db()
-        print("  ✅ SQLite DB initialized")
+        _log("  [ok] SQLite DB initialized")
     except Exception as e:
-        print(f"  ⚠️  DB init: {e}")
+        _log(f"  [!] DB init: {e}")
 
-    # Auto-load datasets if ChromaDB empty
     try:
         from data_loader.loader import check_datasets_loaded, load_all_datasets
         if not check_datasets_loaded():
-            print("  📊 Loading datasets into ChromaDB (first run)...")
+            _log("  [..] Loading datasets into ChromaDB (first run)...")
             load_all_datasets()
         else:
-            print("  ✅ ChromaDB datasets already loaded")
+            _log("  [ok] ChromaDB datasets already loaded")
     except Exception as e:
-        print(f"  ⚠️  Dataset loader: {e}")
+        _log(f"  [!] Dataset loader: {e}")
 
-    print("\n  🚀 Starting UI at http://localhost:8501\n")
+    _log("")
+    _log("  Starting UI at http://localhost:8501")
+    _log("  Press Ctrl+C to stop.")
+    _log("")
+
     threading.Thread(target=open_browser, daemon=True).start()
 
-    ui = os.path.join(os.path.dirname(__file__), "ui", "app.py")
+    ui = os.path.join(_ROOT, "ui", "app.py")
     child_env = os.environ.copy()
     child_env.setdefault("TOKENIZERS_PARALLELISM", "false")
     child_env.setdefault("PYTHONWARNINGS", "ignore::DeprecationWarning")
-    subprocess.run(
-        [
-            sys.executable, "-m", "streamlit", "run", ui,
-            "--server.port", "8501",
-            "--server.headless", "false",
-            "--browser.gatherUsageStats", "false",
-            "--theme.base", "light",
-        ],
-        env=child_env,
-    )
+    child_env.setdefault("PYTHONUTF8", "1")
+
+    port = os.environ.get("FYP_PORT", "8501")
+    cmd = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        ui,
+        "--server.port",
+        str(port),
+        "--server.headless",
+        "false",
+        "--browser.gatherUsageStats",
+        "false",
+        "--theme.base",
+        "light",
+    ]
+    _log(f"  Streamlit port: {port}")
+    rc = subprocess.run(cmd, env=child_env, cwd=_ROOT).returncode
+    if rc != 0 and str(port) == "8501":
+        _log("  [!] Port 8501 busy — close other Streamlit windows or run: set FYP_PORT=8502 && python main.py")
+
 
 def _launched_as_streamlit_script() -> bool:
-    """
-    True when this file is executed via `streamlit run .../main.py` (e.g. Streamlit Cloud).
-
-    In that case we must NOT spawn a nested `streamlit run` subprocess — it blocks this
-    process forever and the browser shows perpetual "Running".
-    """
     return bool(os.environ.get("STREAMLIT_SERVER_PORT"))
 
 
 if __name__ == "__main__":
+    _configure_windows_console()
     if _launched_as_streamlit_script():
-        # Same interpreter / event loop as Streamlit — load the real UI module.
-        _root = os.path.dirname(os.path.abspath(__file__))
-        sys.path.insert(0, _root)
         os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        _ensure_env_file()
+        _load_secrets()
         import importlib.util
 
-        _ui = os.path.join(_root, "ui", "app.py")
+        _ui = os.path.join(_ROOT, "ui", "app.py")
         _spec = importlib.util.spec_from_file_location("_fyp_streamlit_ui", _ui)
         if _spec is None or _spec.loader is None:
             raise RuntimeError(f"Cannot load UI spec: {_ui}")
