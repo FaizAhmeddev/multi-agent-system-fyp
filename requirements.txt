@@ -1,7 +1,8 @@
 # ============================================================
 # Office Automation Agents Pro — FYP v7.0
-# Local / Codespaces: pip install -r requirements.txt
-# Streamlit Cloud: use repo-root requirements.txt instead.
+# Streamlit Community Cloud installs dependencies from THIS file
+# at the repository root only (not FYP_FINAL/requirements.txt).
+# Main app entry: FYP_FINAL/ui/app.py
 # ============================================================
 
 # Core AI
