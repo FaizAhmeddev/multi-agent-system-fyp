@@ -90,9 +90,11 @@ from config import (
     ROLE_PORTAL_BANNERS,
     is_hosted_deploy,
     local_background_services_enabled,
-    HOSTED_SERVICES_UNAVAILABLE_MSG,
+    can_manage_background_services,
     is_gmail_configured,
-    gmail_setup_hint,
+    is_google_drive_configured,
+    DriveNotConfiguredError,
+    use_postgresql_database,
     refresh_config_from_env,
     OPENAI_API_KEY,
 )
@@ -292,6 +294,9 @@ _defs = {
     "pending_hr_gmail_batch_id": None,
     "orch_finance_export_files": None,
     "auth_session_id": "",
+    "orch_conversation_id": None,
+    "coord_conversation_id": None,
+    "docs_conversation_id": None,
     "inbox_emails": [],
     "selected_inbox_idx": None,
 }
@@ -477,10 +482,7 @@ def _service_status_pill(label: str, state: str) -> str:
     if state == "on":
         text, cls, tip = "On", "svc-on", f"{label} is running (local deploy)."
     elif state == "cloud":
-        text, cls, tip = "Cloud", "svc-cloud", (
-            f"{label} is disabled on Streamlit Community Cloud. "
-            "Run python main.py locally to enable."
-        )
+        text, cls, tip = "Off", "svc-cloud", f"{label} is not available in this environment."
     else:
         text, cls, tip = "Off", "svc-off", f"{label} is stopped."
     return (
@@ -516,17 +518,38 @@ if not st.session_state.logged_in:
         username = st.text_input("Username", placeholder="admin · hr · finance · it · assistant · demo")
         password = st.text_input("Password", type="password", placeholder="Enter password")
         if st.button("Sign In", use_container_width=True):
-            from config import USERS
-            if username in USERS and USERS[username]["password"] == password:
-                st.session_state.logged_in  = True
-                st.session_state.username   = username
-                st.session_state.user_role  = USERS[username]["role"]
-                st.session_state.user_name  = USERS[username]["name"]
+            from database.sqlite_db import (
+                authenticate_user,
+                touch_user_session,
+                get_or_create_conversation,
+                load_conversation_ui_messages,
+            )
+
+            user = authenticate_user(username, password)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.username = user["username"]
+                st.session_state.user_role = user["role"]
+                st.session_state.user_name = user["name"]
                 st.session_state.auth_session_id = _new_auth_session_id()
+                touch_user_session(
+                    st.session_state.auth_session_id,
+                    user["username"],
+                    user["name"],
+                    user["role"],
+                )
+                st.session_state.orch_conversation_id = get_or_create_conversation(
+                    st.session_state.auth_session_id,
+                    user["username"],
+                    "orchestrator",
+                )
+                st.session_state.orch_chat = load_conversation_ui_messages(
+                    st.session_state.orch_conversation_id
+                )
                 _record_login_event(
-                    username=username,
-                    display_name=USERS[username]["name"],
-                    role=USERS[username]["role"],
+                    username=user["username"],
+                    display_name=user["name"],
+                    role=user["role"],
                     event="login",
                 )
                 st.rerun()
@@ -544,23 +567,49 @@ if not st.session_state.logged_in:
                     "Hosted deploy: add **OPENAI_API_KEY** to Streamlit **Secrets** (same names as `.env.example`). "
                     "Secrets are applied before the app loads."
                 )
-            st.caption(
-                "On Streamlit Cloud, **MCP** and **Gmail monitor** stay off (not clickable in the header). "
-                "Use **Assistant** and other tabs here; run `python main.py` locally for full MCP + monitor."
-            )
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN APP (after login)
 # ══════════════════════════════════════════════════════════════════════════════
 
+if st.session_state.logged_in and not st.session_state.get("orch_conversation_id"):
+    try:
+        from database.sqlite_db import (
+            get_or_create_conversation,
+            load_conversation_ui_messages,
+            touch_user_session,
+        )
+
+        touch_user_session(
+            st.session_state.auth_session_id,
+            st.session_state.username,
+            st.session_state.user_name,
+            st.session_state.user_role,
+        )
+        st.session_state.orch_conversation_id = get_or_create_conversation(
+            st.session_state.auth_session_id,
+            st.session_state.username,
+            "orchestrator",
+        )
+        if not st.session_state.orch_chat:
+            st.session_state.orch_chat = load_conversation_ui_messages(
+                st.session_state.orch_conversation_id
+            )
+    except Exception:
+        pass
+
 # ── Top header ────────────────────────────────────────────────────────────────
 c1, c2, c3 = st.columns([3, 1.5, 1])
 with c1:
     from html import escape as _hesc
-    mcp_pill = _service_status_pill("MCP", _mcp_header_state())
-    mon_pill = _service_status_pill("Monitor", _monitor_header_state())
     unm = _hesc(st.session_state.user_name or "")
+    _role = st.session_state.user_role or ""
+    _svc_line = ""
+    if can_manage_background_services(_role):
+        mcp_pill = _service_status_pill("MCP", _mcp_header_state())
+        mon_pill = _service_status_pill("Monitor", _monitor_header_state())
+        _svc_line = f"{mcp_pill} &nbsp; {mon_pill}<br>"
     rol = _hesc(st.session_state.user_role or "")
     st.markdown(
         f'<div class="main-header">'
@@ -569,8 +618,7 @@ with c1:
         f'<div class="header-sub">LangGraph | OpenAI | MCP | A2A | ChromaDB | SQLite | WhatsApp</div>'
         f"</div>"
         f'<div style="text-align:right;font-size:12px;line-height:1.6">'
-        f"{mcp_pill} &nbsp; {mon_pill}<br>"
-        f'<span style="color:#94a3b8;font-size:11px">Status only — not buttons</span><br>'
+        f"{_svc_line}"
         f'<span style="color:#94a3b8">{unm} ({rol})</span>'
         f"</div>"
         f"</div>",
@@ -584,12 +632,19 @@ with c3:
             role=st.session_state.user_role,
             event="logout",
         )
-        for k in ["logged_in", "username", "user_role", "user_name", "auth_session_id"]:
-            st.session_state[k] = "" if k != "logged_in" else False
-        st.rerun()
+        try:
+            from database.sqlite_db import deactivate_user_session
 
-if not local_background_services_enabled():
-    st.info(HOSTED_SERVICES_UNAVAILABLE_MSG)
+            deactivate_user_session(st.session_state.auth_session_id or "")
+        except Exception:
+            pass
+        for k in ("username", "user_role", "user_name", "auth_session_id"):
+            st.session_state[k] = ""
+        st.session_state.logged_in = False
+        for k in ("orch_conversation_id", "coord_conversation_id", "docs_conversation_id"):
+            st.session_state[k] = None
+        st.session_state.orch_chat = []
+        st.rerun()
 
 # ── Tabs (RBAC: visible labels depend on role) ──────────────────────────────────
 tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
@@ -733,23 +788,22 @@ if _ti is not None:
                 _port_disp = int(_mcp_port)
             except Exception:
                 _port_disp = 8765
-            if not local_background_services_enabled():
-                mcp_st = "Unavailable (Streamlit Cloud)"
-                mon_st = "Unavailable (Streamlit Cloud)"
-            else:
+            _dash_svc = can_manage_background_services(st.session_state.user_role or "")
+            if _dash_svc:
                 mcp_st = f"Running :{_port_disp}" if st.session_state.mcp_running else "Stopped"
                 mon_st = "Active" if is_running() else "Stopped"
+            else:
+                mcp_st = mon_st = "—"
             vdb_st = "ChromaDB (has rows)" if total_vecs > 0 else "ChromaDB (empty)"
             from html import escape as _escu
             un = _escu(st.session_state.user_name or "")
             st.markdown(
                 f'<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;font-size:13px">'
                 f"<b>Uptime:</b> {uptime}s<br>"
-                f"<b>MCP:</b> {mcp_st}<br>"
-                f"<b>Monitor:</b> {mon_st}<br>"
-                f"<b>DB:</b> SQLite connected<br>"
+                f"<b>DB:</b> {'PostgreSQL' if use_postgresql_database() else 'SQLite'} connected<br>"
                 f"<b>VectorDB:</b> {vdb_st}<br>"
-                f"<b>User:</b> {un}"
+                + (f"<b>MCP:</b> {mcp_st}<br><b>Monitor:</b> {mon_st}<br>" if _dash_svc else "")
+                + f"<b>User:</b> {un}"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -914,7 +968,26 @@ if _ti is not None:
                         orch_hist.append({"role": "user", "content": e.get("content", "")})
                     elif e.get("role") == "agent":
                         orch_hist.append({"role": "assistant", "content": e.get("content", "")})
+                if not orch_hist and st.session_state.get("orch_conversation_id"):
+                    try:
+                        from database.sqlite_db import load_conversation_openai_history
+
+                        orch_hist = load_conversation_openai_history(
+                            st.session_state.orch_conversation_id, limit=14
+                        )
+                    except Exception:
+                        pass
                 st.session_state.orch_chat.append({"role": "user", "content": inp.strip()})
+                try:
+                    from database.sqlite_db import append_conversation_message
+
+                    append_conversation_message(
+                        st.session_state.get("orch_conversation_id"),
+                        "user",
+                        inp.strip(),
+                    )
+                except Exception:
+                    pass
                 with st.spinner("Routing and running agents (parallel)..."):
                     try:
                         from Orchestrator.orchestrator_brain import orchestrator
@@ -941,6 +1014,22 @@ if _ti is not None:
                             "elapsed_ms": result["elapsed_ms"],
                             "per_agent": result.get("responses") or {},
                         })
+                        try:
+                            from database.sqlite_db import append_conversation_message
+
+                            append_conversation_message(
+                                st.session_state.get("orch_conversation_id"),
+                                "agent",
+                                result["final_answer"],
+                                agents_used=", ".join(result.get("agents_used") or []),
+                                metadata={
+                                    "agents_used": result.get("agents_used"),
+                                    "elapsed_ms": result.get("elapsed_ms"),
+                                    "per_agent": result.get("responses"),
+                                },
+                            )
+                        except Exception:
+                            pass
                         try:
                             from database.sqlite_db import log_task, add_notification
 
@@ -1226,55 +1315,45 @@ if _ti is not None:
                         st.error(f"Error: {e}")
 
         with c2:
-            st.markdown('<div class="sec-hdr sec-orange">📬 Auto-Reply Monitor</div>', unsafe_allow_html=True)
-            _hosted = not local_background_services_enabled()
-            _gmail_ok = is_gmail_configured()
-            if _hosted:
-                st.info(HOSTED_SERVICES_UNAVAILABLE_MSG)
-            elif not _gmail_ok:
-                st.warning(gmail_setup_hint())
-            b1, b2 = st.columns(2)
-            with b1:
-                if st.button(
-                    "▶️ Start Monitor",
-                    use_container_width=True,
-                    disabled=_hosted or is_running() or not _gmail_ok,
-                    key="mon_on",
-                ):
-                    start_monitor()
-                    st.rerun()
-            with b2:
-                if st.button(
-                    "⏹️ Stop",
-                    use_container_width=True,
-                    disabled=_hosted or not is_running(),
-                    key="mon_off",
-                ):
-                    stop_monitor()
-                    st.rerun()
-
-            if _hosted:
-                status_html = (
-                    '<div style="background:#e0f2fe;border:1px solid #0284c7;padding:8px 14px;'
-                    'border-radius:8px;margin:8px 0">☁️ <b>Disabled on Streamlit Cloud</b> — '
-                    "run <code>python main.py</code> locally to enable.</div>"
-                )
-            elif is_running():
-                status_html = (
-                    '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-                    'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ACTIVE</b></div>'
-                )
-            else:
-                status_html = (
-                    '<div style="background:#fef9c3;border:1px solid #ca8a04;padding:8px 14px;'
-                    'border-radius:8px;margin:8px 0">🟡 <b>Auto-reply OFF</b></div>'
-                )
-            st.markdown(status_html, unsafe_allow_html=True)
-
-            if st.session_state.monitor_log:
-                with st.expander("📋 Activity Log", expanded=True):
-                    for log in reversed(st.session_state.monitor_log[-20:]):
-                        st.caption(log)
+            if can_manage_background_services(st.session_state.user_role or ""):
+                st.markdown('<div class="sec-hdr sec-orange">📬 Auto-Reply Monitor</div>', unsafe_allow_html=True)
+                _hosted = not local_background_services_enabled()
+                _gmail_ok = is_gmail_configured()
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button(
+                        "▶️ Start Monitor",
+                        use_container_width=True,
+                        disabled=_hosted or is_running() or not _gmail_ok,
+                        key="mon_on",
+                    ):
+                        start_monitor()
+                        st.rerun()
+                with b2:
+                    if st.button(
+                        "⏹️ Stop",
+                        use_container_width=True,
+                        disabled=_hosted or not is_running(),
+                        key="mon_off",
+                    ):
+                        stop_monitor()
+                        st.rerun()
+                if is_running():
+                    st.markdown(
+                        '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
+                        'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ACTIVE</b></div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        '<div style="background:#fef9c3;border:1px solid #ca8a04;padding:8px 14px;'
+                        'border-radius:8px;margin:8px 0">🟡 <b>Auto-reply OFF</b></div>',
+                        unsafe_allow_html=True,
+                    )
+                if st.session_state.monitor_log:
+                    with st.expander("📋 Activity Log", expanded=True):
+                        for log in reversed(st.session_state.monitor_log[-20:]):
+                            st.caption(log)
 
             st.markdown('<div class="sec-hdr" style="margin-top:14px">🎫 Recent IT Tickets</div>', unsafe_allow_html=True)
             try:
@@ -1368,10 +1447,7 @@ if _ti is not None:
 
         st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">📥 Read Inbox</div>', unsafe_allow_html=True)
         if not is_gmail_configured():
-            st.warning("**Gmail not configured.** " + gmail_setup_hint())
-            st.caption(
-                "Streamlit Cloud uses **Secrets** in the dashboard; local terminal uses **FYP_FINAL/.env** — they are separate."
-            )
+            st.warning("Gmail is not configured.")
         inbox_count = st.number_input("How many emails to fetch", min_value=1, max_value=30, value=10, key="inbox_fetch_n")
         if st.button("📬 Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
             with st.spinner("Connecting to Gmail..."):
@@ -2221,36 +2297,55 @@ if _ti is not None:
         lc1, lc2 = st.columns(2)
         with lc1:
             if st.button("☁️ Load from Google Drive", key="load_drive", use_container_width=True):
-                with st.spinner("📂 Loading and reading Drive files..."):
-                    try:
-                        from tools.mcp_drive_client import DriveClient
-                        client = DriveClient()
-                        docs   = client.load_documents(max_results=50)
-                        if docs:
-                            st.session_state.drive_documents = docs
-                            # Embed into ChromaDB
-                            from database.vector_db import embed_documents
-                            with st.spinner("🧠 Embedding into ChromaDB..."):
-                                res = embed_documents(docs, "documents")
-                            st.success(f"✅ Loaded {len(docs)} docs · Embedded {res.get('embedded',0)} into ChromaDB")
-                            # Save metadata to SQLite
-                            try:
-                                from database.sqlite_db import get_session, DocumentMeta
-                                s = get_session()
-                                for d in docs:
-                                    s.add(DocumentMeta(file_name=d.get("file",""), content_len=len(d.get("content","")), source="drive", embedded=True))
-                                s.commit(); s.close()
-                            except Exception:
-                                pass
-                        else:
-                            files = client.list_files(max_results=50)
-                            if files:
-                                st.session_state.drive_documents = [{"file":f.get("name",""), "id":f.get("id",""), "content":""} for f in files]
-                                st.warning(f"⚠️ Listed {len(files)} files but could not read content.")
+                if not is_google_drive_configured():
+                    st.error("Google Drive is not configured.")
+                else:
+                    with st.spinner("📂 Loading and reading Drive files..."):
+                        try:
+                            from tools.mcp_drive_client import DriveClient
+
+                            client = DriveClient()
+                            docs = client.load_documents(max_results=50)
+                            if docs:
+                                st.session_state.drive_documents = docs
+                                from database.vector_db import embed_documents
+
+                                with st.spinner("🧠 Embedding into ChromaDB..."):
+                                    res = embed_documents(docs, "documents")
+                                st.success(
+                                    f"✅ Loaded {len(docs)} docs · Embedded {res.get('embedded', 0)} into ChromaDB"
+                                )
+                                try:
+                                    from database.sqlite_db import get_session, DocumentMeta
+
+                                    s = get_session()
+                                    for d in docs:
+                                        s.add(
+                                            DocumentMeta(
+                                                file_name=d.get("file", ""),
+                                                content_len=len(d.get("content", "")),
+                                                source="drive",
+                                                embedded=True,
+                                            )
+                                        )
+                                    s.commit()
+                                    s.close()
+                                except Exception:
+                                    pass
                             else:
-                                st.warning("No files found in Google Drive.")
-                    except Exception as e:
-                        st.error(f"Drive error: {e}")
+                                files = client.list_files(max_results=50)
+                                if files:
+                                    st.session_state.drive_documents = [
+                                        {"file": f.get("name", ""), "id": f.get("id", ""), "content": ""}
+                                        for f in files
+                                    ]
+                                    st.warning(f"⚠️ Listed {len(files)} files but could not read content.")
+                                else:
+                                    st.warning("No files found in Google Drive.")
+                        except DriveNotConfiguredError as e:
+                            st.error(str(e))
+                        except Exception as e:
+                            st.error(f"Drive error: {e}")
 
         with lc2:
             up_docs = st.file_uploader("📁 Upload Files", accept_multiple_files=True, type=["pdf","txt","docx"], key="doc_up")

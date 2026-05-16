@@ -226,6 +226,53 @@ class HRGmailShortlistBatch(Base):
     payload_json    = Column(Text)
 
 
+class AppUser(Base):
+    """Application users (synced from config.USERS on init)."""
+    __tablename__ = "app_users"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    username     = Column(String(100), unique=True, index=True)
+    password     = Column(String(256))
+    role         = Column(String(80))
+    display_name = Column(String(200))
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class UserSession(Base):
+    """Server-side session row keyed by auth_session_id (Streamlit session)."""
+    __tablename__ = "user_sessions"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    session_id   = Column(String(64), unique=True, index=True)
+    username     = Column(String(100), index=True)
+    display_name = Column(String(200))
+    role         = Column(String(80))
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    is_active    = Column(Boolean, default=True)
+
+
+class Conversation(Base):
+    """Persistent chat thread per user + channel."""
+    __tablename__ = "conversations"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    session_id   = Column(String(64), index=True, default="")
+    username     = Column(String(100), index=True)
+    channel      = Column(String(50), default="orchestrator", index=True)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    updated_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class ConversationMessage(Base):
+    """Agent / user messages with optional reasoning metadata."""
+    __tablename__ = "conversation_messages"
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id  = Column(Integer, ForeignKey("conversations.id"), index=True)
+    role             = Column(String(20))
+    content          = Column(Text)
+    agents_used      = Column(String(200), default="")
+    metadata_json    = Column(Text, default="{}")
+    created_at       = Column(DateTime, default=datetime.utcnow)
+
+
 # ── Engine & Session ──────────────────────────────────────────────────────────
 
 _engine  = None
@@ -235,14 +282,20 @@ _Session = None
 def get_engine():
     global _engine
     if _engine is None:
-        from config import DB_PATH
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        _engine = create_engine(
-            f"sqlite:///{DB_PATH}",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
+        from config import DB_PATH, get_database_url
+
+        url = get_database_url()
+        if url.startswith("sqlite"):
+            os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+            _engine = create_engine(
+                url,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+            )
+        else:
+            _engine = create_engine(url, pool_pre_ping=True)
         Base.metadata.create_all(_engine)
+        seed_app_users_from_config()
     return _engine
 
 
@@ -743,3 +796,221 @@ def hr_shortlist_update_status(batch_id: str, status: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# ── Users, sessions, conversation memory ─────────────────────────────────────
+
+
+def seed_app_users_from_config() -> None:
+    """Insert config.USERS into app_users when table is empty."""
+    try:
+        from config import USERS
+
+        s = get_session()
+        if s.query(AppUser).count() > 0:
+            s.close()
+            return
+        for uname, data in USERS.items():
+            s.add(
+                AppUser(
+                    username=uname,
+                    password=data.get("password", ""),
+                    role=data.get("role", ""),
+                    display_name=data.get("name", uname),
+                )
+            )
+        s.commit()
+        s.close()
+    except Exception:
+        pass
+
+
+def authenticate_user(username: str, password: str) -> dict | None:
+    """Return {username, role, name} if credentials match DB or config.USERS."""
+    username = (username or "").strip()
+    if not username:
+        return None
+    try:
+        s = get_session()
+        row = s.query(AppUser).filter_by(username=username).one_or_none()
+        s.close()
+        if row and row.password == password:
+            return {
+                "username": row.username,
+                "role": row.role,
+                "name": row.display_name or row.username,
+            }
+    except Exception:
+        pass
+    try:
+        from config import USERS
+
+        if username in USERS and USERS[username]["password"] == password:
+            return {
+                "username": username,
+                "role": USERS[username]["role"],
+                "name": USERS[username]["name"],
+            }
+    except Exception:
+        pass
+    return None
+
+
+def touch_user_session(
+    session_id: str,
+    username: str,
+    display_name: str,
+    role: str,
+) -> None:
+    try:
+        s = get_session()
+        row = s.query(UserSession).filter_by(session_id=session_id).one_or_none()
+        if row:
+            row.username = username
+            row.display_name = display_name
+            row.role = role
+            row.last_seen_at = datetime.utcnow()
+            row.is_active = True
+        else:
+            s.add(
+                UserSession(
+                    session_id=session_id[:64],
+                    username=username[:100],
+                    display_name=(display_name or "")[:200],
+                    role=(role or "")[:80],
+                )
+            )
+        s.commit()
+        s.close()
+    except Exception:
+        pass
+
+
+def deactivate_user_session(session_id: str) -> None:
+    try:
+        s = get_session()
+        row = s.query(UserSession).filter_by(session_id=session_id).one_or_none()
+        if row:
+            row.is_active = False
+            s.commit()
+        s.close()
+    except Exception:
+        pass
+
+
+def get_or_create_conversation(
+    session_id: str,
+    username: str,
+    channel: str = "orchestrator",
+) -> int | None:
+    """Reuse latest conversation for user+channel; creates one if missing."""
+    try:
+        s = get_session()
+        conv = (
+            s.query(Conversation)
+            .filter_by(username=username, channel=channel)
+            .order_by(Conversation.updated_at.desc())
+            .first()
+        )
+        if conv:
+            conv.session_id = (session_id or "")[:64]
+            conv.updated_at = datetime.utcnow()
+            cid = conv.id
+            s.commit()
+            s.close()
+            return cid
+        conv = Conversation(
+            session_id=(session_id or "")[:64],
+            username=username[:100],
+            channel=channel[:50],
+        )
+        s.add(conv)
+        s.commit()
+        cid = conv.id
+        s.close()
+        return cid
+    except Exception:
+        return None
+
+
+def append_conversation_message(
+    conversation_id: int,
+    role: str,
+    content: str,
+    agents_used: str = "",
+    metadata: dict | None = None,
+) -> None:
+    if not conversation_id:
+        return
+    try:
+        s = get_session()
+        s.add(
+            ConversationMessage(
+                conversation_id=conversation_id,
+                role=(role or "user")[:20],
+                content=content or "",
+                agents_used=(agents_used or "")[:200],
+                metadata_json=json.dumps(metadata or {}, ensure_ascii=False)[:50_000],
+            )
+        )
+        conv = s.query(Conversation).filter_by(id=conversation_id).one_or_none()
+        if conv:
+            conv.updated_at = datetime.utcnow()
+        s.commit()
+        s.close()
+    except Exception:
+        pass
+
+
+def load_conversation_ui_messages(conversation_id: int, limit: int = 100) -> list:
+    """Hydrate Streamlit chat lists: [{role, content, agents?}]."""
+    if not conversation_id:
+        return []
+    try:
+        s = get_session()
+        rows = (
+            s.query(ConversationMessage)
+            .filter_by(conversation_id=conversation_id)
+            .order_by(ConversationMessage.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+        out = []
+        for r in rows:
+            ui_role = "agent" if r.role in ("agent", "assistant") else "user"
+            entry = {"role": ui_role, "content": r.content or ""}
+            if r.agents_used:
+                entry["agents"] = [a.strip() for a in r.agents_used.split(",") if a.strip()]
+            out.append(entry)
+        s.close()
+        return out
+    except Exception:
+        return []
+
+
+def load_conversation_openai_history(
+    conversation_id: int, limit: int = 20
+) -> list[dict[str, str]]:
+    """OpenAI-style roles for orchestrator: user | assistant."""
+    if not conversation_id:
+        return []
+    try:
+        s = get_session()
+        rows = (
+            s.query(ConversationMessage)
+            .filter_by(conversation_id=conversation_id)
+            .order_by(ConversationMessage.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        rows = list(reversed(rows))
+        out = []
+        for r in rows:
+            if r.role in ("agent", "assistant"):
+                out.append({"role": "assistant", "content": r.content or ""})
+            else:
+                out.append({"role": "user", "content": r.content or ""})
+        s.close()
+        return out
+    except Exception:
+        return []

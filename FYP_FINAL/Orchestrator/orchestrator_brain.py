@@ -51,6 +51,24 @@ def _get_llm():
     return ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
+def _history_context_block(
+    conversation_history: Optional[List[Dict[str, str]]],
+    max_turns: int = 6,
+) -> str:
+    """Prefix prior turns so specialist agents and intent LLM see thread context."""
+    lines: list[str] = []
+    for h in (conversation_history or [])[-(max_turns * 2) :]:
+        content = (h.get("content") or "").strip()[:2000]
+        if not content:
+            continue
+        role = (h.get("role") or "").strip()
+        label = "User" if role == "user" else "Assistant"
+        lines.append(f"{label}: {content}")
+    if not lines:
+        return ""
+    return "Previous conversation:\n" + "\n".join(lines) + "\n\nCurrent request:\n"
+
+
 def run_general_assistant(
     user_message: str,
     user_name: str = "User",
@@ -350,15 +368,22 @@ def build_context_with_attachments(user_message: str, attachments: Optional[List
     return "\n".join(parts).strip()
 
 
-def detect_intent_llm(user_message: str) -> list:
+def detect_intent_llm(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> list:
     """
     LLM-powered intent detection for complex/ambiguous messages.
     Falls back gracefully.
     """
     try:
         llm = _get_llm()
+        hist = _history_context_block(conversation_history, max_turns=4)
+        context_block = (
+            f"\nRecent conversation:\n{hist}\n" if hist else "\n(No prior turns in this thread.)\n"
+        )
         prompt = f"""You are an intent detector for an office automation system.
-
+{context_block}
 User message: "{user_message}"
 
 Available agents:
@@ -528,7 +553,7 @@ class Orchestrator:
         if gspec_early:
             agents = ["hr_gmail"]
         elif use_llm_intent:
-            agents = detect_intent_llm(user_message)
+            agents = detect_intent_llm(user_message, conversation_history)
         else:
             agents = normalize_agent_list(detect_intent(user_message))
 
@@ -675,6 +700,8 @@ class Orchestrator:
         This is the A2A execution layer.
         """
         raw = (user_message_raw or user_message or "").strip()
+        hist_prefix = _history_context_block(conversation_history)
+        contextual = (hist_prefix + user_message) if hist_prefix else user_message
 
         if agent_type == "general":
             return run_general_assistant(raw, user_name, conversation_history)
@@ -691,19 +718,19 @@ class Orchestrator:
 
         if agent_type == "it_support":
             from graph.it_graph import it_graph
-            state  = {"user_name": user_name, "it_problem": user_message}
+            state  = {"user_name": user_name, "it_problem": contextual}
             result = it_graph.invoke(state)
             return result.get("it_solution", "No solution returned.")
 
         elif agent_type == "email":
             from agents.auto_reply_agent import generate_reply
-            state  = {"email_content": user_message, "sender_name": user_name, "sender_email": ""}
+            state  = {"email_content": contextual, "sender_name": user_name, "sender_email": ""}
             result = generate_reply(state)
             return result.get("body", "No reply generated.")
 
         elif agent_type == "hr":
             from graph.hr_graph import hr_graph
-            state  = {"action": "hr_query", "query": user_message, "user_name": user_name}
+            state  = {"action": "hr_query", "query": contextual, "user_name": user_name}
             result = hr_graph.invoke(state)
             return result.get("output", "No HR response.")
 
@@ -740,13 +767,13 @@ class Orchestrator:
                         "(same browser session)."
                     )
                 return out
-            state = {"action": "query", "question": user_message, "context": attach_blob, "user_name": user_name}
+            state = {"action": "query", "question": contextual, "context": attach_blob, "user_name": user_name}
             fin_result = finance_graph.invoke(state)
             return fin_result.get("output", "No finance response.")
 
         elif agent_type == "documents":
             from graph.documents_graph import documents_graph
-            state  = {"action": "qa", "query": user_message, "user_name": user_name, "documents": []}
+            state  = {"action": "qa", "query": contextual, "user_name": user_name, "documents": []}
             result = documents_graph.invoke(state)
             return result.get("output", "No documents response.")
 

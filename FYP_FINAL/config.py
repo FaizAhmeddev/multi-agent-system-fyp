@@ -4,6 +4,7 @@ FYP configuration — paths, RBAC, and **secrets from environment variables**.
 For local development, copy `.env.example` to `.env` in this folder and fill in values.
 Never commit `.env` or real API keys to GitHub.
 """
+import json as _json
 import os as _os
 
 _PROJECT_ROOT = _os.path.abspath(_os.path.dirname(__file__))
@@ -55,7 +56,7 @@ def refresh_config_from_env() -> None:
     """Reload secrets from os.environ (after .env or Streamlit Secrets hydration)."""
     global OPENAI_API_KEY, GMAIL_EMAIL, GMAIL_APP_PASSWORD
     global TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO, TWILIO_CONTENT_SID
-    global GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, DEMO_MODE, USERS
+    global GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, DEMO_MODE, USERS, DATABASE_URL
 
     OPENAI_API_KEY = _env("OPENAI_API_KEY")
     GMAIL_EMAIL = _env("GMAIL_EMAIL")
@@ -73,6 +74,7 @@ def refresh_config_from_env() -> None:
     GOOGLE_TOKEN_FILE = _gtf if _os.path.isabs(_gtf) else _os.path.join(_PROJECT_ROOT, _gtf)
 
     DEMO_MODE = _env("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+    DATABASE_URL = _env("DATABASE_URL", "")
 
     USERS = {
         "admin": {"password": _env("FYP_PASSWORD_ADMIN", "admin123"), "role": "Admin", "name": "System Admin"},
@@ -137,6 +139,71 @@ GOOGLE_CREDENTIALS_FILE = _gcf if _os.path.isabs(_gcf) else _os.path.join(_PROJE
 _gtf = _env("GOOGLE_TOKEN_FILE", "token.json")
 GOOGLE_TOKEN_FILE = _gtf if _os.path.isabs(_gtf) else _os.path.join(_PROJECT_ROOT, _gtf)
 
+
+class DriveNotConfiguredError(RuntimeError):
+    """Raised when Google Drive credentials are missing or invalid."""
+
+
+def _env_json_dict(name: str) -> dict | None:
+    raw = _env(name, "")
+    if not raw:
+        return None
+    try:
+        data = _json.loads(raw)
+        return data if isinstance(data, dict) else None
+    except _json.JSONDecodeError:
+        return None
+
+
+def google_token_dict() -> dict | None:
+    """OAuth user token (token.json) from env JSON or file."""
+    data = _env_json_dict("GOOGLE_TOKEN_JSON")
+    if data:
+        return data
+    if _os.path.isfile(GOOGLE_TOKEN_FILE):
+        try:
+            with open(GOOGLE_TOKEN_FILE, encoding="utf-8") as f:
+                loaded = _json.load(f)
+            return loaded if isinstance(loaded, dict) else None
+        except Exception:
+            return None
+    return None
+
+
+def google_oauth_client_config() -> dict | None:
+    """OAuth client secrets (credentials.json) from env JSON or file."""
+    data = _env_json_dict("GOOGLE_CREDENTIALS_JSON")
+    if data:
+        return data
+    if _os.path.isfile(GOOGLE_CREDENTIALS_FILE):
+        try:
+            with open(GOOGLE_CREDENTIALS_FILE, encoding="utf-8") as f:
+                loaded = _json.load(f)
+            return loaded if isinstance(loaded, dict) else None
+        except Exception:
+            return None
+    return None
+
+
+def google_service_account_info() -> dict | None:
+    """Service account JSON from GOOGLE_SERVICE_ACCOUNT_JSON secret."""
+    return _env_json_dict("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+
+def is_google_drive_configured() -> bool:
+    if google_service_account_info():
+        return True
+    if google_token_dict():
+        return True
+    if google_oauth_client_config() and not is_hosted_deploy():
+        return True
+    return False
+
+
+def can_manage_background_services(role: str) -> bool:
+    """MCP server + Gmail monitor controls (Admin / IT only)."""
+    return role in ("Admin", "IT Staff")
+
 # ─── Twilio WhatsApp ───────────────────────────────────────
 TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
@@ -147,6 +214,21 @@ TWILIO_CONTENT_SID = _env("TWILIO_CONTENT_SID")
 # ─── Database ──────────────────────────────────────────────
 DB_PATH = _os.path.join(_PROJECT_ROOT, "database", "fyp_data.db")
 CHROMA_PATH = _os.path.join(_PROJECT_ROOT, "database", "chroma_db")
+DATABASE_URL = _env("DATABASE_URL", "")
+
+
+def get_database_url() -> str:
+    """PostgreSQL when DATABASE_URL is set; otherwise local SQLite file."""
+    url = (DATABASE_URL or _env("DATABASE_URL", "")).strip()
+    if url:
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://") :]
+        return url
+    return f"sqlite:///{DB_PATH}"
+
+
+def use_postgresql_database() -> bool:
+    return get_database_url().startswith("postgresql")
 
 # ─── Message Queue ─────────────────────────────────────────
 MESSAGE_QUEUE_MAX_SIZE = 1000
@@ -199,13 +281,6 @@ def local_background_services_enabled() -> bool:
     """In-process MCP HTTP server and Gmail IMAP monitor (not available on Streamlit Cloud)."""
     return not is_hosted_deploy()
 
-
-HOSTED_SERVICES_UNAVAILABLE_MSG = (
-    "MCP and the Gmail auto-reply monitor are disabled on Streamlit Community Cloud. "
-    "They require a long-lived local process (localhost HTTP + IMAP). "
-    "To enable them, run `python main.py` from the **FYP_FINAL** folder on your PC "
-    "with `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD` in `.env` or Streamlit Secrets (local only)."
-)
 
 # ─── Login Users (passwords overridable via env for production) ─
 USERS = {

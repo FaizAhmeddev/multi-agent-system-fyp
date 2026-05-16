@@ -163,26 +163,63 @@ class DirectDriveClient:
             return self._service
 
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from config import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE
+        from config import (
+            DriveNotConfiguredError,
+            GOOGLE_CREDENTIALS_FILE,
+            GOOGLE_TOKEN_FILE,
+            google_oauth_client_config,
+            google_service_account_info,
+            google_token_dict,
+            is_hosted_deploy,
+        )
         from googleapiclient.discovery import build
+        from google.oauth2 import service_account
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
         from google.auth.transport.requests import Request
 
         creds = None
-        if os.path.exists(GOOGLE_TOKEN_FILE):
-            creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_FILE, SCOPES)
 
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+        sa_info = google_service_account_info()
+        if sa_info:
+            creds = service_account.Credentials.from_service_account_info(
+                sa_info, scopes=SCOPES
+            )
+
+        if not creds:
+            token_info = google_token_dict()
+            if token_info:
+                creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+
+        if creds and (not creds.valid or creds.expired):
+            if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-            else:
+            elif creds.expired:
+                creds = None
+
+        if not creds:
+            if is_hosted_deploy():
+                raise DriveNotConfiguredError(
+                    "Google Drive is not configured for this deploy."
+                )
+            client_config = google_oauth_client_config()
+            if client_config:
+                flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+                creds = flow.run_local_server(port=0)
+            elif os.path.isfile(GOOGLE_CREDENTIALS_FILE):
                 flow = InstalledAppFlow.from_client_secrets_file(
                     GOOGLE_CREDENTIALS_FILE, SCOPES
                 )
                 creds = flow.run_local_server(port=0)
-            with open(GOOGLE_TOKEN_FILE, "w") as f:
-                f.write(creds.to_json())
+            else:
+                raise DriveNotConfiguredError(
+                    "Google Drive is not configured."
+                )
+            try:
+                with open(GOOGLE_TOKEN_FILE, "w", encoding="utf-8") as f:
+                    f.write(creds.to_json())
+            except OSError:
+                pass
 
         self._service = build("drive", "v3", credentials=creds)
         return self._service
