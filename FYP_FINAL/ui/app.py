@@ -89,6 +89,8 @@ from config import (
     get_role_orchestrator_allowlist,
     ROLE_PORTAL_BANNERS,
     is_hosted_deploy,
+    local_background_services_enabled,
+    HOSTED_SERVICES_UNAVAILABLE_MSG,
     is_gmail_configured,
     gmail_setup_hint,
     refresh_config_from_env,
@@ -200,6 +202,16 @@ st.markdown("""<style>
 .badge-mcp    { background:#0d9488; color:white; }
 .badge-a2a    { background:#7c3aed; color:white; }
 .badge-wa     { background:#16a34a; color:white; }
+
+/* Header service status (display-only, not buttons) */
+.svc-pill {
+    display:inline-block; padding:2px 8px; border-radius:6px;
+    font-size:11px; font-weight:600; margin-left:4px; cursor:default;
+    border:1px solid transparent;
+}
+.svc-on  { background:#dcfce7; color:#15803d; border-color:#86efac; }
+.svc-off { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+.svc-cloud { background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; }
 
 /* Queue messages */
 .qmsg { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; margin-bottom:5px; font-size:12px; font-family:monospace; }
@@ -456,6 +468,37 @@ else:
         def stop_monitor():
             pass
 
+
+def _service_status_pill(label: str, state: str) -> str:
+    """HTML status pill for header/dashboard. state: on | off | cloud."""
+    from html import escape as _esc
+
+    lbl = _esc(label)
+    if state == "on":
+        text, cls, tip = "On", "svc-on", f"{label} is running (local deploy)."
+    elif state == "cloud":
+        text, cls, tip = "Cloud", "svc-cloud", (
+            f"{label} is disabled on Streamlit Community Cloud. "
+            "Run python main.py locally to enable."
+        )
+    else:
+        text, cls, tip = "Off", "svc-off", f"{label} is stopped."
+    return (
+        f'{lbl}: <span class="svc-pill {cls}" title="{_esc(tip)}">{text}</span>'
+    )
+
+
+def _mcp_header_state() -> str:
+    if not local_background_services_enabled():
+        return "cloud"
+    return "on" if st.session_state.mcp_running else "off"
+
+
+def _monitor_header_state() -> str:
+    if not local_background_services_enabled():
+        return "cloud"
+    return "on" if is_running() else "off"
+
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN PAGE
 # ══════════════════════════════════════════════════════════════════════════════
@@ -502,7 +545,8 @@ if not st.session_state.logged_in:
                     "Secrets are applied before the app loads."
                 )
             st.caption(
-                "Tip: in Streamlit Cloud **Secrets**, set **FYP_HOSTED** = `true` to disable the local MCP HTTP server."
+                "On Streamlit Cloud, **MCP** and **Gmail monitor** stay off (not clickable in the header). "
+                "Use **Assistant** and other tabs here; run `python main.py` locally for full MCP + monitor."
             )
     st.stop()
 
@@ -513,9 +557,9 @@ if not st.session_state.logged_in:
 # ── Top header ────────────────────────────────────────────────────────────────
 c1, c2, c3 = st.columns([3, 1.5, 1])
 with c1:
-    mcp_b = "On" if st.session_state.mcp_running else "Off"
-    mon_b = "On" if is_running() else "Off"
     from html import escape as _hesc
+    mcp_pill = _service_status_pill("MCP", _mcp_header_state())
+    mon_pill = _service_status_pill("Monitor", _monitor_header_state())
     unm = _hesc(st.session_state.user_name or "")
     rol = _hesc(st.session_state.user_role or "")
     st.markdown(
@@ -524,8 +568,9 @@ with c1:
         f'<div class="header-title">Office Automation Agents Pro</div>'
         f'<div class="header-sub">LangGraph | OpenAI | MCP | A2A | ChromaDB | SQLite | WhatsApp</div>'
         f"</div>"
-        f'<div style="text-align:right;font-size:12px">'
-        f"MCP: {mcp_b} &nbsp; Monitor: {mon_b}<br>"
+        f'<div style="text-align:right;font-size:12px;line-height:1.6">'
+        f"{mcp_pill} &nbsp; {mon_pill}<br>"
+        f'<span style="color:#94a3b8;font-size:11px">Status only — not buttons</span><br>'
         f'<span style="color:#94a3b8">{unm} ({rol})</span>'
         f"</div>"
         f"</div>",
@@ -542,6 +587,9 @@ with c3:
         for k in ["logged_in", "username", "user_role", "user_name", "auth_session_id"]:
             st.session_state[k] = "" if k != "logged_in" else False
         st.rerun()
+
+if not local_background_services_enabled():
+    st.info(HOSTED_SERVICES_UNAVAILABLE_MSG)
 
 # ── Tabs (RBAC: visible labels depend on role) ──────────────────────────────────
 tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
@@ -685,8 +733,12 @@ if _ti is not None:
                 _port_disp = int(_mcp_port)
             except Exception:
                 _port_disp = 8765
-            mcp_st = f"Running :{_port_disp}" if st.session_state.mcp_running else "Stopped"
-            mon_st = "Active" if is_running() else "Stopped"
+            if not local_background_services_enabled():
+                mcp_st = "Unavailable (Streamlit Cloud)"
+                mon_st = "Unavailable (Streamlit Cloud)"
+            else:
+                mcp_st = f"Running :{_port_disp}" if st.session_state.mcp_running else "Stopped"
+                mon_st = "Active" if is_running() else "Stopped"
             vdb_st = "ChromaDB (has rows)" if total_vecs > 0 else "ChromaDB (empty)"
             from html import escape as _escu
             un = _escu(st.session_state.user_name or "")
@@ -1175,15 +1227,48 @@ if _ti is not None:
 
         with c2:
             st.markdown('<div class="sec-hdr sec-orange">📬 Auto-Reply Monitor</div>', unsafe_allow_html=True)
+            _hosted = not local_background_services_enabled()
+            _gmail_ok = is_gmail_configured()
+            if _hosted:
+                st.info(HOSTED_SERVICES_UNAVAILABLE_MSG)
+            elif not _gmail_ok:
+                st.warning(gmail_setup_hint())
             b1, b2 = st.columns(2)
             with b1:
-                if st.button("▶️ Start Monitor", use_container_width=True, disabled=is_running(), key="mon_on"):
-                    start_monitor(); st.rerun()
+                if st.button(
+                    "▶️ Start Monitor",
+                    use_container_width=True,
+                    disabled=_hosted or is_running() or not _gmail_ok,
+                    key="mon_on",
+                ):
+                    start_monitor()
+                    st.rerun()
             with b2:
-                if st.button("⏹️ Stop", use_container_width=True, disabled=not is_running(), key="mon_off"):
-                    stop_monitor(); st.rerun()
+                if st.button(
+                    "⏹️ Stop",
+                    use_container_width=True,
+                    disabled=_hosted or not is_running(),
+                    key="mon_off",
+                ):
+                    stop_monitor()
+                    st.rerun()
 
-            status_html = '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ACTIVE</b></div>' if is_running() else '<div style="background:#fef9c3;border:1px solid #ca8a04;padding:8px 14px;border-radius:8px;margin:8px 0">🟡 <b>Auto-reply OFF</b></div>'
+            if _hosted:
+                status_html = (
+                    '<div style="background:#e0f2fe;border:1px solid #0284c7;padding:8px 14px;'
+                    'border-radius:8px;margin:8px 0">☁️ <b>Disabled on Streamlit Cloud</b> — '
+                    "run <code>python main.py</code> locally to enable.</div>"
+                )
+            elif is_running():
+                status_html = (
+                    '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
+                    'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ACTIVE</b></div>'
+                )
+            else:
+                status_html = (
+                    '<div style="background:#fef9c3;border:1px solid #ca8a04;padding:8px 14px;'
+                    'border-radius:8px;margin:8px 0">🟡 <b>Auto-reply OFF</b></div>'
+                )
             st.markdown(status_html, unsafe_allow_html=True)
 
             if st.session_state.monitor_log:

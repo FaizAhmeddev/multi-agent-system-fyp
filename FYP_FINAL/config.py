@@ -194,6 +194,19 @@ def is_hosted_deploy() -> bool:
         pass
     return False
 
+
+def local_background_services_enabled() -> bool:
+    """In-process MCP HTTP server and Gmail IMAP monitor (not available on Streamlit Cloud)."""
+    return not is_hosted_deploy()
+
+
+HOSTED_SERVICES_UNAVAILABLE_MSG = (
+    "MCP and the Gmail auto-reply monitor are disabled on Streamlit Community Cloud. "
+    "They require a long-lived local process (localhost HTTP + IMAP). "
+    "To enable them, run `python main.py` from the **FYP_FINAL** folder on your PC "
+    "with `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD` in `.env` or Streamlit Secrets (local only)."
+)
+
 # ─── Login Users (passwords overridable via env for production) ─
 USERS = {
     "admin": {
