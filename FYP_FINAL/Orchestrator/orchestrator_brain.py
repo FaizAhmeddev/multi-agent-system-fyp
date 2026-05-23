@@ -125,9 +125,10 @@ IT_KEYWORDS = [
     "computer", "laptop", "wifi", "internet", "password", "login",
     "software", "install", "error", "crash", "slow", "printer",
     "network", "screen", "keyboard", "virus", "update", "windows",
-    "system", "restart", "freeze", "not working", "broken", "connection",
+    "restart", "freeze", "not working", "broken", "connection",
     "vpn", "access", "reset", "boot", "driver", "it support", "technical",
-    "device", "hardware", "monitor", "cable", "usb", "mouse"
+    "device", "hardware", "monitor", "cable", "usb", "mouse",
+    "blue screen", "bsod", "cannot connect", "won't turn on",
 ]
 
 HR_KEYWORDS = [
@@ -158,33 +159,93 @@ DOCS_KEYWORDS = [
 ]
 
 
-def detect_intent(user_message: str) -> list:
-    """
-    Detect which agents should handle the message.
-    Returns list of agent types.
-    """
+def _keyword_score(msg: str, keywords: list, weight: int = 1) -> int:
+    """Score how strongly a message matches a keyword set (phrase-aware)."""
+    score = 0
+    for kw in keywords:
+        k = kw.lower().strip()
+        if not k:
+            continue
+        if " " in k:
+            if k in msg:
+                score += weight * 2
+        elif re.search(rf"\b{re.escape(k)}\b", msg):
+            score += weight
+    return score
+
+
+def _pre_route_intent(user_message: str) -> list | None:
+    """Fast, deterministic routing for common phrasing before LLM/keywords."""
     from tools.hr_gmail_shortlist import parse_gmail_shortlist_prompt
 
     if parse_gmail_shortlist_prompt(user_message):
         return ["hr_gmail"]
 
+    msg = (user_message or "").lower().strip()
+    if not msg:
+        return ["general"]
+
+    approve_send = re.search(
+        r"\b(approve\s+(and\s+)?send|send\s+(the\s+)?(interview\s+)?emails?|confirm\s+send)\b",
+        msg,
+    )
+    if approve_send and ("gmail" in msg or "shortlist" in msg or "batch" in msg or "interview" in msg):
+        return ["hr_gmail"]
+
+    if re.search(r"\b(what\s+day|what\s+date|what\s+time|today'?s\s+date|current\s+time)\b", msg):
+        return ["general"]
+    if re.search(r"^(hi|hello|hey|thanks|thank you|good\s+(morning|afternoon|evening))\b", msg):
+        return ["general"]
+
+    fin_doc = re.search(
+        r"\b(generate|export|create|download)\b.*\b(pdf|xlsx|excel|csv|word|docx|report)\b",
+        msg,
+    ) or re.search(r"\b(pdf|xlsx|excel)\b.*\b(expense|invoice|budget|finance|financial)\b", msg)
+    if fin_doc:
+        return ["finance"]
+
+    if re.search(r"\b(google\s+drive|drive\s+folder|search\s+(the\s+)?document)\b", msg):
+        return ["documents"]
+
+    return None
+
+
+def detect_intent(user_message: str) -> list:
+    """
+    Detect which agents should handle the message (keyword scoring).
+    Returns list of agent types.
+    """
+    early = _pre_route_intent(user_message)
+    if early is not None:
+        return early
+
     msg = user_message.lower()
 
-    matches = []
-    if any(kw in msg for kw in EMAIL_KEYWORDS):
-        matches.append("email")
-    if any(kw in msg for kw in IT_KEYWORDS):
-        matches.append("it_support")
-    if any(kw in msg for kw in HR_KEYWORDS):
-        matches.append("hr")
-    if any(kw in msg for kw in RECRUITMENT_KEYWORDS):
-        matches.append("recruitment")
-    if any(kw in msg for kw in FINANCE_KEYWORDS):
-        matches.append("finance")
-    if any(kw in msg for kw in DOCS_KEYWORDS):
-        matches.append("documents")
+    scores = {
+        "email": _keyword_score(msg, EMAIL_KEYWORDS),
+        "it_support": _keyword_score(msg, IT_KEYWORDS),
+        "hr": _keyword_score(msg, HR_KEYWORDS),
+        "recruitment": _keyword_score(msg, RECRUITMENT_KEYWORDS, weight=2),
+        "finance": _keyword_score(msg, FINANCE_KEYWORDS),
+        "documents": _keyword_score(msg, DOCS_KEYWORDS),
+    }
 
-    # Default: friendly conversational + real-world clock agent (not a fake "IT" answer)
+    # Disambiguate shared terms
+    if "salary" in msg or "payroll" in msg:
+        if scores["finance"] >= scores["hr"]:
+            scores["hr"] = max(0, scores["hr"] - 1)
+        else:
+            scores["finance"] = max(0, scores["finance"] - 1)
+
+    if "resume" in msg or "cv" in msg:
+        if any(w in msg for w in ("upload", "attached", "shortlist", "rank", "screen")):
+            scores["recruitment"] += 3
+            scores["email"] = max(0, scores["email"] - 1)
+
+    threshold = 1
+    matches = [agent for agent, sc in scores.items() if sc >= threshold]
+    matches.sort(key=lambda a: scores[a], reverse=True)
+
     if not matches:
         return ["general"]
 
@@ -376,42 +437,52 @@ def detect_intent_llm(
     LLM-powered intent detection for complex/ambiguous messages.
     Falls back gracefully.
     """
+    early = _pre_route_intent(user_message)
+    if early is not None:
+        return early
+
     try:
         llm = _get_llm()
-        hist = _history_context_block(conversation_history, max_turns=4)
+        hist = _history_context_block(conversation_history, max_turns=8)
         context_block = (
             f"\nRecent conversation:\n{hist}\n" if hist else "\n(No prior turns in this thread.)\n"
         )
         prompt = f"""You are an intent detector for an office automation system.
+Use the conversation thread to resolve follow-ups ("that", "them", "approve", "send it", "the shortlist").
 {context_block}
 User message: "{user_message}"
 
-Available agents:
-- general: greetings, thanks, **today's date / day / local time**, small talk, follow-up questions that refer to the previous message, short general knowledge **not** tied to running IT/HR/Finance/Gmail/Drive tools in this system
-- hr_gmail: **fetch recent Gmail inbox messages**, extract **PDF/DOCX CV attachments**, rank top N for a role (e.g. Python), draft interview emails — **human approval required before send** (never auto-send from the scan step). After a shortlist, the user may explicitly say **approve and send** in chat to SMTP-send that batch, or use the UI button. Example: "fetch last 40 emails with CVs and select 5 candidates for Python and email them"
-- it_support: IT problems, computer issues, software/hardware
-- email: send/read/reply/search emails
-- hr: CV screening, hiring, onboarding, HR policy, employees (single-agent HR Q&A / simple screening)
-- recruitment: **only** agent when the user attached resume/CV files and asks to screen, rank, shortlist, and/or email interview invitations. If they say "email them" / "send interview email", still use **only** recruitment (it can send via Gmail when asked).
-- finance: expenses, invoices, budgets, financial reports; **generate PDF / Excel / CSV / Word / TXT finance documents** when the user asks to export or download (e.g. "generate PDF expense summary")
-- documents: Google Drive files, PDFs, document search/summary
+Available agents (return canonical slugs only):
+- general: greetings, thanks, date/time, small talk, clarifying questions, follow-ups that do NOT require running Gmail/IT/HR/Finance/Drive tools
+- hr_gmail: fetch Gmail inbox CVs, rank candidates for a role, draft interview emails (approval before SMTP send). Follow-up "approve and send" after a shortlist → hr_gmail
+- it_support: computer, laptop, wifi, printer, software install, errors, VPN, passwords (IT hardware/software)
+- email: compose/send/reply to a specific person, read inbox (NOT bulk CV shortlist from Gmail — use hr_gmail for that)
+- hr: HR policies, leave, onboarding, employee questions, simple CV Q&A without Gmail fetch
+- recruitment: user attached CV/resume files AND wants screen/rank/shortlist/interview email workflow
+- finance: expenses, invoices, budgets, revenue, tax, payroll reports, export PDF/Excel/CSV financial documents
+- documents: Google Drive search, summarize files, contracts, manuals
 
-Respond with ONLY a JSON array of agent names that should handle this request.
+Rules:
+1. Pick the MINIMUM agents needed (usually one). Use multiple only when the user clearly asks for two domains in one message.
+2. Bulk Gmail CV fetch + shortlist → hr_gmail only (not email+hr).
+3. CV attachments + hiring language → recruitment only.
+4. "Salary" in a budget/expense/invoice context → finance; in hiring/employee context → hr.
+5. Follow-up approval to send interview emails after hr_gmail shortlist → hr_gmail.
+
+Respond with ONLY a JSON array of agent slugs.
 Examples:
   "what day is it today?" → ["general"]
-  "fetch last 40 emails with CVs and select 5 candidates for Python developer and email them" → ["hr_gmail"]
-  "approve and send the interview emails" (after a Gmail shortlist in thread) → ["hr_gmail"]
-  "collect 50 resumes from inbox and shortlist top 3 for data entry" → ["hr_gmail"]
-  "hi" → ["general"]
-  "thanks!" → ["general"]
-  "my laptop is slow" → ["it_support"]
-  "email Ahmed and check HR policy" → ["email", "hr"]
-  "I uploaded 10 CVs and a JD, rank them and draft interview emails for tomorrow 3pm" → ["recruitment"]
-  "Select best candidate for Data Entry, email them interview tomorrow 8am" + CV attachments → ["recruitment"]
-  "generate a PDF and XLSX quarterly finance summary for PKR revenue" → ["finance"]
-  "analyze expenses and generate invoice" → ["finance"]
+  "fetch last 40 emails with CVs and select 5 Python developers" → ["hr_gmail"]
+  "approve and send" (after shortlist in thread) → ["hr_gmail"]
+  "my laptop is very slow" → ["it_support"]
+  "draft a reply to the client email" → ["email"]
+  "what is our leave policy?" → ["hr"]
+  "rank these CVs and email top candidate" (with attachments) → ["recruitment"]
+  "generate quarterly expense PDF and Excel" → ["finance"]
+  "find the contract PDF on Google Drive" → ["documents"]
+  "thanks, that helped" → ["general"]
 
-JSON array only, no explanation:"""
+JSON array only:"""
 
         resp = llm.invoke(prompt)
         text = resp.content.strip()
@@ -509,10 +580,68 @@ class Orchestrator:
                 agents_used=["hr_gmail"],
             )
 
-        sr = approve_and_send_shortlist_batch(bid)
+        sr = approve_and_send_shortlist_batch(bid, user_message=raw)
+        if sr.get("needs_clarification"):
+            body = f"**HR Recruitment Assistant**\n\n{sr.get('error', 'Specify recipients.')}"
+            return _done(body, ok=False, batch_id=bid, agents_used=["hr_gmail"])
         body = format_hr_gmail_approve_send_reply(sr)
         out = _done(body, ok=bool(sr.get("ok")), batch_id=bid, agents_used=["hr_gmail"])
         if sr.get("ok"):
+            out["hr_gmail_pending_cleared"] = True
+        return out
+
+    def _try_hr_recruitment_follow_up(
+        self,
+        *,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, str]]],
+        allowed_agents: Optional[List[str]],
+        start_time: float,
+        user_name: str = "User",
+        user_role: str = "",
+    ) -> Optional[dict]:
+        from tools.hr_gmail_shortlist import handle_hr_recruitment_follow_up, user_requests_hr_recruitment_follow_up
+
+        if not user_requests_hr_recruitment_follow_up(user_message):
+            return None
+
+        allow = set(normalize_agent_list(allowed_agents)) if allowed_agents else None
+        if allow is not None and "hr_gmail" not in allow:
+            elapsed = round((time.time() - start_time) * 1000)
+            return {
+                "agents_used": [],
+                "responses": {},
+                "final_answer": "**HR recruitment follow-up blocked** — your role cannot use Gmail CV shortlist.",
+                "task_ids": {},
+                "elapsed_ms": elapsed,
+                "mq_messages": self.mq.get_all_messages_for_display(limit=30),
+                "hr_gmail_batch_id": None,
+                "finance_export_files": None,
+            }
+
+        res = handle_hr_recruitment_follow_up(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            user_name=user_name,
+            user_role=user_role,
+        )
+        if not res:
+            return None
+
+        elapsed = round((time.time() - start_time) * 1000)
+        agents = res.get("agents_used") or ["hr_gmail"]
+        ans = res.get("final_answer") or ""
+        out = {
+            "agents_used": agents,
+            "responses": {agents[0]: ans} if agents else {},
+            "final_answer": ans,
+            "task_ids": {},
+            "elapsed_ms": elapsed,
+            "mq_messages": self.mq.get_all_messages_for_display(limit=30),
+            "hr_gmail_batch_id": res.get("hr_gmail_batch_id"),
+            "finance_export_files": None,
+        }
+        if res.get("hr_gmail_pending_cleared"):
             out["hr_gmail_pending_cleared"] = True
         return out
 
@@ -538,18 +667,44 @@ class Orchestrator:
 
         full_message = build_context_with_attachments(user_message, attachments)
 
-        early_send = self._try_hr_gmail_approve_send_via_chat(
-            user_message=user_message,
-            conversation_history=conversation_history,
-            allowed_agents=allowed_agents,
-            start_time=start_time,
-        )
-        if early_send is not None:
-            return early_send
-
+        from tools.hr_email_intelligence import try_hr_email_assistant_command
         from tools.hr_gmail_shortlist import parse_gmail_shortlist_prompt
 
+        allow = set(normalize_agent_list(allowed_agents)) if allowed_agents else None
+        hr_email_ok = allow is None or "hr_gmail" in allow or "hr" in allow or "recruitment" in allow
+        if hr_email_ok:
+            hr_early = try_hr_email_assistant_command(
+                user_message=user_message,
+                conversation_history=conversation_history,
+                user_name=user_name,
+                user_role=user_role,
+                start_time=start_time,
+            )
+            if hr_early is not None:
+                return hr_early
+
         gspec_early = parse_gmail_shortlist_prompt(user_message)
+
+        if gspec_early is None:
+            early_follow = self._try_hr_recruitment_follow_up(
+                user_message=user_message,
+                conversation_history=conversation_history,
+                allowed_agents=allowed_agents,
+                start_time=start_time,
+                user_name=user_name,
+                user_role=user_role,
+            )
+            if early_follow is not None:
+                return early_follow
+
+            early_send = self._try_hr_gmail_approve_send_via_chat(
+                user_message=user_message,
+                conversation_history=conversation_history,
+                allowed_agents=allowed_agents,
+                start_time=start_time,
+            )
+            if early_send is not None:
+                return early_send
         if gspec_early:
             agents = ["hr_gmail"]
         elif use_llm_intent:
@@ -563,24 +718,29 @@ class Orchestrator:
         if allowed_agents:
             allow = set(normalize_agent_list(allowed_agents))
             allow.add("general")
+            blocked = [a for a in agents if a not in allow]
             agents = [a for a in agents if a in allow]
             if not agents:
-                elapsed = round((time.time() - start_time) * 1000)
-                return {
-                    "agents_used": [],
-                    "responses": {},
-                    "final_answer": (
-                        "**Access restricted for your role**\n\n"
-                        "This request would use agents outside your permissions. "
-                        "Use the module tabs assigned to your department (e.g. **Email** for assistants, "
-                        "**Finance** for finance managers), or contact an **Administrator**."
-                    ),
-                    "task_ids": {},
-                    "elapsed_ms": elapsed,
-                    "mq_messages": self.mq.get_all_messages_for_display(limit=30),
-                    "hr_gmail_batch_id": None,
-                    "finance_export_files": None,
-                }
+                if "general" in allow:
+                    agents = ["general"]
+                else:
+                    elapsed = round((time.time() - start_time) * 1000)
+                    allowed_txt = ", ".join(sorted(allow - {"general"})) or "none"
+                    return {
+                        "agents_used": [],
+                        "responses": {},
+                        "final_answer": (
+                            "**Outside your department scope**\n\n"
+                            f"This request matched: **{', '.join(blocked) or 'restricted agents'}**, but your role may use: "
+                            f"**{allowed_txt}** (plus general chat).\n\n"
+                            "Try rephrasing for your department tab, or ask an **Administrator** for broader access."
+                        ),
+                        "task_ids": {},
+                        "elapsed_ms": elapsed,
+                        "mq_messages": self.mq.get_all_messages_for_display(limit=30),
+                        "hr_gmail_batch_id": None,
+                        "finance_export_files": None,
+                    }
 
         result = {
             "agents_used":  agents,
@@ -657,6 +817,32 @@ class Orchestrator:
             result["hr_gmail_batch_id"] = bid
         for k in list(responses.keys()):
             responses[k] = strip_hr_gmail_batch_marker(responses[k] or "")
+
+        from tools.assistant_display import build_display_text, build_hr_shortlist_ui_payload
+        from database.sqlite_db import hr_shortlist_get_batch
+
+        ui_payload = result.get("ui_payload")
+        if bid and not ui_payload:
+            try:
+                row = hr_shortlist_get_batch(bid)
+                if row:
+                    pl = row.get("payload") or {}
+                    ui_payload = build_hr_shortlist_ui_payload(
+                        {
+                            "ok": True,
+                            "batch_id": bid,
+                            "drafts": pl.get("top") or [],
+                            "role_title": (row.get("criteria") or "")[:120],
+                            "emails_scanned": pl.get("emails_scanned", 0),
+                            "attachments_parsed": pl.get("attachments_parsed", 0),
+                            "filters_applied": (pl.get("session_memory") or {}).get("filters_applied") or {},
+                        }
+                    )
+            except Exception:
+                pass
+        if ui_payload:
+            result["ui_payload"] = ui_payload
+        result["display_answer"] = build_display_text(result.get("final_answer", ""), ui_payload)
 
         # 4. Merge responses (stable order matching original agent list)
         ordered = [(at, responses[at]) for at in agents if at in responses]
@@ -949,7 +1135,7 @@ class Orchestrator:
             lines += [
                 "",
                 "To **send** interview emails from here, say e.g. **email them** or **send interview invitation** "
-                "in the same request. Otherwise use **Recruitment AI** → **Approve send** to review every draft first.",
+                "in the same request. Otherwise use **Assistant** to review candidates and approve send.",
             ]
 
         return "\n".join(lines)

@@ -170,6 +170,84 @@ def read_emails(state: dict) -> dict:
     return state
 
 
+def search_inbox_messages(
+    *,
+    max_results: int = 25,
+    since_date=None,
+    on_date=None,
+    sender: str = "",
+    subject_contains: str = "",
+    body_keyword: str = "",
+    candidate_name: str = "",
+) -> dict[str, Any]:
+    """
+    Search inbox with optional date/sender/subject/body filters.
+    ``on_date`` restricts to a single calendar day; ``since_date`` is inclusive from that day.
+    """
+    from datetime import date as date_cls
+
+    max_results = max(1, min(50, int(max_results or 10)))
+    try:
+        mail = _connect_imap()
+        criteria = ["ALL"]
+        if since_date:
+            d = since_date if isinstance(since_date, date_cls) else since_date
+            criteria = ["SINCE", d.strftime("%d-%b-%Y")]
+        status, data = mail.search(None, *criteria)
+        mail_ids = data[0].split() if data and data[0] else []
+        scan = mail_ids[-max(200, max_results * 8) :] if mail_ids else []
+
+        sender_l = (sender or "").lower()
+        sub_l = (subject_contains or "").lower()
+        kw_l = (body_keyword or "").lower()
+        cand_l = (candidate_name or "").lower()
+
+        emails: list[dict[str, Any]] = []
+        for num in reversed(scan):
+            if len(emails) >= max_results:
+                break
+            try:
+                uid = num.decode() if isinstance(num, bytes) else str(num)
+                status, msg_data = mail.fetch(num, "(RFC822)")
+                if not msg_data or not msg_data[0]:
+                    continue
+                raw = msg_data[0][1]
+                msg = email.message_from_bytes(raw)
+                parsed = _parse_message(msg, uid)
+                date_raw = msg.get("Date", "")
+                try:
+                    msg_dt = parsedate_to_datetime(date_raw) if date_raw else None
+                    msg_date = msg_dt.date() if msg_dt else None
+                except Exception:
+                    msg_date = None
+
+                if on_date and msg_date and msg_date != on_date:
+                    continue
+                if since_date and msg_date and msg_date < since_date:
+                    continue
+
+                from_blob = f"{parsed.get('from_name', '')} {parsed.get('from_email', '')}".lower()
+                if sender_l and sender_l not in from_blob:
+                    continue
+                if sub_l and sub_l not in (parsed.get("subject") or "").lower():
+                    continue
+                body_l = (parsed.get("body") or "").lower()
+                subj_l = (parsed.get("subject") or "").lower()
+                if kw_l and kw_l not in body_l and kw_l not in subj_l:
+                    continue
+                if cand_l and cand_l not in body_l and cand_l not in subj_l and cand_l not in from_blob:
+                    continue
+
+                emails.append(parsed)
+            except Exception:
+                continue
+
+        mail.logout()
+        return {"ok": True, "emails": emails, "count": len(emails)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "emails": []}
+
+
 def get_email_by_uid(uid: str) -> dict[str, Any]:
     """Fetch a single inbox message by IMAP sequence id."""
     try:

@@ -1,7 +1,12 @@
 .env
 .env.local
+.env.*
+!.env.example
+.streamlit/secrets.toml
 token.json
 credentials.json
+*.db
+database/fyp_data.db
 __pycache__/
 *.py[cod]
 *$py.class

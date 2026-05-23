@@ -1,7 +1,7 @@
 """
 UI/APP.PY — Office Automation Agents Pro v7.0 — FYP FINAL
 ==========================================================
-Tabs: Login | Assistant (orchestrator) | Dashboard | Recruitment AI | specialist tools | History
+Tabs: Login | Assistant (orchestrator) | Dashboard | specialist tools | History
 """
 import sys, os, time, json
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -103,12 +103,21 @@ refresh_config_from_env()
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-/* Inter for text only — do NOT override Streamlit Material icon fonts (fixes upload/arrow/checkbox glitches) */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+:root {
+    --bg: #f1f5f9;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --accent: #0ea5e9;
+}
 .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, .stTextInput label, .stTextArea label,
 .stSelectbox label, .stCheckbox label, .stButton button, .stForm label, .stCaption, .stAlert,
 [data-testid="stWidgetLabel"], input, textarea, select {
-    font-family: 'Inter', sans-serif !important;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
 }
 [data-testid="stIconMaterial"], .material-symbols-rounded, .material-icons {
     font-family: 'Material Symbols Rounded', 'Material Icons' !important;
@@ -117,93 +126,126 @@ st.markdown("""<style>
     text-transform: none !important;
     white-space: nowrap !important;
 }
-.main { padding-top: 0.3rem; background: #f8fafc; }
-.stApp { background: #f8fafc; }
+.main { padding-top: 0.4rem; background: var(--bg); }
+.stApp { background: var(--bg); }
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+    border: none !important; font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+}
+.stTabs [data-baseweb="tab-list"] { gap: 6px; background: transparent; }
+.stTabs [data-baseweb="tab"] {
+    background: var(--surface); border-radius: 10px 10px 0 0;
+    border: 1px solid var(--border); font-weight: 600;
+}
+.stTabs [aria-selected="true"] {
+    background: var(--surface) !important; color: var(--primary) !important;
+    border-bottom: 2px solid var(--primary) !important;
+}
 
-/* Login card */
+/* Login */
 .login-wrap { display:flex; justify-content:center; align-items:center; min-height:80vh; }
 .login-card {
-    background: white; border-radius: 20px; padding: 40px 48px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.12); max-width: 420px; width:100%;
-    border: 1px solid #e2e8f0;
+    background: var(--surface); border-radius: 20px; padding: 40px 48px;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.12); max-width: 420px; width:100%;
+    border: 1px solid var(--border);
 }
-.login-logo { text-align:center; font-size:48px; margin-bottom:8px; }
-.login-title { text-align:center; font-size:24px; font-weight:800; color:#1e293b; margin-bottom:4px; }
-.login-sub { text-align:center; font-size:13px; color:#64748b; margin-bottom:28px; }
+.login-title { text-align:center; font-size:24px; font-weight:800; color:var(--text); }
+.login-sub { text-align:center; font-size:13px; color:var(--muted); }
 
 /* Header */
 .main-header {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #0f172a 100%);
-    color: white; padding: 14px 24px; border-radius: 14px; margin-bottom: 16px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+    color: white; padding: 16px 26px; border-radius: 16px; margin-bottom: 18px;
     display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 32px rgba(49, 46, 129, 0.25);
+    border: 1px solid rgba(255,255,255,0.08);
 }
-.header-title { font-size:22px; font-weight:800; letter-spacing:-0.3px; }
-.header-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+.header-title { font-size:22px; font-weight:800; letter-spacing:-0.4px; }
+.header-sub { font-size:11px; color:#a5b4fc; margin-top:3px; }
 
-/* Metric cards */
-.metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+/* Metrics */
 .metric-card {
-    background:white; border:1px solid #e2e8f0; border-radius:14px;
-    padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px 20px; box-shadow:0 1px 3px rgba(15,23,42,0.06);
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.metric-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.1); }
-.metric-icon { font-size:28px; margin-bottom:6px; }
-.metric-num { font-size:32px; font-weight:800; color:#1e293b; line-height:1; }
-.metric-label { font-size:12px; color:#64748b; margin-top:4px; font-weight:500; }
-.metric-delta { font-size:11px; color:#16a34a; font-weight:600; }
+.metric-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(79,70,229,0.12); }
+.metric-num { font-size:32px; font-weight:800; color:var(--text); }
 
 /* Agent cards */
 .agent-status-card {
-    background:white; border:1px solid #e2e8f0; border-radius:12px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
     padding:14px 18px; display:flex; align-items:center; gap:12px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.05);
+    box-shadow:0 1px 3px rgba(15,23,42,0.05);
 }
-.agent-dot { width:10px; height:10px; border-radius:50%; background:#16a34a; flex-shrink:0; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.agent-dot { width:10px; height:10px; border-radius:50%; background:#10b981; flex-shrink:0; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
 
 /* Response boxes */
 .resp-box {
-    background:white; border-left:4px solid #2563eb; border-radius:0 12px 12px 0;
-    padding:18px 22px; margin:10px 0; box-shadow:0 2px 8px rgba(0,0,0,0.07);
+    background:var(--surface); border-left:4px solid var(--primary); border-radius:0 12px 12px 0;
+    padding:18px 22px; margin:10px 0; box-shadow:0 2px 8px rgba(15,23,42,0.06);
     line-height:1.7; white-space:pre-wrap;
 }
-.resp-green  { border-left-color:#16a34a; }
+.resp-green  { border-left-color:#059669; }
 .resp-purple { border-left-color:#7c3aed; }
 .resp-orange { border-left-color:#ea580c; }
 .resp-teal   { border-left-color:#0d9488; }
 .resp-red    { border-left-color:#dc2626; }
 
 /* Chat */
-.chat-user  { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; padding:10px 16px; border-radius:18px 18px 4px 18px; margin:6px 0 6px auto; max-width:75%; display:inline-block; float:right; clear:both; font-size:14px; }
-.chat-agent { background:white; color:#1e293b; padding:12px 16px; border-radius:18px 18px 18px 4px; margin:6px 0; max-width:80%; display:inline-block; float:left; clear:both; font-size:14px; border:1px solid #e2e8f0; box-shadow:0 2px 6px rgba(0,0,0,0.06); line-height:1.6; white-space:pre-wrap; }
-.chat-wrap  { overflow:hidden; margin-bottom:6px; }
+.chat-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px 18px; margin-bottom: 14px; min-height: 120px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.chat-user  {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white; padding: 11px 16px; border-radius: 16px 16px 4px 16px;
+    margin: 8px 0 8px auto; max-width: 78%; display: block; margin-left: auto;
+    font-size: 14px; line-height: 1.55; word-wrap: break-word;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+.chat-agent {
+    background: #f8fafc; color: var(--text); padding: 12px 16px;
+    border-radius: 16px 16px 16px 4px; margin: 8px 0; max-width: 85%;
+    display: block; font-size: 14px; border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(15,23,42,0.04); line-height: 1.6; word-wrap: break-word;
+}
+.chat-wrap  { width: 100%; margin-bottom: 4px; overflow: hidden; }
+.thread-bar {
+    background: linear-gradient(90deg, #eef2ff, #f8fafc);
+    border: 1px solid #c7d2fe; border-radius: 12px; padding: 10px 14px;
+    margin-bottom: 12px; font-size: 13px; color: #4338ca;
+}
 
 /* Sections */
 .sec-hdr {
-    background:linear-gradient(90deg,#1e293b,#334155); color:white;
-    padding:10px 18px; border-radius:10px; margin:14px 0 10px 0;
-    font-weight:700; font-size:14px; letter-spacing:0.2px;
+    background: linear-gradient(90deg, #312e81, #4f46e5); color: white;
+    padding: 11px 18px; border-radius: 12px; margin: 14px 0 12px 0;
+    font-weight: 700; font-size: 14px; letter-spacing: 0.15px;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
 }
-.sec-blue   { background:linear-gradient(90deg,#1d4ed8,#3b82f6) !important; }
-.sec-green  { background:linear-gradient(90deg,#15803d,#22c55e) !important; }
-.sec-purple { background:linear-gradient(90deg,#6d28d9,#a855f7) !important; }
+.sec-blue   { background:linear-gradient(90deg,#3730a3,#4f46e5) !important; }
+.sec-green  { background:linear-gradient(90deg,#047857,#10b981) !important; }
+.sec-purple { background:linear-gradient(90deg,#6d28d9,#8b5cf6) !important; }
 .sec-teal   { background:linear-gradient(90deg,#0f766e,#14b8a6) !important; }
 .sec-orange { background:linear-gradient(90deg,#c2410c,#f97316) !important; }
-.sec-wa     { background:linear-gradient(90deg,#15803d,#16a34a) !important; }
+.sec-wa     { background:linear-gradient(90deg,#15803d,#22c55e) !important; }
 
 /* Badges */
-.badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-block; }
-.badge-green  { background:#dcfce7; color:#15803d; }
-.badge-blue   { background:#dbeafe; color:#1d4ed8; }
-.badge-purple { background:#f3e8ff; color:#6d28d9; }
+.badge { padding:4px 11px; border-radius:999px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-green  { background:#d1fae5; color:#047857; }
+.badge-blue   { background:#e0e7ff; color:#4338ca; }
+.badge-purple { background:#ede9fe; color:#6d28d9; }
 .badge-orange { background:#ffedd5; color:#c2410c; }
-.badge-red    { background:#fee2e2; color:#dc2626; }
+.badge-red    { background:#fee2e2; color:#b91c1c; }
 .badge-yellow { background:#fef9c3; color:#854d0e; }
 .badge-mcp    { background:#0d9488; color:white; }
-.badge-a2a    { background:#7c3aed; color:white; }
+.badge-a2a    { background:#6366f1; color:white; }
 .badge-wa     { background:#16a34a; color:white; }
+.badge-indigo { background:#4f46e5; color:white; }
 
 /* Header service status (display-only, not buttons) */
 .svc-pill {
@@ -222,10 +264,15 @@ st.markdown("""<style>
 .qmsg-status { border-left:3px solid #f59e0b; }
 .qmsg-broadcast { border-left:3px solid #7c3aed; }
 
-/* Candidate */
-.cand-card { background:white; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+/* Candidate ATS cards */
+.cand-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 2px 10px rgba(15,23,42,0.05);
+    border-left: 4px solid #4f46e5;
+}
+.cand-card.rejected { border-left-color: #dc2626; opacity: 0.85; }
 .score-bar  { height:8px; border-radius:4px; background:#e2e8f0; margin:8px 0 4px 0; }
-.score-fill { height:8px; border-radius:4px; }
+.score-fill { height:8px; border-radius:4px; background: linear-gradient(90deg, #4f46e5, #6366f1); }
 
 /* WhatsApp */
 .wa-bubble-out { background:#dcf8c6; border-radius:18px 4px 18px 18px; padding:10px 14px; margin:6px 0 6px auto; max-width:75%; display:inline-block; float:right; clear:both; font-size:14px; }
@@ -251,9 +298,6 @@ st.markdown("""<style>
 .block-container { max-width: 1280px; }
 .stMarkdown, .stMarkdown p, .stMarkdown li { text-align: left; }
 .resp-box, .hist-row, .cand-card, .qmsg, .a2a-flow, .chat-agent { text-align: left; }
-.chat-wrap { clear: both; overflow: auto; width: 100%; }
-.chat-user { float: right; }
-.chat-agent { float: left; }
 div[data-testid="column"] { min-width: 0; }
 
 div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
@@ -292,6 +336,10 @@ _defs = {
     "hr_gmail_batch_id": None,
     "hr_gmail_last": None,
     "pending_hr_gmail_batch_id": None,
+    "hr_ats_candidates": [],
+    "hr_ats_batch_id": None,
+    "hr_ats_selected": [],
+    "hr_ats_filters": {},
     "orch_finance_export_files": None,
     "auth_session_id": "",
     "orch_conversation_id": None,
@@ -356,6 +404,231 @@ def _extract_text_from_uploaded_file(f) -> str:
 def _new_auth_session_id() -> str:
     import uuid
     return str(uuid.uuid4())
+
+
+def _hesc_html(text: str) -> str:
+    """Escape user/model text for safe HTML chat bubbles."""
+    from html import escape
+    return escape(str(text or "")).replace("\n", "<br>")
+
+
+def _sync_orch_chat_from_db(force: bool = False) -> None:
+    """Load persisted thread into Assistant UI (survives rerun / new session)."""
+    cid = st.session_state.get("orch_conversation_id")
+    if not cid:
+        return
+    active = st.session_state.get("_orch_active_cid")
+    if force or active != cid:
+        try:
+            from database.sqlite_db import load_conversation_ui_messages
+            st.session_state.orch_chat = load_conversation_ui_messages(cid)
+            st.session_state["_orch_active_cid"] = cid
+        except Exception:
+            pass
+
+
+def _sync_hr_ats_from_result(result: dict) -> None:
+    """Keep last fetched candidates in session for ATS panel + follow-up commands."""
+    if not result or not result.get("ok"):
+        return
+    drafts = result.get("drafts") or []
+    if not drafts:
+        return
+    st.session_state.hr_ats_candidates = drafts
+    st.session_state.hr_ats_batch_id = result.get("batch_id")
+    st.session_state.hr_ats_filters = result.get("filters_applied") or {}
+    if result.get("batch_id"):
+        st.session_state.pending_hr_gmail_batch_id = result.get("batch_id")
+    mem = result.get("session_memory") or {}
+    if mem.get("candidates"):
+        st.session_state.hr_ats_candidates = mem["candidates"]
+
+
+def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats") -> None:
+    """Professional ATS cards: select, send, shortlist, reject."""
+    candidates = st.session_state.get("hr_ats_candidates") or []
+    if not candidates:
+        return
+    bid = batch_id or st.session_state.get("hr_ats_batch_id") or ""
+    filters = st.session_state.get("hr_ats_filters") or {}
+    st.markdown(
+        '<div class="sec-hdr sec-teal">Candidate pipeline <span class="badge badge-indigo">ATS</span></div>',
+        unsafe_allow_html=True,
+    )
+    if filters.get("required_skills"):
+        st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** · Min score: **{filters.get('min_score', 55)}%**")
+    st.caption("Select candidates, then **Send email** per person, or use bulk actions. Emails are never sent without your action.")
+
+    selected: list[str] = []
+    for i, c in enumerate(candidates):
+        cid = c.get("candidate_id") or f"c{i}"
+        name = c.get("candidate_name") or "Candidate"
+        score = int(c.get("match_score") or 0)
+        status = c.get("status") or "—"
+        skills = ", ".join(c.get("key_skills") or []) or "—"
+        exp = c.get("experience_level") or "—"
+        hr_st = c.get("hr_state") or "pending"
+        status_cls = "badge-green" if status == "Recommended" else "badge-orange"
+        if hr_st == "rejected":
+            status_cls = "badge-red"
+        st.markdown(
+            f'<div class="cand-card">'
+            f'<b>{_hesc_html(name)}</b> <span class="badge {status_cls}">{_hesc_html(status)}</span> '
+            f'<span class="badge badge-blue">{score}% Match</span><br>'
+            f'<span style="font-size:12px;color:#64748b">Skills: {_hesc_html(skills)} · {_hesc_html(exp)}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        cols = st.columns([0.5, 1.2, 1, 1, 1])
+        with cols[0]:
+            sel = st.checkbox("Select", key=f"{key_prefix}_sel_{bid}_{cid}", value=cid in (st.session_state.hr_ats_selected or []))
+            if sel:
+                selected.append(cid)
+        with cols[1]:
+            st.caption(f"To: {c.get('recipient') or '—'}")
+        with cols[2]:
+            if st.button("Send email", key=f"{key_prefix}_send_{bid}_{cid}", disabled=hr_st == "rejected" or not c.get("sendable")):
+                if bid:
+                    with st.spinner(f"Sending to {name}..."):
+                        try:
+                            from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
+                            sr = approve_and_send_shortlist_batch(
+                                bid,
+                                user_message=f"send to {name}",
+                                ui_selected_ids=[cid],
+                            )
+                            if sr.get("ok"):
+                                st.success(f"Sent to **{name}**.")
+                            else:
+                                st.error(sr.get("error", "Send failed."))
+                        except Exception as ex:
+                            st.error(str(ex))
+        with cols[3]:
+            if st.button("Shortlist", key=f"{key_prefix}_sl_{bid}_{cid}"):
+                c["hr_state"] = "shortlisted"
+                st.toast(f"{name} shortlisted")
+        with cols[4]:
+            if st.button("Reject", key=f"{key_prefix}_rej_{bid}_{cid}"):
+                c["hr_state"] = "rejected"
+                st.toast(f"{name} rejected")
+    st.session_state.hr_ats_selected = selected
+
+    st.markdown("")
+    b1, b2, b3, b4 = st.columns(4)
+    with b1:
+        if st.button("Send to selected", key=f"{key_prefix}_bulk_sel", use_container_width=True):
+            if bid and selected:
+                from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
+                sr = approve_and_send_shortlist_batch(bid, user_message="send to selected", ui_selected_ids=selected)
+                if sr.get("ok"):
+                    st.success(f"Sent **{sr.get('emails_sent', 0)}** email(s).")
+                    st.session_state.pending_hr_gmail_batch_id = None
+                    st.rerun()
+                else:
+                    st.error(sr.get("error", "Failed"))
+            else:
+                st.warning("Select at least one candidate.")
+    with b2:
+        if st.button("Email recommended", key=f"{key_prefix}_bulk_rec", use_container_width=True):
+            if bid:
+                from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
+                sr = approve_and_send_shortlist_batch(bid, user_message="email all recommended candidates")
+                if sr.get("ok"):
+                    st.success(f"Sent **{sr.get('emails_sent', 0)}** to recommended.")
+                    st.rerun()
+                else:
+                    st.error(sr.get("error", "Failed"))
+    with b3:
+        if st.button("Invite top 2", key=f"{key_prefix}_bulk_top2", use_container_width=True):
+            if bid:
+                from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
+                sr = approve_and_send_shortlist_batch(bid, user_message="invite top 2 candidates")
+                if sr.get("ok"):
+                    st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
+                    st.rerun()
+                else:
+                    st.error(sr.get("error", "Failed"))
+    with b4:
+        if st.button("Email all (explicit)", key=f"{key_prefix}_bulk_all", use_container_width=True):
+            st.caption("Sends every sendable candidate in this batch.")
+            if bid:
+                from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
+                sr = approve_and_send_shortlist_batch(bid, user_message="email all candidates send to everyone")
+                if sr.get("ok"):
+                    st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
+                    st.session_state.pending_hr_gmail_batch_id = None
+                    st.rerun()
+                else:
+                    st.error(sr.get("error", "Failed"))
+
+
+def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> None:
+    """Structured results (candidates, inbox rows) — not raw markdown dumps."""
+    if not ui or not isinstance(ui, dict):
+        return
+    t = ui.get("type") or ""
+    if t == "hr_shortlist":
+        bid = ui.get("batch_id")
+        if bid:
+            st.session_state.pending_hr_gmail_batch_id = bid
+            st.session_state.hr_ats_batch_id = bid
+        st.session_state.hr_ats_candidates = ui.get("candidates") or []
+        st.session_state.hr_ats_filters = ui.get("stats") or {}
+        stats = ui.get("stats") or {}
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Shortlisted", len(ui.get("candidates") or []))
+        c2.metric("Emails scanned", stats.get("emails_scanned", "—"))
+        c3.metric("CVs parsed", stats.get("attachments_parsed", "—"))
+        skills = stats.get("required_skills") or []
+        c4.metric("Skill filter", ", ".join(skills) if skills else "—")
+        if ui.get("send_result", {}).get("ok"):
+            st.success(
+                f"Sent {ui['send_result'].get('emails_sent', 0)} invitation(s) via Gmail."
+            )
+        _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
+    elif t == "email_list":
+        st.markdown(
+            '<div class="sec-hdr sec-blue" style="margin-top:12px">Inbox results</div>',
+            unsafe_allow_html=True,
+        )
+        for i, em in enumerate(ui.get("emails") or []):
+            cls = em.get("classification") or ""
+            badge = f'<span class="badge badge-indigo">{_hesc_html(cls)}</span> ' if cls else ""
+            st.markdown(
+                f'<div class="cand-card" style="margin-bottom:8px">'
+                f"<b>{_hesc_html(em.get('from_name', ''))}</b> "
+                f"<span style='font-size:12px;color:#64748b'>&lt;{_hesc_html(em.get('from_email', ''))}&gt;</span><br>"
+                f"<span style='font-size:13px'>{_hesc_html(em.get('subject', ''))}</span> "
+                f"{badge}"
+                f"<span style='font-size:11px;color:#94a3b8'> · {_hesc_html(em.get('date', ''))}</span>"
+                f"<br><span style='font-size:12px;color:#475569'>{_hesc_html(em.get('snippet', ''))}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            if int(em.get("attachment_count") or 0) > 0:
+                st.caption(f"Attachments: {em.get('attachment_count', 0)}")
+    elif t == "email_send":
+        if ui.get("ok"):
+            st.success(ui.get("message") or "Emails sent.")
+        else:
+            st.warning(ui.get("message") or "Send could not be completed.")
+    elif t == "hr_error":
+        st.error(ui.get("message") or "Request failed.")
+
+
+def _start_new_orch_conversation() -> None:
+    from database.sqlite_db import create_new_conversation
+    cid = create_new_conversation(
+        st.session_state.get("auth_session_id") or "",
+        st.session_state.username,
+        "orchestrator",
+    )
+    if cid:
+        st.session_state.orch_conversation_id = cid
+        st.session_state.orch_chat = []
+        st.session_state.orch_last_proc = None
+        st.session_state["_orch_active_cid"] = cid
+        st.session_state.pending_hr_gmail_batch_id = None
 
 
 def _record_login_event(username: str, display_name: str, role: str, event: str) -> None:
@@ -573,13 +846,9 @@ if not st.session_state.logged_in:
 # MAIN APP (after login)
 # ══════════════════════════════════════════════════════════════════════════════
 
-if st.session_state.logged_in and not st.session_state.get("orch_conversation_id"):
+if st.session_state.logged_in:
     try:
-        from database.sqlite_db import (
-            get_or_create_conversation,
-            load_conversation_ui_messages,
-            touch_user_session,
-        )
+        from database.sqlite_db import get_or_create_conversation, touch_user_session
 
         touch_user_session(
             st.session_state.auth_session_id,
@@ -587,15 +856,13 @@ if st.session_state.logged_in and not st.session_state.get("orch_conversation_id
             st.session_state.user_name,
             st.session_state.user_role,
         )
-        st.session_state.orch_conversation_id = get_or_create_conversation(
-            st.session_state.auth_session_id,
-            st.session_state.username,
-            "orchestrator",
-        )
-        if not st.session_state.orch_chat:
-            st.session_state.orch_chat = load_conversation_ui_messages(
-                st.session_state.orch_conversation_id
+        if not st.session_state.get("orch_conversation_id"):
+            st.session_state.orch_conversation_id = get_or_create_conversation(
+                st.session_state.auth_session_id,
+                st.session_state.username,
+                "orchestrator",
             )
+        _sync_orch_chat_from_db(force=True)
     except Exception:
         pass
 
@@ -880,19 +1147,64 @@ if _ti is not None:
         _allow = get_role_orchestrator_allowlist(st.session_state.user_role)
         if _allow is None:
             st.info(
-                "**One place for every task.** The orchestrator routes you to the right specialist when needed, "
-                "or to a **natural assistant** for greetings, **today's date/time**, and follow-up chat that remembers "
-                "this thread. **Gmail CV shortlist:** say e.g. *Fetch last 40 emails with CVs, select 5 candidates for "
-                "Python and email them* — drafts are built and you **approve** before send (orange button or type **approve and send** in chat). Attach PDFs/DOCX for "
-                "uploaded-CV recruitment; there say **email them** or **draft only** as needed."
+                "**One assistant for everything** — IT, finance, documents, and **HR hiring** in plain language. "
+                "Examples: *Fetch the latest 10 candidate emails*, *fetch 20 and select two for python*, "
+                "*Show emails received on 15 May 2026*, *Send interview invitations for Monday at 3 PM*. "
+                "Results appear as cards below your message (not raw reports)."
             )
         else:
             st.warning(
-                "**Department-scoped orchestrator (RBAC).** Allowed specialists: "
-                f"**{', '.join(_allow)}** — plus **general** chat. **Gmail CV fetch + shortlist** works from one prompt "
-                "when your role includes it (e.g. HR Manager, Office Assistant). **Emails are never sent until you approve** "
-                "in the orange box below or with **approve and send** in chat."
+                "**Department-scoped (RBAC).** Allowed: "
+                f"**{', '.join(_allow)}** + general chat. "
+                "HR hiring runs here when your role includes Gmail shortlist (fetch, rank, invite, follow-up)."
             )
+
+        _sync_orch_chat_from_db()
+        tc1, tc2, tc3 = st.columns([2, 1, 1])
+        with tc1:
+            try:
+                from database.sqlite_db import list_user_conversations, get_conversation_for_user
+
+                threads = list_user_conversations(st.session_state.username, "orchestrator", limit=20)
+                thread_opts = {0: "— Open a saved thread —"}
+                for t in threads:
+                    label = f"#{t['id']} · {t['updated_at']} · {t['message_count']} msgs"
+                    if t.get("preview"):
+                        label += f" — {t['preview'][:50]}"
+                    thread_opts[t["id"]] = label
+                pick = st.selectbox(
+                    "Saved conversations",
+                    options=list(thread_opts.keys()),
+                    format_func=lambda x: thread_opts.get(x, str(x)),
+                    key="orch_thread_pick",
+                    label_visibility="collapsed",
+                )
+            except Exception:
+                pick = 0
+        with tc2:
+            if st.button("Load thread", use_container_width=True, key="orch_load_thread"):
+                if pick and pick != 0:
+                    try:
+                        from database.sqlite_db import get_conversation_for_user
+                        if get_conversation_for_user(pick, st.session_state.username):
+                            st.session_state.orch_conversation_id = pick
+                            st.session_state.orch_chat = []
+                            st.session_state.orch_last_proc = None
+                            _sync_orch_chat_from_db(force=True)
+                            st.rerun()
+                    except Exception:
+                        pass
+        with tc3:
+            if st.button("New chat", use_container_width=True, key="orch_new_chat"):
+                _start_new_orch_conversation()
+                st.rerun()
+        n_msgs = len(st.session_state.orch_chat or [])
+        st.markdown(
+            f'<div class="thread-bar">'
+            f'Active thread <b>#{st.session_state.get("orch_conversation_id") or "—"}</b> · '
+            f'{n_msgs} messages · persisted across sessions</div>',
+            unsafe_allow_html=True,
+        )
 
         orch_up = st.file_uploader(
             "Attach files (optional, PDF / TXT / DOCX)",
@@ -907,29 +1219,35 @@ if _ti is not None:
                 if txt.strip():
                     orch_attachments.append({"name": f.name, "content": txt})
 
-        for entry in st.session_state.orch_chat:
+        st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
+        if not st.session_state.orch_chat:
+            st.caption("Start a conversation — messages are saved automatically and reload when you return or open a saved thread.")
+        for idx, entry in enumerate(st.session_state.orch_chat):
             if entry["role"] == "user":
-                st.markdown(f'<div class="chat-wrap"><div class="chat-user">{entry["content"]}</div></div>', unsafe_allow_html=True)
+                body = _hesc_html(entry.get("content", ""))
+                st.markdown(f'<div class="chat-wrap"><div class="chat-user">{body}</div></div>', unsafe_allow_html=True)
             else:
-                badges = " ".join([f'<span class="badge badge-blue">{a}</span>' for a in entry.get("agents",[])])
+                from tools.assistant_display import build_display_text
+
+                display = entry.get("display_content") or build_display_text(
+                    entry.get("content", ""),
+                    entry.get("ui_payload"),
+                )
+                body = _hesc_html(display)
+                badges = " ".join(
+                    f'<span class="badge badge-indigo">{_hesc_html(a)}</span>'
+                    for a in entry.get("agents", [])
+                )
                 ms = entry.get("elapsed_ms", 0)
-                st.markdown(f'<div class="chat-wrap"><div class="chat-agent">{badges} <small style="color:#94a3b8">({ms} ms)</small><br><br>{entry["content"]}</div></div>', unsafe_allow_html=True)
-                pa = entry.get("per_agent") or {}
-                if pa:
-                    with st.expander("Per-agent results", expanded=False):
-                        labels = {
-                            "general": "Assistant (chat)",
-                            "hr_gmail": "Gmail CV shortlist",
-                            "it_support": "IT Support",
-                            "email": "Email",
-                            "hr": "HR",
-                            "recruitment": "Recruitment",
-                            "finance": "Finance",
-                            "documents": "Documents",
-                        }
-                        for ag, txt in pa.items():
-                            st.markdown(f"**{labels.get(ag, ag)}**")
-                            st.markdown(str(txt)[:12000] + ("…" if len(str(txt)) > 12000 else ""))
+                st.markdown(
+                    f'<div class="chat-wrap"><div class="chat-agent">{badges} '
+                    f'<small style="color:#94a3b8">({ms} ms)</small><br><br>{body}</div></div>',
+                    unsafe_allow_html=True,
+                )
+                ui = entry.get("ui_payload")
+                if ui:
+                    _render_assistant_ui_payload(ui, key_prefix=f"orch_{idx}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
         _orch_fe = st.session_state.get("orch_finance_export_files")
         if _orch_fe:
@@ -950,7 +1268,11 @@ if _ti is not None:
                         st.caption(fe.get("filename", ""))
 
         with st.form("orch_form", clear_on_submit=True):
-            inp = st.text_area("Your message", placeholder="Describe any task — IT, email, HR, finance, documents...", height=90)
+            inp = st.text_area(
+                "Your message",
+                placeholder="e.g. Fetch latest 10 candidate emails · select 2 python developers · send invites Monday 3 PM",
+                height=90,
+            )
             c1, c2 = st.columns([4, 1])
             with c1:
                 sub = st.form_submit_button("Send (route to specialists)", use_container_width=True)
@@ -963,20 +1285,21 @@ if _ti is not None:
                 st.caption("Same request was just processed; change the message or attachments to send again.")
             else:
                 orch_hist: list = []
-                for e in st.session_state.orch_chat[-14:]:
-                    if e.get("role") == "user":
-                        orch_hist.append({"role": "user", "content": e.get("content", "")})
-                    elif e.get("role") == "agent":
-                        orch_hist.append({"role": "assistant", "content": e.get("content", "")})
-                if not orch_hist and st.session_state.get("orch_conversation_id"):
+                if st.session_state.get("orch_conversation_id"):
                     try:
                         from database.sqlite_db import load_conversation_openai_history
 
                         orch_hist = load_conversation_openai_history(
-                            st.session_state.orch_conversation_id, limit=14
+                            st.session_state.orch_conversation_id, limit=16
                         )
                     except Exception:
                         pass
+                if not orch_hist:
+                    for e in st.session_state.orch_chat[-14:]:
+                        if e.get("role") == "user":
+                            orch_hist.append({"role": "user", "content": e.get("content", "")})
+                        elif e.get("role") == "agent":
+                            orch_hist.append({"role": "assistant", "content": e.get("content", "")})
                 st.session_state.orch_chat.append({"role": "user", "content": inp.strip()})
                 try:
                     from database.sqlite_db import append_conversation_message
@@ -1007,13 +1330,23 @@ if _ti is not None:
                         elif result.get("hr_gmail_batch_id"):
                             st.session_state.pending_hr_gmail_batch_id = result["hr_gmail_batch_id"]
                         st.session_state.orch_finance_export_files = result.get("finance_export_files")
-                        st.session_state.orch_chat.append({
-                            "role": "agent",
-                            "content": result["final_answer"],
-                            "agents": result["agents_used"],
-                            "elapsed_ms": result["elapsed_ms"],
-                            "per_agent": result.get("responses") or {},
-                        })
+                        if "hr_gmail" in (result.get("agents_used") or []):
+                            try:
+                                from database.sqlite_db import hr_shortlist_get_batch
+                                bid = result.get("hr_gmail_batch_id")
+                                if bid:
+                                    row = hr_shortlist_get_batch(bid)
+                                    if row:
+                                        payload = row.get("payload") or {}
+                                        st.session_state.hr_ats_candidates = payload.get("top") or []
+                                        st.session_state.hr_ats_batch_id = bid
+                                        st.session_state.hr_ats_filters = (payload.get("session_memory") or {}).get("filters_applied") or {}
+                            except Exception:
+                                pass
+                        from tools.assistant_display import prepare_assistant_chat_entry
+
+                        chat_entry = prepare_assistant_chat_entry(result)
+                        st.session_state.orch_chat.append(chat_entry)
                         try:
                             from database.sqlite_db import append_conversation_message
 
@@ -1025,7 +1358,8 @@ if _ti is not None:
                                 metadata={
                                     "agents_used": result.get("agents_used"),
                                     "elapsed_ms": result.get("elapsed_ms"),
-                                    "per_agent": result.get("responses"),
+                                    "ui_payload": result.get("ui_payload"),
+                                    "display_content": chat_entry.get("display_content"),
                                 },
                             )
                         except Exception:
@@ -1051,7 +1385,8 @@ if _ti is not None:
                             pass
                         st.rerun()
                     except Exception as e:
-                        st.session_state.orch_chat.pop()
+                        if st.session_state.orch_chat and st.session_state.orch_chat[-1].get("role") == "user":
+                            st.session_state.orch_chat.pop()
                         st.error(f"Orchestrator error: {e}")
 
         with st.expander("Message queue (live)"):
@@ -1067,219 +1402,23 @@ if _ti is not None:
             except Exception:
                 st.caption("Queue unavailable")
 
-        _pbid = st.session_state.get("pending_hr_gmail_batch_id")
-        if _pbid and st.session_state.user_role in ("Admin", "HR Manager", "Assistant"):
+        _pbid = st.session_state.get("pending_hr_gmail_batch_id") or st.session_state.get("hr_ats_batch_id")
+        if (
+            _pbid
+            and st.session_state.user_role in ("Admin", "HR Manager", "Assistant", "Demo User")
+            and st.session_state.get("hr_ats_candidates")
+            and not any((e.get("ui_payload") or {}).get("type") == "hr_shortlist" for e in st.session_state.orch_chat if e.get("role") == "agent")
+        ):
             st.divider()
-            st.markdown(
-                '<div style="background:#fff7ed;border:1px solid #fb923c;border-radius:12px;padding:14px 16px;margin-top:8px">'
-                "<b>Human-in-the-loop — Gmail shortlist:</b> drafts are saved; <b>no emails sent</b> until you approve "
-                "(button here or type <b>approve and send</b> in chat). "
-                f"Batch <code>{_pbid}</code></div>",
-                unsafe_allow_html=True,
-            )
-            h1, h2 = st.columns(2)
-            with h1:
-                if st.button("Approve & send interview emails (Gmail SMTP)", type="primary", key="asst_hitl_send"):
-                    with st.spinner("Sending..."):
-                        try:
-                            from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
-
-                            sr = approve_and_send_shortlist_batch(_pbid)
-                            if sr.get("ok"):
-                                st.success(f"Sent **{sr.get('emails_sent', 0)}** / {sr.get('total', 0)}.")
-                                st.session_state.pending_hr_gmail_batch_id = None
-                                st.json(sr.get("details", []))
-                                st.rerun()
-                            else:
-                                st.error(sr.get("error", "Send failed."))
-                                if sr.get("details"):
-                                    st.json(sr["details"])
-                        except Exception as ex:
-                            st.error(str(ex))
-            with h2:
-                if st.button("Dismiss pending batch", key="asst_hitl_clear"):
-                    st.session_state.pending_hr_gmail_batch_id = None
-                    st.rerun()
+            st.caption("Active shortlist — use chat to send invites or the actions below.")
+            _render_hr_ats_candidate_panel(_pbid, key_prefix="asst_sticky")
+            if st.button("Dismiss shortlist panel", key="asst_hitl_clear"):
+                st.session_state.pending_hr_gmail_batch_id = None
+                st.session_state.hr_ats_candidates = []
+                st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — RECRUITMENT AI (multi-agent orchestration, HITL before send)
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Recruitment AI")
-if _ti is not None:
-    with tabs[_ti]:
-        st.markdown(
-            '<div class="sec-hdr sec-purple">Multi-Agent Recruitment Orchestrator '
-            '<span class="badge badge-a2a">parallel</span> '
-            '<span class="badge badge-yellow">HITL</span></div>',
-            unsafe_allow_html=True,
-        )
-        st.info(
-            "Upload a **Job Description** (file or text) and **multiple CVs**. "
-            "Agents parse CVs in parallel, analyze the JD, match, shortlist, and draft interview emails. "
-            "**No email is sent** until you click **Approve send**."
-        )
-        st.caption(
-            "Use **Assistant** with CV attachments for the same pipeline; add **email them** / **send interview invitation** "
-            "to send from the Assistant, or use **Approve send** here to review every draft first."
-        )
-
-        rec_company = st.text_input("Company name", value="Our Company", key="rec_company")
-        rec_role = st.text_input("Role title (optional; inferred from JD if empty)", value="", key="rec_role")
-        rec_interview = st.text_input(
-            "Interview schedule text",
-            value="Tomorrow at 3:00 PM",
-            key="rec_interview",
-            help="Shown verbatim in drafts, e.g. 'Monday 2:00 PM' or 'Tomorrow at 3:00 PM'.",
-        )
-        rec_meeting = st.text_input(
-            "Meeting / logistics note",
-            value="We will send a calendar invite or video link after you confirm.",
-            key="rec_meeting",
-        )
-        c_top, c_thr = st.columns(2)
-        with c_top:
-            rec_top_n = st.number_input("Shortlist size (top N)", min_value=1, max_value=25, value=5, key="rec_top")
-        with c_thr:
-            rec_min_score = st.number_input("Minimum match score", min_value=0, max_value=100, value=52, key="rec_min")
-
-        jd_file = st.file_uploader("Job description file (optional)", type=["pdf", "docx", "txt"], key="rec_jd_file")
-        jd_text = st.text_area("Job description (paste if no JD file)", height=120, key="rec_jd_text")
-
-        cv_files = st.file_uploader(
-            "Candidate CVs (PDF / DOCX / TXT, multiple)",
-            accept_multiple_files=True,
-            type=["pdf", "docx", "txt"],
-            key="rec_cvs",
-        )
-
-        run_rec = st.button("Run recruitment pipeline", type="primary", use_container_width=True, key="rec_run")
-
-        if run_rec:
-            parts_jd = []
-            if jd_text.strip():
-                parts_jd.append(jd_text.strip())
-            if jd_file:
-                try:
-                    jd_file.seek(0)
-                    tj = _extract_text_from_uploaded_file(jd_file)
-                    if tj.strip():
-                        parts_jd.append(tj.strip())
-                except Exception:
-                    pass
-            jd_combined = "\n\n".join(parts_jd).strip()
-            cvs_list = []
-            if cv_files:
-                for f in cv_files:
-                    try:
-                        f.seek(0)
-                        txt = _extract_text_from_uploaded_file(f)
-                        cvs_list.append({"name": f.name, "content": txt or "", "file_name": f.name})
-                    except Exception:
-                        cvs_list.append({"name": f.name, "content": "", "file_name": f.name})
-
-            if not jd_combined:
-                st.error("Provide a job description (text and/or JD file).")
-            elif not cvs_list:
-                st.error("Upload at least one CV.")
-            else:
-                with st.spinner("Running parallel agents (CV parse ∥ JD) → match → shortlist → draft)..."):
-                    try:
-                        from recruitment.pipeline import run_recruitment_pipeline
-
-                        out = run_recruitment_pipeline(
-                            job_description=jd_combined,
-                            cvs=cvs_list,
-                            user_name=st.session_state.user_name,
-                            company=rec_company,
-                            role_title_hint=rec_role,
-                            interview_when=rec_interview,
-                            meeting_details=rec_meeting,
-                            top_n=int(rec_top_n),
-                            min_match_score=int(rec_min_score),
-                        )
-                        st.session_state.recruitment_last = out
-                        if out.get("ok"):
-                            st.session_state.recruitment_wf_id = out.get("workflow_id")
-                            st.session_state.recruitment_persist_ok = out.get("workflow_persisted", True)
-                            st.success(out.get("approval_message", "Pipeline completed."))
-                            if out.get("workflow_persisted") is False:
-                                st.error(
-                                    "Workflow was **not saved** to the database (check `database/` folder permissions). "
-                                    "**Approve send** cannot load drafts — fix the DB issue and run the pipeline again."
-                                )
-                        else:
-                            st.error(out.get("error", "Pipeline failed."))
-                    except Exception as e:
-                        st.error(str(e))
-
-        last = st.session_state.get("recruitment_last") or {}
-        if last.get("ok") and last.get("email_drafts"):
-            st.markdown("---")
-            st.markdown("#### Human-in-the-loop — review drafts")
-            st.warning(last.get("human_prompt", "Review drafts before sending."))
-            st.caption(f"Workflow ID: `{st.session_state.get('recruitment_wf_id')}`")
-
-            for i, d in enumerate(last.get("email_drafts") or [], 1):
-                with st.expander(f"{i}. {d.get('candidate_name')} — score {d.get('match_score')} — sendable: {d.get('sendable')}"):
-                    st.text(f"To: {d.get('recipient') or '(no email in CV — cannot send)'}")
-                    st.text(f"Subject: {d.get('subject', '')}")
-                    st.text_area("Body", value=d.get("body") or "", height=220, key=f"rec_draft_{i}", disabled=True)
-
-            if st.button("Approve send (Gmail SMTP)", type="primary", key="rec_approve"):
-                wf = st.session_state.get("recruitment_wf_id")
-                last = st.session_state.get("recruitment_last") or {}
-                drafts = last.get("email_drafts") or []
-                persist_ok = st.session_state.get("recruitment_persist_ok", True)
-
-                if not wf:
-                    st.error("No workflow id; run the pipeline again.")
-                else:
-                    with st.spinner("Sending approved emails..."):
-                        try:
-                            from recruitment.pipeline import approve_and_send_workflow, send_recruitment_email_drafts
-
-                            send_r: dict = {}
-                            used_fallback = False
-
-                            if persist_ok:
-                                send_r = approve_and_send_workflow(wf)
-                                err = send_r.get("error") or ""
-                                if (not send_r.get("ok")) and last.get("workflow_id") == wf and drafts:
-                                    if err == "Workflow not found." or "No drafts with valid recipient" in err:
-                                        send_r = send_recruitment_email_drafts(drafts)
-                                        used_fallback = True
-                            else:
-                                if last.get("workflow_id") == wf and drafts:
-                                    send_r = send_recruitment_email_drafts(drafts)
-                                    used_fallback = True
-                                else:
-                                    send_r = {"ok": False, "error": "Nothing to send; re-run the pipeline."}
-
-                            if used_fallback and (send_r.get("ok") or send_r.get("partial")):
-                                st.info("Sent using **session drafts** (database copy was missing or had no recipients).")
-
-                            if send_r.get("ok"):
-                                if send_r.get("partial"):
-                                    st.warning(send_r.get("error", "Some emails failed to send."))
-                                else:
-                                    st.success(
-                                        f"Sent **{send_r['send_results'].get('emails_sent', 0)}** / "
-                                        f"{send_r['send_results'].get('total', 0)} email(s)."
-                                    )
-                                st.json(send_r.get("send_results", {}))
-                            else:
-                                st.error(send_r.get("error", "Send failed."))
-                                if send_r.get("send_results"):
-                                    st.json(send_r.get("send_results", {}))
-                                st.caption(
-                                    "Tip: set `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD` in Windows environment variables "
-                                    "or set `GMAIL_APP_PASSWORD` in your `.env` file with a fresh Gmail App Password (16 letters, spaces optional)."
-                                )
-                        except Exception as e:
-                            st.error(str(e))
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — IT SUPPORT
+# TAB — IT SUPPORT
 # ══════════════════════════════════════════════════════════════════════════════
 _ti = _tab_idx.get("IT Support")
 if _ti is not None:
@@ -1498,133 +1637,10 @@ if _ti is not None:
 _ti = _tab_idx.get("HR")
 if _ti is not None:
     with tabs[_ti]:
-        st.caption("Tip: **Assistant** routes HR questions and CV-style tasks to the HR / recruitment specialists automatically.")
-        if st.session_state.user_role in ("HR Manager", "Admin"):
-            st.markdown(
-                '<div class="sec-hdr sec-teal" style="margin-top:0">📬 Gmail CV shortlist (IMAP → parse → match → HITL send)</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div style="background:#ecfeff;border:1px solid #06b6d4;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px">'
-                "<b>Operational workflow (not Q&amp;A-only):</b> scans your <b>configured Gmail inbox</b> for recent "
-                "messages with <b>PDF/DOCX CVs</b>, ranks them against your criteria with <b>explainable dimensions</b>, "
-                "writes interview drafts, saves a <b>SQLite batch record</b>, and sends <b>only after you approve</b>."
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            hr_nl = st.text_area(
-                "One-shot prompt (same wording as Assistant)",
-                placeholder="e.g. Fetch last 40 emails with CVs and select 5 candidates for Python developer and email them — interview tomorrow 8am",
-                height=90,
-                key="hr_gmail_nl",
-            )
-            if st.button("Run from prompt", use_container_width=True, key="hr_gmail_nl_run") and hr_nl.strip():
-                with st.spinner("Parsing prompt + IMAP + ranking..."):
-                    try:
-                        from tools.hr_gmail_shortlist import run_gmail_shortlist_from_user_prompt
-
-                        out = run_gmail_shortlist_from_user_prompt(
-                            user_message=hr_nl.strip(),
-                            user_name=st.session_state.user_name,
-                            user_role=st.session_state.user_role,
-                        )
-                        st.session_state.hr_gmail_last = out
-                        if out.get("ok"):
-                            st.session_state.hr_gmail_batch_id = out.get("batch_id")
-                            st.session_state.pending_hr_gmail_batch_id = out.get("batch_id")
-                            st.success(
-                                f"**{len(out.get('drafts') or [])}** candidate(s) — batch `{out.get('batch_id')}` "
-                                "(pending approval below)."
-                            )
-                            st.rerun()
-                        else:
-                            st.error(out.get("error", "Could not parse or run."))
-                    except Exception as e:
-                        st.error(str(e))
-            g1, g2, g3 = st.columns(3)
-            with g1:
-                gm_scan = st.number_input("Inbox messages to scan", min_value=10, max_value=100, value=50, key="hr_gmail_scan")
-            with g2:
-                gm_top = st.number_input("Top candidates to keep", min_value=1, max_value=25, value=5, key="hr_gmail_top")
-            with g3:
-                gm_company = st.text_input("Company name", value="Our Company", key="hr_gmail_co")
-            gm_role = st.text_input(
-                "Role / JD criteria",
-                value="Python developer: Python, REST APIs, SQL, teamwork, 2+ years.",
-                key="hr_gmail_role",
-            )
-            gm_when = st.text_input("Interview time (shown in email)", value="Tomorrow at 08:00 AM", key="hr_gmail_when")
-            if st.button("🔍 Scan Gmail & build shortlist", type="primary", use_container_width=True, key="hr_gmail_run"):
-                with st.spinner("IMAP fetch + CV parse + JD match (parallel) — may take 1–3 minutes..."):
-                    try:
-                        from tools.hr_gmail_shortlist import run_gmail_shortlist_pipeline
-
-                        out = run_gmail_shortlist_pipeline(
-                            job_criteria=gm_role,
-                            interview_when=gm_when,
-                            company=gm_company,
-                            user_name=st.session_state.user_name,
-                            user_role=st.session_state.user_role,
-                            max_messages=int(gm_scan),
-                            top_n=int(gm_top),
-                        )
-                        st.session_state.hr_gmail_last = out
-                        if out.get("ok"):
-                            st.session_state.hr_gmail_batch_id = out.get("batch_id")
-                            st.success(
-                                f"Shortlist ready — **{len(out.get('drafts') or [])}** candidate(s). "
-                                f"Batch `{out.get('batch_id')}` saved (pending send)."
-                            )
-                        else:
-                            st.error(out.get("error", "Failed."))
-                    except Exception as e:
-                        st.error(str(e))
-
-            last_g = st.session_state.get("hr_gmail_last") or {}
-            if last_g.get("ok") and last_g.get("drafts"):
-                st.markdown("---")
-                st.markdown("#### Explainable shortlist (review before send)")
-                st.caption(f"Role inferred: **{last_g.get('role_title', '')}** · Parsed attachments: **{last_g.get('attachments_parsed', 0)}**")
-                for i, d in enumerate(last_g.get("drafts") or [], 1):
-                    dim = d.get("dimensions") or {}
-                    dim_txt = ""
-                    if isinstance(dim, dict) and dim:
-                        dim_txt = " · ".join(f"{k.replace('_', ' ')}: **{v}**" for k, v in dim.items())
-                    with st.expander(
-                        f"#{i} {d.get('candidate_name')} — match **{d.get('match_score')}** — "
-                        f"to: {d.get('recipient') or '⚠ no email'}",
-                        expanded=(i == 1),
-                    ):
-                        st.markdown(f"**Rationale:** {d.get('rationale', '')}")
-                        if dim_txt:
-                            st.markdown(f"**Dimensions:** {dim_txt}")
-                        if d.get("strengths"):
-                            st.markdown("**Strengths:** " + "; ".join(str(x) for x in d["strengths"][:8]))
-                        if d.get("weaknesses"):
-                            st.markdown("**Risks / gaps:** " + "; ".join(str(x) for x in d["weaknesses"][:6]))
-                        st.text(f"Subject: {d.get('subject', '')}")
-                        st.text_area("Body preview", value=(d.get("body") or "")[:2500], height=180, key=f"hr_gmail_body_{i}", disabled=True)
-
-                bid = st.session_state.get("hr_gmail_batch_id")
-                if st.button("✅ Approve & send interview emails (Gmail SMTP)", type="primary", key="hr_gmail_send"):
-                    if not bid:
-                        st.error("No batch id — run scan again.")
-                    else:
-                        with st.spinner("Sending approved emails..."):
-                            try:
-                                from tools.hr_gmail_shortlist import approve_and_send_shortlist_batch
-
-                                sr = approve_and_send_shortlist_batch(bid)
-                                if sr.get("ok"):
-                                    st.success(f"Sent **{sr.get('emails_sent', 0)}** / {sr.get('total', 0)} email(s).")
-                                    st.json(sr.get("details", []))
-                                else:
-                                    st.error(sr.get("error", "Send failed."))
-                                    if sr.get("details"):
-                                        st.json(sr["details"])
-                            except Exception as e:
-                                st.error(str(e))
-            st.markdown("---")
+        st.info(
+            "**Inbox fetch, CV shortlist, interview invites, and follow-ups** are handled in the **Assistant** tab "
+            "using natural language (e.g. *fetch 20 and select two for python*, *send interview invitations Monday 3 PM*)."
+        )
 
         st.markdown('<div class="sec-hdr sec-purple">HR operations</div>', unsafe_allow_html=True)
         hr_user = st.text_input("Your Name", value=st.session_state.user_name, key="hr_user")
@@ -2616,7 +2632,49 @@ if _ti is not None:
 _ti = _tab_idx.get("History")
 if _ti is not None:
     with tabs[_ti]:
-        st.markdown('<div class="sec-hdr">📋 Task History</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-blue">Chat &amp; activity history</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="sec-hdr" style="margin-top:8px">Saved chat threads</div>', unsafe_allow_html=True)
+        try:
+            from database.sqlite_db import (
+                list_user_conversations,
+                load_conversation_ui_messages,
+                get_conversation_for_user,
+            )
+
+            threads = list_user_conversations(st.session_state.username, "orchestrator", limit=25)
+            if threads:
+                for t in threads:
+                    with st.expander(
+                        f"Thread #{t['id']} · {t['updated_at']} · {t['message_count']} messages",
+                        expanded=False,
+                    ):
+                        if t.get("preview"):
+                            st.caption(t["preview"])
+                        msgs = load_conversation_ui_messages(t["id"], limit=40)
+                        for m in msgs:
+                            role_lbl = "You" if m.get("role") == "user" else "Assistant"
+                            agents = ", ".join(m.get("agents") or [])
+                            st.markdown(
+                                f'<div class="hist-row"><b>{role_lbl}</b>'
+                                + (f' <span class="badge badge-blue">{_hesc_html(agents)}</span>' if agents else "")
+                                + f"<br>{_hesc_html(m.get('content', '')[:800])}</div>",
+                                unsafe_allow_html=True,
+                            )
+                        if st.button(f"Open in Assistant", key=f"hist_open_{t['id']}"):
+                            if get_conversation_for_user(t["id"], st.session_state.username):
+                                st.session_state.orch_conversation_id = t["id"]
+                                st.session_state.orch_chat = []
+                                _sync_orch_chat_from_db(force=True)
+                                st.info(f"Thread #{t['id']} loaded — open the **Assistant** tab to continue.")
+                                st.rerun()
+            else:
+                st.info("No saved chat threads yet. Use **Assistant** — each thread is stored automatically.")
+        except Exception as ex:
+            st.error(f"Chat threads: {ex}")
+
+        st.divider()
+        st.markdown('<div class="sec-hdr">Task audit log</div>', unsafe_allow_html=True)
 
         hist_filter = st.selectbox("Filter by source", ["All","ui","whatsapp","api"], key="hist_filter")
         try:
@@ -2634,12 +2692,12 @@ if _ti is not None:
                         tail = "..." if len(resp) > 500 else ""
                         body = (
                             f'<div class="hist-row">'
-                            f'<span class="badge {src_badge}">{h.get("source", "ui").upper()}</span> '
-                            f'<span class="badge badge-green">{h.get("role", "")}</span> '
+                            f'<span class="badge {src_badge}">{_hesc_html(h.get("source", "ui").upper())}</span> '
+                            f'<span class="badge badge-green">{_hesc_html(h.get("role", ""))}</span> '
                             f'<span style="font-size:12px;color:#64748b"> {h.get("elapsed", 0)}ms</span><br><br>'
-                            f'<b>Input:</b> {h.get("input", "")}<br><br>'
-                            f'<b>Agents:</b> {h.get("agents", "")}<br><br>'
-                            f'<b>Response:</b><br>{resp[:500]}{tail}'
+                            f'<b>Input:</b> {_hesc_html(h.get("input", ""))}<br><br>'
+                            f'<b>Agents:</b> {_hesc_html(h.get("agents", ""))}<br><br>'
+                            f'<b>Response:</b><br>{_hesc_html(resp[:500])}{tail}'
                             f"</div>"
                         )
                         st.markdown(body, unsafe_allow_html=True)

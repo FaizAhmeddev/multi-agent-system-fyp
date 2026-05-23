@@ -320,7 +320,6 @@ USERS = {
 _FULL_TABS = [
     "Assistant",
     "Dashboard",
-    "Recruitment AI",
     "IT Support",
     "Email",
     "HR",
@@ -336,12 +335,11 @@ ROLE_VISIBLE_TABS = {
     "HR Manager": {
         "Assistant",
         "Dashboard",
-        "Recruitment AI",
         "Email",
         "HR",
         "History",
     },
-    "Assistant": {"Email", "History"},
+    "Assistant": {"Assistant", "Email", "History"},
     "Finance Manager": {"Assistant", "Dashboard", "Finance", "History"},
     "IT Staff": {"Assistant", "Dashboard", "IT Support", "History"},
 }
@@ -378,9 +376,9 @@ def get_role_orchestrator_allowlist(role: str):
 
 ROLE_PORTAL_BANNERS = {
     "Admin": """<div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#e2e8f0;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #334155">
-<b style="font-size:15px">Administrator portal</b> — full orchestrator, all departments, MCP tools, recruitment approvals, and system analytics.</div>""",
+<b style="font-size:15px">Administrator portal</b> — full orchestrator, all departments, MCP tools, and HR hiring via <b>Assistant</b>.</div>""",
     "HR Manager": """<div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);color:#faf5ff;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #7c3aed">
-<b style="font-size:15px">HR operations portal</b> — CV screening, Gmail shortlist with <b>human approval before send</b>, recruitment pipeline, and email — not generic Q&amp;A: operational hiring workflows.</div>""",
+<b style="font-size:15px">HR operations portal</b> — use <b>Assistant</b> for inbox fetch, CV shortlist, interview invites, and follow-ups in plain language.</div>""",
     "Assistant": """<div style="background:linear-gradient(135deg,#0f766e,#115e59);color:#ecfdf5;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #14b8a6">
 <b style="font-size:15px">Assistant portal</b> — <b>Email</b> plus <b>Gmail CV shortlist</b> (fetch → rank → <b>approve before send</b>). Other departments stay hidden.</div>""",
     "Finance Manager": """<div style="background:linear-gradient(135deg,#14532d,#166534);color:#f0fdf4;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #22c55e">

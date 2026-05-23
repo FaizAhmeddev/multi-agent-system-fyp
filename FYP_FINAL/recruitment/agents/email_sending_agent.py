@@ -1,7 +1,7 @@
 """
 Email Sending Agent — Gmail SMTP with retries and logging.
 
-Used after **Recruitment AI → Approve send**, or from the **Assistant** path when the user
+Used from the **Assistant** path when the user
 explicitly asks to send interview emails (orchestrator auto-send).
 """
 

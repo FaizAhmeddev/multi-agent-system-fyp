@@ -20,6 +20,17 @@ from recruitment.agents.jd_analysis_agent import analyze_job_description
 from recruitment.agents.matching_agent import match_candidate_to_jd
 from recruitment.agents.email_drafting_agent import draft_interview_invitation
 from database.sqlite_db import hr_shortlist_save_batch, hr_shortlist_get_batch, hr_shortlist_update_status, log_agent
+from tools.hr_recruitment_assistant import (
+    DEFAULT_MIN_RECOMMEND_SCORE,
+    build_session_memory_from_result,
+    candidate_matches_required_skills,
+    enrich_candidate_record,
+    extract_required_skills_from_prompt,
+    filter_drafts_for_send,
+    format_ats_ranking,
+    parse_selective_send_command,
+    user_explicitly_requests_email_all,
+)
 
 HR_GMAIL_BATCH_MARKER_PREFIX = "[[HR_GMAIL_BATCH_ID:"
 HR_GMAIL_BATCH_MARKER_SUFFIX = "]]"
@@ -127,59 +138,160 @@ def gmail_fetch_cv_attachments(max_messages: int = 50) -> list[dict[str, Any]]:
     return out
 
 
-def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
-    """
-    Detect natural-language requests like:
-    "fetch last 40 emails CVs and select 5 candidates for python and email them"
-    """
-    m = (message or "").strip()
-    if len(m) < 20:
-        return None
-    low = m.lower()
-    has_inbox = any(
-        x in low
-        for x in ("email", "e-mail", "emails", "inbox", "gmail", "mail message", "messages")
-    )
-    has_cv = any(x in low for x in ("cv", "resume", "candidat", "applicant"))
-    has_fetch = any(
-        x in low
-        for x in ("fetch", "scan", "pull", "get", "retrieve", "collect", "read last", "last ")
-    )
-    if not (has_inbox and has_cv and has_fetch):
-        return None
+_WORD_TO_INT: dict[str, int] = {
+    "a": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
 
-    max_messages = 50
+_TECH_ROLE_RE = (
+    r"python|java|javascript|typescript|react|django|flask|fastapi|node\.?js|"
+    r"sql|devops|aws|ml|machine\s+learning|data\s+scientist|data\s+entry"
+)
+
+
+def _parse_count_token(token: str | None) -> int | None:
+    if not token:
+        return None
+    t = token.strip().lower()
+    if t.isdigit():
+        return int(t)
+    return _WORD_TO_INT.get(t)
+
+
+def _extract_top_n_from_prompt(low: str) -> int | None:
+    """How many candidates to keep, e.g. select 1 python, select two for python."""
+    patterns = (
+        r"\bselect\s+(?:only\s+)?(?:the\s+)?(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+        rf"(?:{_TECH_ROLE_RE}|developer|engineer|candidate|people|person)s?\b",
+        rf"\bselect\s+(?:only\s+)?(?P<n>\d+|one|two|three|four|five)\s+for\s+(?:{_TECH_ROLE_RE})\b",
+        r"\bselect\s+(?:only\s+)?(?:the\s+)?(?:top\s*)?(?P<n>\d+|one|two|three|four|five)\s+candidates?\b",
+        r"\b(?:pick|choose|take|shortlist)\s+(?:only\s+)?(?P<n>\d+|one|two|three|four|five)\s+"
+        rf"(?:{_TECH_ROLE_RE}|developer|engineer|candidates?)\b",
+        r"\bfetch\s+\d+\s+.*?\bselect\s+(?P<n>\d+|one|two|three|four|five)\b",
+        r"\bonly\s+(?P<n>\d+|one|two|three|four|five)\s+"
+        rf"(?:{_TECH_ROLE_RE})\s+(?:developer|engineer|candidate|people)?s?\b",
+        r"\b(?P<n>\d+|one|two|three|four|five)\s+"
+        rf"(?:{_TECH_ROLE_RE})\s+(?:developer|engineer|candidate|people)s?\b",
+        r"\btop\s*(?P<n>\d+|one|two|three|four|five)\s+(?:candidates?|developers?|engineers?)\b",
+        r"\bshortlist\s+(?P<n>\d+|one|two|three|four|five)\b",
+        r"\b(\d+)\s+best\s+candidates?\b",
+    )
+    for pat in patterns:
+        mm = re.search(pat, low, re.I)
+        if not mm:
+            continue
+        tok = mm.groupdict().get("n")
+        if not tok and mm.lastindex:
+            tok = mm.group(1)
+        n = _parse_count_token(tok)
+        if n is not None:
+            return max(1, min(25, n))
+    return None
+
+
+def _extract_max_messages_from_prompt(low: str) -> int:
     for pat in (
         r"(?:last|past|recent)\s+(\d+)\s+(?:e-?mails?|emails?|messages?)",
-        r"(?:fetch|get|scan|pull|collect|retrieve)\s+(\d+)\s+(?:e-?mails?|emails?|messages?)",
+        r"(?:fetch|get|scan|pull|collect|retrieve)\s+(?:last\s+)?(\d+)\s+(?:e-?mails?|emails?|messages?)",
+        r"(?:fetch|get|scan)\s+(\d+)\b",
         r"(\d+)\s+(?:e-?mails?|emails?|messages?)\s+(?:from|in)\s+(?:my\s+)?(?:inbox|gmail|mail)",
     ):
         mm = re.search(pat, low, re.I)
         if mm:
-            max_messages = max(5, min(100, int(mm.group(1))))
-            break
+            return max(5, min(100, int(mm.group(1))))
+    return 50
 
-    top_n = 5
-    for pat in (
-        r"select\s+(?:the\s+)?(?:top\s*)?(\d+)\s+candidates?",
-        r"(?:pick|choose|take)\s+(\d+)\s+candidates?",
-        r"(\d+)\s+best\s+candidates?",
-        r"top\s*(\d+)\s+candidates?",
-        r"shortlist\s+(\d+)",
+
+def _prompt_has_hiring_focus(low: str) -> bool:
+    if any(x in low for x in ("cv", "resume", "candidat", "applicant", "attachment")):
+        return True
+    if re.search(
+        rf"\b(?:{_TECH_ROLE_RE})\b.*\b(?:dev|developer|engineer|candidate|role|position)\b",
+        low,
+        re.I,
     ):
-        mm = re.search(pat, low, re.I)
-        if mm:
-            top_n = max(1, min(25, int(mm.group(1))))
-            break
+        return True
+    if re.search(
+        rf"\b(?:select|shortlist|find|pick|choose|hire)\s+(?:only\s+)?(?:\d+|one|two|three|four|five)\s+"
+        rf"(?:for\s+)?(?:{_TECH_ROLE_RE})\b",
+        low,
+        re.I,
+    ):
+        return True
+    if re.search(rf"\bfor\s+(?:{_TECH_ROLE_RE})\b", low, re.I):
+        return True
+    if re.search(rf"\b(?:{_TECH_ROLE_RE})\s+(?:dev|developer|engineer)s?\b", low, re.I):
+        return True
+    if re.search(
+        rf"\bfind\s+(?:{_TECH_ROLE_RE})\s+developers?\b",
+        low,
+        re.I,
+    ):
+        return True
+    return False
+
+
+def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
+    """
+    Detect natural-language requests like:
+    - fetch last 20 emails and select two for python
+    - select 1 python developer
+    - fetch last 40 emails CVs and select 5 candidates for python
+    """
+    m = (message or "").strip()
+    if len(m) < 12:
+        return None
+    low = m.lower()
+
+    has_inbox = any(
+        x in low
+        for x in ("email", "e-mail", "emails", "inbox", "gmail", "mail message", "messages")
+    )
+    has_fetch = any(
+        x in low
+        for x in ("fetch", "scan", "pull", "get", "retrieve", "collect", "read last", "last ", "find ")
+    )
+    has_select = bool(re.search(r"\b(?:select|shortlist|pick|choose)\b", low))
+    has_hiring = _prompt_has_hiring_focus(low)
+
+    is_fetch_flow = has_hiring and (
+        (has_fetch and (has_inbox or re.search(r"\bfetch\s+\d+", low)))
+        or (has_fetch and has_select)
+        or (has_select and has_hiring)
+        or (has_fetch and has_inbox and has_hiring)
+    )
+    if not is_fetch_flow:
+        return None
+
+    max_messages = _extract_max_messages_from_prompt(low)
+    top_n = _extract_top_n_from_prompt(low)
+    if top_n is None:
+        top_n = 5
 
     interview_when = "To be scheduled — confirm by reply."
     im = re.search(
         r"(?i)(interview\s+(?:on\s+|at\s+)?[^.;]{5,140}|"
-        r"(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)[^.;\n]{0,100})",
+        r"(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
+        r"[^.;\n]{0,100}(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?)",
         m,
     )
     if im:
         interview_when = im.group(1).strip()[:220]
+    tm = re.search(
+        r"(?i)\b(?:tomorrow|today)\b[^.;\n]{0,80}(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?)",
+        m,
+    )
+    if tm and not im:
+        interview_when = tm.group(0).strip()[:220]
 
     job_criteria = _infer_job_criteria_from_prompt(m)
     company = "Our Company"
@@ -193,16 +305,36 @@ def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
         "job_criteria": job_criteria,
         "interview_when": interview_when,
         "company": company,
+        "user_message": m,
     }
 
 
 def _infer_job_criteria_from_prompt(message: str) -> str:
-    m = re.search(r"(?i)for\s+(.+?)(?:\s+and\s+email|\s*,\s*email|\s+email\s+them|\.|$)", message)
+    tech_dev = re.search(
+        rf"(?i)\b({_TECH_ROLE_RE})\s+(?:dev|developer|engineer)s?\b",
+        message,
+    )
+    if tech_dev:
+        return f"{tech_dev.group(1)} developer. Full request: {message[:700]}"
+    for pat in (
+        rf"\bselect\s+(?:only\s+)?(?:\d+|one|two|three|four|five)\s+for\s+({_TECH_ROLE_RE}(?:\s+developer)?)",
+        rf"\bfor\s+({_TECH_ROLE_RE})(?:\s+developer|\s+engineer|\s+candidate|\s+role|\s+position)?\b",
+        r"(?i)find\s+((?:python|java|javascript|react|node)\s+developers?)",
+    ):
+        m = re.search(pat, message, re.I)
+        if m:
+            chunk = m.group(1).strip()
+            if len(chunk) >= 3:
+                return f"{chunk} role. Context: {message[:500]}"
+    m = re.search(
+        r"(?i)for\s+((?:python|java|javascript|react|node|django|flask)[^.;]{2,80}?)"
+        r"(?:\s+and\s+email|\s*,\s*email|\s+email\s+them|\.|$)",
+        message,
+    )
     if m:
         return m.group(1).strip()[:1500]
     tech = re.search(
-        r"(?i)\b(python|java|javascript|typescript|react|django|flask|node\.?js|sql|"
-        r"data\s+scientist|data\s+entry|devops|aws|ml\b|machine\s+learning)\b[^.;]{0,120}",
+        rf"(?i)\b({_TECH_ROLE_RE})\b[^.;]{{0,120}}",
         message,
     )
     if tech:
@@ -211,32 +343,21 @@ def _infer_job_criteria_from_prompt(message: str) -> str:
 
 
 def format_hr_gmail_orchestrator_reply(res: dict[str, Any]) -> str:
+    """Internal thread text (batch marker for follow-ups). UI uses assistant_display cards."""
     if not res.get("ok"):
-        return f"**Gmail CV shortlist**\n\n{res.get('error', 'Failed.')}"
+        return res.get("error", "Failed.")
 
     drafts = res.get("drafts") or []
     bid = res.get("batch_id") or ""
-    lines = [
-        "**Gmail CV shortlist** (IMAP → parse → match → drafts saved)",
-        "",
-        f"**Batch ID:** `{bid}`",
-        f"**Role title (inferred):** {res.get('role_title', '')}",
-        f"**CV attachments parsed:** {res.get('attachments_parsed', 0)}",
-        "",
-        "**Human-in-the-loop:** nothing was sent yet. Use **Approve & send interview emails** below (or on the **HR** tab), "
-        "or type **approve and send** in this chat (batch id is taken from this thread or paste the UUID).",
-        "",
-        "### Shortlist",
-    ]
-    for d in drafts:
-        ok = "yes" if d.get("sendable") else "**missing email**"
-        lines.append(f"- **{d.get('candidate_name')}** — match **{d.get('match_score')}** — sendable: {ok}")
-    if drafts:
-        p0 = drafts[0]
-        lines += ["", "### First draft preview", "", f"**Subject:** {p0.get('subject', '')}", "", (p0.get("body") or "")[:1800]]
-
+    fa = res.get("filters_applied") or {}
+    skills = ", ".join(fa.get("required_skills") or []) or "—"
+    summary = (
+        f"Shortlisted {len(drafts)} candidate(s) for {res.get('role_title', 'role')}. "
+        f"Scanned {res.get('emails_scanned', 0)} emails, {res.get('attachments_parsed', 0)} CVs. "
+        f"Skill filter: {skills}."
+    )
     marker = f"\n\n{HR_GMAIL_BATCH_MARKER_PREFIX}{bid}{HR_GMAIL_BATCH_MARKER_SUFFIX}"
-    return "\n".join(lines) + marker
+    return summary + marker
 
 
 def run_gmail_shortlist_from_user_prompt(
@@ -256,6 +377,7 @@ def run_gmail_shortlist_from_user_prompt(
         user_role=user_role,
         max_messages=int(spec["max_messages"]),
         top_n=int(spec["top_n"]),
+        user_prompt=spec.get("user_message") or user_message,
     )
 
 
@@ -279,11 +401,12 @@ def strip_hr_gmail_batch_marker(text: str) -> str:
 
 def user_requests_hr_gmail_approve_send(message: str) -> bool:
     """
-    Explicit chat opt-in to SMTP-send a pending Gmail shortlist batch.
-    Kept narrow so normal \"send an email\" requests are not confused with this path.
+    Chat opt-in to SMTP-send — includes selective targets (Send to Faiz, top 2, etc.).
     """
+    if parse_gmail_shortlist_prompt(message):
+        return False
     low = (message or "").lower().strip()
-    if len(low) < 12:
+    if len(low) < 8:
         return False
     phrases = (
         "approve and send",
@@ -294,19 +417,67 @@ def user_requests_hr_gmail_approve_send(message: str) -> bool:
         "send pending interview",
         "send gmail shortlist",
         "send the gmail shortlist",
+        "send to ",
+        "email ",
+        "invite ",
+        "mail ",
+        "email all",
+        "send to all",
+        "send to everyone",
+        "top 1",
+        "top 2",
+        "top 3",
+        "top 4",
+        "top 5",
+        "recommended",
     )
-    return any(p in low for p in phrases)
+    if any(p in low for p in phrases):
+        return True
+    if re.search(r"\b(?:send|email|invite)\s+(?:to\s+)?[a-z]{3,}", low):
+        return True
+    return False
+
+
+def user_requests_hr_recruitment_follow_up(message: str) -> bool:
+    """Follow-up on a prior shortlist without re-fetching inbox."""
+    low = (message or "").lower().strip()
+    if len(low) < 6:
+        return False
+    if parse_gmail_shortlist_prompt(message):
+        return False
+    cues = (
+        "send to",
+        "invite ",
+        "approve",
+        "top 1",
+        "top 2",
+        "top 3",
+        "top 4",
+        "top 5",
+        "recommended",
+        "email all",
+        "send to all",
+        "send to everyone",
+        "reject ",
+        "decline ",
+    )
+    if any(c in low for c in cues):
+        return True
+    if re.search(r"\b(?:send|email|invite)\s+(?:to\s+)?[a-z]{3,}", low):
+        return True
+    return False
 
 
 def resolve_hr_gmail_batch_id_for_send(
     user_message: str,
     conversation_history: list[dict[str, str]] | None,
+    *,
+    require_send_phrase: bool = True,
 ) -> str | None:
     """
-    When ``user_requests_hr_gmail_approve_send`` is true: resolve batch UUID from the
-    current message or the most recent assistant reply in this thread (Batch ID line).
+    Resolve batch UUID from the message or the most recent assistant reply in this thread.
     """
-    if not user_requests_hr_gmail_approve_send(user_message):
+    if require_send_phrase and not user_requests_hr_gmail_approve_send(user_message):
         return None
     msg = user_message or ""
     um = re.search(
@@ -391,6 +562,7 @@ def run_gmail_shortlist_pipeline(
     max_messages: int = 50,
     top_n: int = 5,
     max_workers: int = 5,
+    user_prompt: str = "",
 ) -> dict[str, Any]:
     """
     Fetch CVs from Gmail, rank vs ``job_criteria``, draft interview emails for top ``top_n``.
@@ -408,8 +580,11 @@ def run_gmail_shortlist_pipeline(
             "Check inbox, labels, and that CVs are attached (not only links in body).",
         }
 
+    skill_source = f"{job_criteria}\n{user_prompt or ''}".strip()
     jd_profile = analyze_job_description(job_criteria, role_title_hint="")
     role_title = (jd_profile.get("role_title") or "Open role").strip() or "Open role"
+    required_skills = extract_required_skills_from_prompt(skill_source, jd_profile)
+    min_score = DEFAULT_MIN_RECOMMEND_SCORE
 
     scored: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
@@ -433,8 +608,19 @@ def run_gmail_shortlist_pipeline(
                 )
 
     scored.sort(key=lambda x: -int(x.get("match_score") or 0))
+
+    skill_filtered: list[dict[str, Any]] = []
+    for item in scored:
+        parsed = item.get("parsed") or {}
+        match = item.get("match") or {}
+        if int(item.get("match_score") or 0) < min_score:
+            continue
+        if not candidate_matches_required_skills(parsed, match, required_skills):
+            continue
+        skill_filtered.append(item)
+
     tn = max(1, min(25, int(top_n)))
-    top = scored[:tn]
+    top = skill_filtered[:tn]
 
     drafts_out: list[dict[str, Any]] = []
     for item in top:
@@ -452,22 +638,19 @@ def run_gmail_shortlist_pipeline(
         )
         rec = (item.get("recipient") or "").strip()
         sendable = bool(rec and "@" in rec)
-        drafts_out.append(
-            {
-                "candidate_name": name,
-                "recipient": rec,
-                "sendable": sendable,
-                "match_score": int(item.get("match_score") or 0),
-                "subject": dr.get("subject"),
-                "body": dr.get("body"),
-                "dimensions": match.get("dimensions") or {},
-                "strengths": match.get("strengths") or [],
-                "weaknesses": match.get("weaknesses") or [],
-                "rationale": match.get("rationale") or "",
-                "source_mail_subject": item.get("subject_mail") or "",
-                "cv_filename": item.get("filename") or "",
-            }
-        )
+        raw = {
+            "parsed": parsed,
+            "match": match,
+            "candidate_name": name,
+            "recipient": rec,
+            "sendable": sendable,
+            "match_score": int(item.get("match_score") or 0),
+            "subject": dr.get("subject"),
+            "body": dr.get("body"),
+            "source_mail_subject": item.get("subject_mail") or "",
+            "cv_filename": item.get("filename") or "",
+        }
+        drafts_out.append(enrich_candidate_record(raw, min_score=min_score, jd_profile=jd_profile))
 
     batch_id = str(uuid.uuid4())
     payload = {
@@ -475,6 +658,19 @@ def run_gmail_shortlist_pipeline(
         "jd_profile": {k: v for k, v in jd_profile.items() if k != "jd_status"},
         "emails_scanned": int(max_messages),
         "attachments_parsed": len(rows),
+        "required_skills": required_skills,
+        "session_memory": build_session_memory_from_result({
+            "batch_id": batch_id,
+            "role_title": role_title,
+            "drafts": drafts_out,
+            "required_skills": required_skills,
+            "filters_applied": {
+                "required_skills": required_skills,
+                "min_score": min_score,
+                "matched_after_filter": len(skill_filtered),
+                "total_scored": len(scored),
+            },
+        }),
     }
     hr_shortlist_save_batch(
         batch_id=batch_id,
@@ -499,11 +695,22 @@ def run_gmail_shortlist_pipeline(
         "role_title": role_title,
         "drafts": drafts_out,
         "attachments_parsed": len(rows),
+        "emails_scanned": int(max_messages),
+        "required_skills": required_skills,
+        "filters_applied": payload.get("session_memory", {}).get("filters_applied") or {},
+        "session_memory": payload.get("session_memory"),
     }
 
 
-def approve_and_send_shortlist_batch(batch_id: str) -> dict[str, Any]:
-    """Send all sendable drafts in the batch; never sends without valid recipient."""
+def approve_and_send_shortlist_batch(
+    batch_id: str,
+    *,
+    user_message: str = "",
+    ui_selected_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Send only explicitly targeted candidates. Never emails everyone unless user says email all / send to everyone.
+    """
     row = hr_shortlist_get_batch(batch_id)
     if not row:
         return {"ok": False, "error": "Batch not found."}
@@ -516,9 +723,24 @@ def approve_and_send_shortlist_batch(batch_id: str) -> dict[str, Any]:
 
     payload = row.get("payload") or {}
     drafts = payload.get("top") or []
+    send_spec = parse_selective_send_command(user_message, drafts)
+    if user_explicitly_requests_email_all(user_message):
+        send_spec["mode"] = "all_explicit"
+
+    to_send, err = filter_drafts_for_send(drafts, send_spec, ui_selected_ids=ui_selected_ids)
+    if err:
+        return {"ok": False, "error": err, "needs_clarification": True, "candidates": drafts}
+
+    if not to_send:
+        return {
+            "ok": False,
+            "error": "No recipients to send. Select candidates or specify who to email.",
+            "needs_clarification": True,
+        }
+
     results: list[dict[str, Any]] = []
     sent = 0
-    for d in drafts:
+    for d in to_send:
         to = (d.get("recipient") or "").strip()
         if not to or "@" not in to:
             results.append({"recipient": to, "ok": False, "error": "missing recipient"})
@@ -538,4 +760,98 @@ def approve_and_send_shortlist_batch(batch_id: str) -> dict[str, Any]:
 
     hr_shortlist_update_status(batch_id, "sent" if sent else "pending_send")
     log_agent("HR Gmail Shortlist", "gmail_approve_send", batch_id, str(results)[:2000], sent > 0, 0)
-    return {"ok": sent > 0, "emails_sent": sent, "total": len(drafts), "details": results}
+    return {
+        "ok": sent > 0,
+        "emails_sent": sent,
+        "total": len(to_send),
+        "total_in_batch": len(drafts),
+        "details": results,
+        "recipients": [d.get("candidate_name") for d in to_send],
+    }
+
+
+def handle_hr_recruitment_follow_up(
+    *,
+    user_message: str,
+    conversation_history: list[dict[str, str]] | None,
+    user_name: str,
+    user_role: str,
+) -> dict[str, Any] | None:
+    """
+    Process follow-up send/shortlist commands against the last batch in thread.
+    Returns orchestrator-style dict or None if not a follow-up.
+    """
+    if not user_requests_hr_recruitment_follow_up(user_message):
+        return None
+
+    bid = resolve_hr_gmail_batch_id_for_send(
+        user_message, conversation_history, require_send_phrase=False
+    )
+    if not bid and conversation_history:
+        for entry in reversed(conversation_history or []):
+            if (entry.get("role") or "").lower() in ("assistant", "agent"):
+                bid = extract_hr_gmail_batch_id(entry.get("content") or "")
+                if bid:
+                    break
+
+    if not bid:
+        return {
+            "ok": False,
+            "final_answer": (
+                "**HR Recruitment Assistant**\n\n"
+                "No shortlist batch found in this thread. Run a fetch first, e.g. "
+                "*Fetch last 20 emails and find Python developers*."
+            ),
+            "agents_used": ["hr_gmail"],
+        }
+
+    row = hr_shortlist_get_batch(bid)
+    if not row:
+        return {"ok": False, "final_answer": "Batch not found.", "agents_used": ["hr_gmail"]}
+
+    drafts = (row.get("payload") or {}).get("top") or []
+    low = (user_message or "").lower()
+
+    if any(x in low for x in ("reject ", "decline ", "not recommended")):
+        for d in drafts:
+            name = (d.get("candidate_name") or "").lower()
+            if name and name.split()[0] in low:
+                d["hr_state"] = "rejected"
+        return {
+            "ok": True,
+            "final_answer": f"Marked matching candidate(s) as **rejected** in batch `{bid}`. They will not be emailed.",
+            "agents_used": ["hr_gmail"],
+            "hr_gmail_batch_id": bid,
+        }
+
+    if "shortlist" in low and not user_requests_hr_gmail_approve_send(user_message):
+        return {
+            "ok": True,
+            "final_answer": format_ats_ranking(drafts, role_title=row.get("criteria", "")[:80]),
+            "agents_used": ["hr_gmail"],
+            "hr_gmail_batch_id": bid,
+        }
+
+    if user_requests_hr_gmail_approve_send(user_message) or any(
+        v in low for v in ("send to", "email ", "invite ", "mail ")
+    ):
+        sr = approve_and_send_shortlist_batch(bid, user_message=user_message)
+        if sr.get("needs_clarification"):
+            return {
+                "ok": False,
+                "final_answer": f"**HR Recruitment Assistant**\n\n{sr.get('error', '')}",
+                "agents_used": ["hr_gmail"],
+                "hr_gmail_batch_id": bid,
+            }
+        body = format_hr_gmail_approve_send_reply(sr)
+        out = {
+            "ok": bool(sr.get("ok")),
+            "final_answer": body,
+            "agents_used": ["hr_gmail"],
+            "hr_gmail_batch_id": None if sr.get("ok") else bid,
+        }
+        if sr.get("ok"):
+            out["hr_gmail_pending_cleared"] = True
+        return out
+
+    return None

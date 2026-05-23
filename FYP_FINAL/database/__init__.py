@@ -5,7 +5,8 @@ from .sqlite_db import (
     get_notifications, mark_notifications_read,
     log_login_event, get_login_history,
     authenticate_user, touch_user_session, deactivate_user_session,
-    get_or_create_conversation, append_conversation_message,
+    get_or_create_conversation, create_new_conversation, list_user_conversations,
+    get_conversation_for_user, append_conversation_message,
     load_conversation_ui_messages, load_conversation_openai_history,
 )
 from .vector_db import (
@@ -21,7 +22,8 @@ __all__ = [
     "get_notifications", "mark_notifications_read",
     "log_login_event", "get_login_history",
     "authenticate_user", "touch_user_session", "deactivate_user_session",
-    "get_or_create_conversation", "append_conversation_message",
+    "get_or_create_conversation", "create_new_conversation", "list_user_conversations",
+    "get_conversation_for_user", "append_conversation_message",
     "load_conversation_ui_messages", "load_conversation_openai_history",
     "embed_documents", "semantic_search", "rag_answer",
     "collection_stats", "clear_collection", "is_available",

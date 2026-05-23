@@ -56,7 +56,7 @@ def run_recruitment_pipeline(
     """
     Execute full recruitment chain up to email drafts (and persist workflow as ``pending_approval``).
 
-    Actual Gmail delivery happens either from the **Recruitment AI** tab (Approve send) or from the
+    Actual Gmail delivery happens from the **Assistant** tab (approve send / natural-language invite) or from the
     **Assistant** when the user explicitly asks to send (handled in ``Orchestrator._run_recruitment_orchestration``).
 
     ``cvs`` items: ``{{"name": str, "content": str, "file_name"?: str}}``

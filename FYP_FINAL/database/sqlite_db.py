@@ -898,6 +898,90 @@ def deactivate_user_session(session_id: str) -> None:
         pass
 
 
+def create_new_conversation(
+    session_id: str,
+    username: str,
+    channel: str = "orchestrator",
+) -> int | None:
+    """Start a fresh chat thread (does not reuse an existing row)."""
+    try:
+        s = get_session()
+        conv = Conversation(
+            session_id=(session_id or "")[:64],
+            username=username[:100],
+            channel=channel[:50],
+        )
+        s.add(conv)
+        s.commit()
+        cid = conv.id
+        s.close()
+        return cid
+    except Exception:
+        return None
+
+
+def list_user_conversations(
+    username: str,
+    channel: str = "orchestrator",
+    limit: int = 30,
+) -> list:
+    """Return recent threads with preview for History / thread picker."""
+    try:
+        s = get_session()
+        convs = (
+            s.query(Conversation)
+            .filter_by(username=username, channel=channel)
+            .order_by(Conversation.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        out = []
+        for c in convs:
+            preview_row = (
+                s.query(ConversationMessage)
+                .filter_by(conversation_id=c.id)
+                .order_by(ConversationMessage.created_at.desc())
+                .first()
+            )
+            preview = ""
+            if preview_row:
+                preview = (preview_row.content or "")[:120]
+            msg_count = (
+                s.query(ConversationMessage)
+                .filter_by(conversation_id=c.id)
+                .count()
+            )
+            out.append({
+                "id": c.id,
+                "updated_at": c.updated_at.strftime("%Y-%m-%d %H:%M") if c.updated_at else "",
+                "created_at": c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
+                "preview": preview,
+                "message_count": msg_count,
+            })
+        s.close()
+        return out
+    except Exception:
+        return []
+
+
+def get_conversation_for_user(conversation_id: int, username: str) -> int | None:
+    """Return conversation id if it belongs to username, else None."""
+    if not conversation_id:
+        return None
+    try:
+        s = get_session()
+        conv = (
+            s.query(Conversation)
+            .filter_by(id=conversation_id, username=username)
+            .one_or_none()
+        )
+        cid = conv.id if conv else None
+        s.close()
+        return cid
+    except Exception:
+        return None
+
+
 def get_or_create_conversation(
     session_id: str,
     username: str,
@@ -981,6 +1065,24 @@ def load_conversation_ui_messages(conversation_id: int, limit: int = 100) -> lis
             entry = {"role": ui_role, "content": r.content or ""}
             if r.agents_used:
                 entry["agents"] = [a.strip() for a in r.agents_used.split(",") if a.strip()]
+            meta = {}
+            try:
+                meta = json.loads(r.metadata_json or "{}")
+            except Exception:
+                meta = {}
+            if isinstance(meta, dict):
+                if meta.get("elapsed_ms") is not None:
+                    entry["elapsed_ms"] = meta.get("elapsed_ms")
+                if meta.get("per_agent"):
+                    entry["per_agent"] = meta.get("per_agent")
+                if meta.get("ui_payload"):
+                    entry["ui_payload"] = meta.get("ui_payload")
+                if meta.get("display_content"):
+                    entry["display_content"] = meta.get("display_content")
+                if meta.get("agents_used") and not entry.get("agents"):
+                    au = meta.get("agents_used")
+                    if isinstance(au, list):
+                        entry["agents"] = au
             out.append(entry)
         s.close()
         return out
