@@ -1,6 +1,6 @@
 from .sqlite_db import (
     init_db, get_session, log_task, log_agent, log_email,
-    log_candidate, log_it_ticket, log_finance, log_whatsapp,
+    log_candidate, log_it_ticket, log_finance,
     add_notification, get_dashboard_stats, get_task_history,
     get_notifications, mark_notifications_read,
     log_login_event, get_login_history,
@@ -17,7 +17,7 @@ from .vector_db import (
 __all__ = [
     "init_db", "get_session",
     "log_task", "log_agent", "log_email", "log_candidate",
-    "log_it_ticket", "log_finance", "log_whatsapp",
+    "log_it_ticket", "log_finance",
     "add_notification", "get_dashboard_stats", "get_task_history",
     "get_notifications", "mark_notifications_read",
     "log_login_event", "get_login_history",

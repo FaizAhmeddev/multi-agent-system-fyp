@@ -13,7 +13,7 @@ except Exception:
 try:
     from .gmail_auto_reply_monitor import start_monitor, stop_monitor, is_running, get_pending_logs
 except Exception:
-    def start_monitor(): pass
+    def start_monitor(): return False, "Monitor module unavailable"
     def stop_monitor(): pass
     def is_running(): return False
     def get_pending_logs(): return []

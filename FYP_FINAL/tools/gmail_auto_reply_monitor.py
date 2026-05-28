@@ -113,14 +113,19 @@ def _do_monitor():
     _log_queue.put("🛑 Auto-reply monitor stopped.")
 
 
-def start_monitor():
+def start_monitor() -> tuple[bool, str]:
+    """Start background IMAP monitor. Returns (success, message)."""
     global _monitor_running, _monitor_thread
     if _monitor_running:
-        return False
+        return False, "Monitor is already running."
+    email = (GMAIL_EMAIL or "").strip()
+    pwd = (GMAIL_APP_PASSWORD or "").replace(" ", "")
+    if not email or not pwd:
+        return False, "Gmail is not configured. Set GMAIL_EMAIL and GMAIL_APP_PASSWORD in FYP_FINAL/.env"
     _monitor_running = True
     _monitor_thread = threading.Thread(target=_do_monitor, daemon=True)
     _monitor_thread.start()
-    return True
+    return True, "Auto-reply monitor started."
 
 
 def stop_monitor():

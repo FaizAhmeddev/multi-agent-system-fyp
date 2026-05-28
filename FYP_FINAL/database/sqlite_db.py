@@ -6,7 +6,7 @@ SQLite + SQLAlchemy ORM — All tables for the FYP system.
 Tables:
   users, tasks, agent_logs, messages, emails,
   candidates, hr_queries, finance_records,
-  documents_meta, it_tickets, notifications, whatsapp_logs,
+  documents_meta, it_tickets, notifications,
   recruitment_workflows, recruitment_audit_logs, hr_gmail_shortlist_batches,
   login_history
 """
@@ -43,7 +43,7 @@ class TaskLog(Base):
     agents_used = Column(String(200))
     response    = Column(Text)
     elapsed_ms  = Column(Integer, default=0)
-    source      = Column(String(50), default="ui")  # ui | whatsapp | api
+    source      = Column(String(50), default="ui")  # ui | api
 
 
 class AgentLog(Base):
@@ -153,18 +153,6 @@ class Notification(Base):
     level     = Column(String(20), default="info")   # info | warning | error | success
     read      = Column(Boolean, default=False)
     agent     = Column(String(100))
-
-
-class WhatsAppLog(Base):
-    __tablename__ = "whatsapp_logs"
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
-    direction   = Column(String(10))   # inbound | outbound
-    from_number = Column(String(50))
-    to_number   = Column(String(50))
-    message     = Column(Text)
-    agents_used = Column(String(200))
-    status      = Column(String(20), default="sent")
 
 
 class RecruitmentWorkflow(Base):
@@ -432,22 +420,6 @@ def log_finance(user_name: str, action: str, input_data: str,
         pass
 
 
-def log_whatsapp(direction: str, from_number: str, to_number: str,
-                 message: str, agents_used: list = None, status: str = "sent"):
-    try:
-        s = get_session()
-        s.add(WhatsAppLog(
-            direction=direction, from_number=from_number,
-            to_number=to_number, message=message,
-            agents_used=", ".join(agents_used or []),
-            status=status,
-        ))
-        s.commit()
-        s.close()
-    except Exception:
-        pass
-
-
 def add_notification(title: str, message: str, level: str = "info", agent: str = "System"):
     try:
         s = get_session()
@@ -468,7 +440,6 @@ def get_dashboard_stats() -> dict:
             "total_candidates":  s.query(Candidate).count(),
             "total_it_tickets":  s.query(ITTicket).count(),
             "total_finance":     s.query(FinanceRecord).count(),
-            "total_whatsapp":    s.query(WhatsAppLog).count(),
             "unread_notifs":     s.query(Notification).filter_by(read=False).count(),
             "recent_tasks":      [],
             "recent_tickets":    [],
@@ -501,9 +472,8 @@ def get_dashboard_stats() -> dict:
             "recruitment": "Recruitment Orchestrator",
             "finance": "Finance Agent",
             "documents": "Documents Agent",
-            "whatsapp": "WhatsApp Agent",
         }
-        for t in s.query(TaskLog).order_by(TaskLog.timestamp.desc()).limit(500).all():
+        for t in s.query(TaskLog).order_by(TaskLog.timestamp.desc()).limit(50).all():
             blob = (t.agents_used or "").lower()
             for part in blob.split(","):
                 slug = part.strip().replace(" ", "_")
@@ -516,7 +486,7 @@ def get_dashboard_stats() -> dict:
     except Exception as e:
         return {"error": str(e), "total_tasks": 0, "total_emails": 0,
                 "total_candidates": 0, "total_it_tickets": 0,
-                "total_finance": 0, "total_whatsapp": 0,
+                "total_finance": 0,
                 "unread_notifs": 0, "recent_tasks": [],
                 "recent_tickets": [], "agent_usage": {}}
 

@@ -20,10 +20,6 @@ psycopg2-binary>=2.9.9
 chromadb>=0.5.0
 onnxruntime>=1.16.0
 
-# WhatsApp / Twilio
-twilio>=9.0.0
-flask>=3.0.0
-
 # Google APIs (installs the googleapiclient package)
 google-auth>=2.29.0
 google-auth-oauthlib>=1.2.0

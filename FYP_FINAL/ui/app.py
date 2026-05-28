@@ -91,6 +91,8 @@ from config import (
     is_hosted_deploy,
     local_background_services_enabled,
     can_manage_background_services,
+    can_use_email_monitor,
+    gmail_setup_hint,
     is_gmail_configured,
     is_google_drive_configured,
     DriveNotConfiguredError,
@@ -274,10 +276,6 @@ st.markdown("""<style>
 .score-bar  { height:8px; border-radius:4px; background:#e2e8f0; margin:8px 0 4px 0; }
 .score-fill { height:8px; border-radius:4px; background: linear-gradient(90deg, #4f46e5, #6366f1); }
 
-/* WhatsApp */
-.wa-bubble-out { background:#dcf8c6; border-radius:18px 4px 18px 18px; padding:10px 14px; margin:6px 0 6px auto; max-width:75%; display:inline-block; float:right; clear:both; font-size:14px; }
-.wa-bubble-in  { background:white; border-radius:4px 18px 18px 18px; padding:10px 14px; margin:6px 0; max-width:75%; display:inline-block; float:left; clear:both; font-size:14px; border:1px solid #e2e8f0; }
-
 /* History table */
 .hist-row { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-bottom:6px; font-size:13px; }
 
@@ -326,10 +324,11 @@ div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
 # ── Session defaults ──────────────────────────────────────────────────────────
 _defs = {
     "logged_in": False, "username": "", "user_role": "", "user_name": "",
-    "orch_chat": [], "coord_chat": [], "docs_chat": [], "wa_chat": [],
-    "pending_email": None, "monitor_log": [], "hr_results": None,
+    "orch_chat": [], "coord_chat": [], "docs_chat": [],
+    "pending_email": None, "monitor_log": [], "monitor_import_error": "",
+    "hr_results": None,
     "uploaded_cvs": [], "drive_documents": [], "mcp_running": False,
-    "system_start": time.time(), "wa_log": [],
+    "system_start": time.time(),
     "db_hr_cvs": [], "orch_last_proc": None,
     "recruitment_wf_id": None,
     "recruitment_last": None,
@@ -721,7 +720,7 @@ if is_hosted_deploy():
         return False
 
     def start_monitor():
-        pass
+        return False, "Not available on hosted deploy."
 
     def stop_monitor():
         pass
@@ -730,9 +729,11 @@ else:
     try:
         from tools.gmail_auto_reply_monitor import get_pending_logs, is_running, start_monitor, stop_monitor
 
+        st.session_state.monitor_import_error = ""
         for lg in get_pending_logs():
             st.session_state.monitor_log.append(lg)
-    except Exception:
+    except Exception as _mon_ex:
+        st.session_state.monitor_import_error = str(_mon_ex)
 
         def get_pending_logs():
             return []
@@ -741,7 +742,7 @@ else:
             return False
 
         def start_monitor():
-            pass
+            return False, "Monitor module failed to load."
 
         def stop_monitor():
             pass
@@ -774,6 +775,77 @@ def _monitor_header_state() -> str:
         return "cloud"
     return "on" if is_running() else "off"
 
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _cached_dashboard_stats():
+    from database.sqlite_db import get_dashboard_stats
+    return get_dashboard_stats()
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _cached_vector_stats():
+    from database.vector_db import collection_stats
+    return collection_stats()
+
+
+def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
+    """Gmail IMAP auto-reply — Email and IT tabs (local + Gmail configured)."""
+    if not can_use_email_monitor(st.session_state.user_role or ""):
+        return
+    st.markdown('<div class="sec-hdr sec-orange">📬 Email auto-reply monitor</div>', unsafe_allow_html=True)
+    _hosted = not local_background_services_enabled()
+    _gmail_ok = is_gmail_configured()
+    if st.session_state.get("monitor_import_error"):
+        st.error(f"Monitor unavailable: {st.session_state.monitor_import_error}")
+    if _hosted:
+        st.info("Auto-reply monitor runs on **local** installs only (not Streamlit Cloud).")
+    elif not _gmail_ok:
+        st.warning(gmail_setup_hint())
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button(
+            "▶️ Start monitor",
+            use_container_width=True,
+            disabled=_hosted or is_running() or not _gmail_ok,
+            key=f"{key_prefix}_on",
+        ):
+            ok, msg = start_monitor()
+            st.session_state.monitor_log.append(msg)
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+            st.rerun()
+    with b2:
+        if st.button(
+            "⏹️ Stop",
+            use_container_width=True,
+            disabled=_hosted or not is_running(),
+            key=f"{key_prefix}_off",
+        ):
+            stop_monitor()
+            st.session_state.monitor_log.append("Stopping monitor…")
+            st.rerun()
+    if is_running():
+        st.markdown(
+            '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
+            'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply active</b> — checking inbox every 30s</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="background:#f1f5f9;border:1px solid #cbd5e1;padding:8px 14px;'
+            'border-radius:8px;margin:8px 0">⚪ <b>Auto-reply off</b></div>',
+            unsafe_allow_html=True,
+        )
+    for lg in get_pending_logs():
+        st.session_state.monitor_log.append(lg)
+    if st.session_state.monitor_log:
+        with st.expander("📋 Activity log", expanded=is_running()):
+            for log in reversed(st.session_state.monitor_log[-25:]):
+                st.caption(log)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN PAGE
 # ══════════════════════════════════════════════════════════════════════════════
@@ -788,8 +860,8 @@ if not st.session_state.logged_in:
     col = st.columns([1,1.6,1])[1]
     with col:
         st.markdown("")
-        username = st.text_input("Username", placeholder="admin · hr · finance · it · assistant · demo")
-        password = st.text_input("Password", type="password", placeholder="Enter password")
+        username = st.text_input("Username", placeholder="Your account username", autocomplete="username")
+        password = st.text_input("Password", type="password", placeholder="Your password", autocomplete="current-password")
         if st.button("Sign In", use_container_width=True):
             from database.sqlite_db import (
                 authenticate_user,
@@ -828,12 +900,7 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Invalid username or password")
-        st.markdown("""<div style="background:#f8fafc;border-radius:10px;padding:12px 16px;margin-top:12px;font-size:12px;color:#64748b">
-        <b>Demo credentials:</b><br>
-        admin / admin123 &nbsp;|&nbsp; hr / hr123<br>
-        finance / finance123 &nbsp;|&nbsp; it / it123<br>
-        assistant / assistant123 &nbsp;|&nbsp; demo / demo123
-        </div>""", unsafe_allow_html=True)
+        st.caption("Use the account issued by your administrator. Credentials are not shown on this screen.")
         if is_hosted_deploy():
             if not (OPENAI_API_KEY or "").strip():
                 st.warning(
@@ -882,7 +949,8 @@ with c1:
         f'<div class="main-header">'
         f"<div>"
         f'<div class="header-title">Office Automation Agents Pro</div>'
-        f'<div class="header-sub">LangGraph | OpenAI | MCP | A2A | ChromaDB | SQLite | WhatsApp</div>'
+        f'<div class="header-sub">LangGraph · OpenAI · MCP · ChromaDB · '
+        f'{"PostgreSQL" if use_postgresql_database() else "SQLite"}</div>'
         f"</div>"
         f'<div style="text-align:right;font-size:12px;line-height:1.6">'
         f"{_svc_line}"
@@ -928,31 +996,29 @@ _ti = _tab_idx.get("Dashboard")
 if _ti is not None:
     with tabs[_ti]:
         try:
-            from database.sqlite_db import get_dashboard_stats, get_notifications
-            stats = get_dashboard_stats()
+            from database.sqlite_db import get_notifications
+            stats = _cached_dashboard_stats()
             notifs = get_notifications(unread_only=True)
         except Exception:
             stats = {"total_tasks":0,"total_emails":0,"total_candidates":0,"total_it_tickets":0,
-                     "total_finance":0,"total_whatsapp":0,"unread_notifs":0,"recent_tasks":[],
+                     "total_finance":0,"unread_notifs":0,"recent_tasks":[],
                      "agent_usage":{}}
             notifs = []
 
         try:
-            from database.vector_db import collection_stats
-            vdb = collection_stats()
+            vdb = _cached_vector_stats()
             total_vecs = sum(vdb.values()) if isinstance(vdb, dict) and "error" not in vdb else 0
         except Exception:
             vdb, total_vecs = {}, 0
 
         # Metrics row
-        m = st.columns(6)
-        labels = ["Tasks", "Emails", "Candidates", "IT tickets", "WhatsApp", "Vector rows"]
+        m = st.columns(5)
+        labels = ["Tasks", "Emails", "Candidates", "IT tickets", "Vector rows"]
         vals = [
             stats.get("total_tasks", 0),
             stats.get("total_emails", 0),
             stats.get("total_candidates", 0),
             stats.get("total_it_tickets", 0),
-            stats.get("total_whatsapp", 0),
             total_vecs,
         ]
         for col, lab, val in zip(m, labels, vals):
@@ -971,7 +1037,6 @@ if _ti is not None:
                 ("Recruitment Orchestrator", "agent-recruitment-001"),
                 ("Finance Agent", "agent-finance-001"),
                 ("Documents Agent", "agent-docs-001"),
-                ("WhatsApp Agent", "agent-whatsapp-001"),
                 ("Auto-Reply", "agent-autoreply-001"),
             ]
             for name, aid in agents:
@@ -1131,6 +1196,8 @@ if _ti is not None:
             pass
 
         if st.button("Refresh dashboard", key="dash_refresh"):
+            _cached_dashboard_stats.clear()
+            _cached_vector_stats.clear()
             st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1454,46 +1521,7 @@ if _ti is not None:
                         st.error(f"Error: {e}")
 
         with c2:
-            if can_manage_background_services(st.session_state.user_role or ""):
-                st.markdown('<div class="sec-hdr sec-orange">📬 Auto-Reply Monitor</div>', unsafe_allow_html=True)
-                _hosted = not local_background_services_enabled()
-                _gmail_ok = is_gmail_configured()
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button(
-                        "▶️ Start Monitor",
-                        use_container_width=True,
-                        disabled=_hosted or is_running() or not _gmail_ok,
-                        key="mon_on",
-                    ):
-                        start_monitor()
-                        st.rerun()
-                with b2:
-                    if st.button(
-                        "⏹️ Stop",
-                        use_container_width=True,
-                        disabled=_hosted or not is_running(),
-                        key="mon_off",
-                    ):
-                        stop_monitor()
-                        st.rerun()
-                if is_running():
-                    st.markdown(
-                        '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-                        'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ACTIVE</b></div>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        '<div style="background:#fef9c3;border:1px solid #ca8a04;padding:8px 14px;'
-                        'border-radius:8px;margin:8px 0">🟡 <b>Auto-reply OFF</b></div>',
-                        unsafe_allow_html=True,
-                    )
-                if st.session_state.monitor_log:
-                    with st.expander("📋 Activity Log", expanded=True):
-                        for log in reversed(st.session_state.monitor_log[-20:]):
-                            st.caption(log)
-
+            _render_email_auto_monitor_panel(key_prefix="it_mon")
             st.markdown('<div class="sec-hdr" style="margin-top:14px">🎫 Recent IT Tickets</div>', unsafe_allow_html=True)
             try:
                 from database.sqlite_db import get_session
@@ -1529,6 +1557,8 @@ if _ti is not None:
             "Tip: use **Assistant** for email-related tasks routed with other domains; this tab is for drafts, inbox, and confirm-send flows."
         )
         st.markdown('<div class="sec-hdr sec-teal">📧 Email Coordinator <span class="badge badge-a2a">A2A</span></div>', unsafe_allow_html=True)
+        _render_email_auto_monitor_panel(key_prefix="email_mon")
+        st.divider()
 
         for entry in st.session_state.coord_chat:
             if entry["role"] == "user":
@@ -2494,140 +2524,7 @@ if _ti is not None:
                 st.markdown(f'<div class="resp-box resp-teal">{list_documents_summary(st.session_state.drive_documents)}</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 9 — WHATSAPP
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("WhatsApp")
-if _ti is not None:
-    with tabs[_ti]:
-        st.caption("Inbound/outbound WhatsApp already uses the **orchestrator** in code; this tab sends the merged agent reply to Twilio.")
-        st.markdown('<div class="sec-hdr sec-wa">💬 WhatsApp Integration <span class="badge badge-wa">Twilio</span></div>', unsafe_allow_html=True)
-
-        # Twilio status
-        wc1, wc2 = st.columns([2,1])
-        with wc1:
-            st.info("How it works: type a task; the Orchestrator runs agents and can send the reply to WhatsApp and optionally email. For inbound WhatsApp, run `python whatsapp/webhook.py` and expose it with ngrok.")
-        with wc2:
-            if st.button("🔌 Test Twilio Connection", use_container_width=True, key="test_twilio"):
-                with st.spinner("Testing..."):
-                    try:
-                        from whatsapp.bot import test_connection
-                        res = test_connection()
-                        if res.get("success"):
-                            st.success(f"✅ Connected: {res.get('account','')}")
-                        else:
-                            st.error(f"❌ {res.get('error','Failed')}")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-
-        st.divider()
-
-        # WhatsApp chat UI
-        st.markdown('<div class="sec-hdr sec-wa" style="font-size:13px">📱 Send via WhatsApp</div>', unsafe_allow_html=True)
-
-        wa_num = st.text_input("WhatsApp Number", value="+923462792937", placeholder="+923XXXXXXXXX", key="wa_num")
-        wa_email = st.text_input("Also send to Email (optional)", placeholder="ahmed@example.com", key="wa_email")
-
-        # Chat display
-        for entry in st.session_state.wa_chat:
-            if entry["role"] == "user":
-                st.markdown(f'<div class="chat-wrap"><div class="wa-bubble-out">👤 {entry["content"]}</div></div>', unsafe_allow_html=True)
-            else:
-                agents_b = " ".join([f'<span class="badge badge-green">{a}</span>' for a in entry.get("agents",[])])
-                wa_stat  = entry.get("wa_status","")
-                em_stat  = entry.get("email_status","")
-                stat_row = ""
-                if wa_stat: stat_row += f'<br><small>📱 WhatsApp: {wa_stat}</small>'
-                if em_stat: stat_row += f'<small> · 📧 Email: {em_stat}</small>'
-                st.markdown(f'<div class="chat-wrap"><div class="wa-bubble-in">{agents_b}<br><br>{entry["content"]}{stat_row}</div></div>', unsafe_allow_html=True)
-
-        with st.form("wa_form", clear_on_submit=True):
-            wa_inp = st.text_area("Your message / task",
-                placeholder="e.g. 'My laptop won't start, please resolve this issue and send to Ahmed'\nor 'Analyze our IT expenses and notify finance team'",
-                height=100)
-            wc_a, wc_b = st.columns([4,1])
-            with wc_a: wa_sub = st.form_submit_button("📤 Send via Orchestrator + WhatsApp", use_container_width=True)
-            with wc_b: also_email = st.checkbox("+ Email", value=bool(wa_email), key="wa_also_email")
-
-        if wa_sub and wa_inp.strip():
-            st.session_state.wa_chat.append({"role":"user","content":wa_inp.strip()})
-            with st.spinner("🔄 Orchestrator processing + sending WhatsApp..."):
-                try:
-                    from whatsapp.bot import send_agent_response_to_whatsapp
-                    result = send_agent_response_to_whatsapp(
-                        user_input      = wa_inp.strip(),
-                        recipient_number= wa_num,
-                        also_email      = also_email and bool(wa_email),
-                        email_address   = wa_email,
-                        user_name       = st.session_state.user_name,
-                    )
-                    wa_r = result.get("whatsapp", {})
-                    em_r = result.get("email", "")
-
-                    wa_status = f"✅ Sent (SID: {wa_r.get('sid','')[:12]})" if wa_r and wa_r.get("success") else f"❌ {wa_r.get('error','Failed') if wa_r else 'Not sent'}"
-                    em_status = f"✅ {em_r}" if em_r and "✅" in str(em_r) else (f"❌ {em_r}" if em_r else "")
-
-                    st.session_state.wa_chat.append({
-                        "role":         "agent",
-                        "content":      result.get("agent_response",""),
-                        "agents":       result.get("agents_used",[]),
-                        "wa_status":    wa_status,
-                        "email_status": em_status,
-                    })
-
-                    try:
-                        from database.sqlite_db import add_notification
-                        add_notification("WhatsApp message sent", f"To: {wa_num}", "success", "WhatsApp Agent")
-                    except Exception:
-                        pass
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"WhatsApp error: {e}")
-
-        st.divider()
-
-        # WhatsApp logs
-        st.markdown('<div class="sec-hdr sec-wa" style="font-size:13px">WhatsApp logs</div>', unsafe_allow_html=True)
-        try:
-            from database.sqlite_db import get_session, WhatsAppLog
-            s    = get_session()
-            wlogs = s.query(WhatsAppLog).order_by(WhatsAppLog.timestamp.desc()).limit(10).all()
-            s.close()
-            if wlogs:
-                for wl in wlogs:
-                    dir_lbl = "OUT" if wl.direction == "outbound" else "IN"
-                    badge = "green" if wl.status == "sent" else "red"
-                    msg_preview = (wl.message or "")[:100]
-                    ts = wl.timestamp.strftime("%Y-%m-%d %H:%M")
-                    st.markdown(
-                        f'<div class="hist-row">'
-                        f'<b>{dir_lbl}</b> <b>{wl.direction.upper()}</b> &nbsp;'
-                        f'<b>To:</b> {wl.to_number} &nbsp;'
-                        f'<span class="badge badge-{badge}">{wl.status}</span><br>'
-                        f'<small style="color:#64748b">{ts} | {wl.agents_used}</small><br>'
-                        f"{msg_preview}"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.caption("No WhatsApp messages yet.")
-        except Exception:
-            st.caption("WhatsApp logs unavailable.")
-
-        # Webhook instructions
-        with st.expander("Setup incoming WhatsApp (webhook)"):
-            st.markdown(
-                "**To receive WhatsApp messages and auto-reply:**\n\n"
-                "**Step 1** - Install ngrok from https://ngrok.com/download\n\n"
-                "**Step 2** - In a terminal run: `python whatsapp/webhook.py`\n\n"
-                "**Step 3** - In another terminal run: `ngrok http 5000` and copy the HTTPS URL.\n\n"
-                "**Step 4** - Open Twilio WhatsApp sandbox settings in the Twilio console.\n\n"
-                "**Step 5** - Set the webhook URL to `https://YOUR-NGROK-HOST/whatsapp`\n\n"
-                "**Step 6** - From WhatsApp send `join <your-sandbox-word>` to the sandbox number.\n\n"
-                "Inbound messages will then be processed by your agents."
-            )
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 10 — HISTORY
+# TAB — HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 _ti = _tab_idx.get("History")
 if _ti is not None:
@@ -2676,7 +2573,7 @@ if _ti is not None:
         st.divider()
         st.markdown('<div class="sec-hdr">Task audit log</div>', unsafe_allow_html=True)
 
-        hist_filter = st.selectbox("Filter by source", ["All","ui","whatsapp","api"], key="hist_filter")
+        hist_filter = st.selectbox("Filter by source", ["All", "ui", "api"], key="hist_filter")
         try:
             from database.sqlite_db import get_task_history
             history = get_task_history(limit=50)
@@ -2686,7 +2583,7 @@ if _ti is not None:
             if history:
                 st.caption(f"Showing {len(history)} tasks")
                 for h in history:
-                    src_badge = {"ui":"badge-blue","whatsapp":"badge-wa","api":"badge-purple"}.get(h.get("source","ui"),"badge-blue")
+                    src_badge = {"ui": "badge-blue", "api": "badge-purple"}.get(h.get("source", "ui"), "badge-blue")
                     with st.expander(f"#{h['id']} | {h['time']} | {h.get('user','')} | {h.get('agents','')}", expanded=False):
                         resp = h.get("response", "") or ""
                         tail = "..." if len(resp) > 500 else ""
@@ -2712,7 +2609,7 @@ if _ti is not None:
             from database.sqlite_db import get_login_history
             if st.session_state.user_role == "Admin":
                 login_rows = get_login_history(limit=200)
-                st.caption("All users — stored in SQLite `login_history` table.")
+                st.caption("All users — stored in the database login history table.")
             else:
                 login_rows = get_login_history(limit=100, username=st.session_state.username)
                 st.caption("Your sign-in / sign-out events only.")

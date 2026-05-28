@@ -753,23 +753,26 @@ class Orchestrator:
             "finance_export_files": None,
         }
 
-        # 2. Publish task to Message Queue for each agent (A2A dispatch)
+        # 2. Optional A2A message queue (off by default — faster orchestration)
+        from config import orchestrator_mq_enabled
+
         task_ids = {}
-        for agent_type in agents:
-            agent_receiver = AGENT_IDS.get(agent_type, f"agent-{agent_type}-001")
-            msg_id = self.mq.send(
-                sender=self.agent_id,
-                receiver=agent_receiver,
-                topic="task",
-                payload={
-                    "user_message": full_message,
-                    "user_name":    user_name,
-                    "agent_type":   agent_type,
-                    "has_attachments": bool(attachments),
-                },
-                priority=2,
-            )
-            task_ids[agent_type] = msg_id
+        if orchestrator_mq_enabled():
+            for agent_type in agents:
+                agent_receiver = AGENT_IDS.get(agent_type, f"agent-{agent_type}-001")
+                msg_id = self.mq.send(
+                    sender=self.agent_id,
+                    receiver=agent_receiver,
+                    topic="task",
+                    payload={
+                        "user_message": full_message,
+                        "user_name":    user_name,
+                        "agent_type":   agent_type,
+                        "has_attachments": bool(attachments),
+                    },
+                    priority=2,
+                )
+                task_ids[agent_type] = msg_id
 
         result["task_ids"] = task_ids
 
@@ -795,13 +798,14 @@ class Orchestrator:
             for fut in as_completed(futures):
                 agent_type, resp, err = fut.result()
                 responses[agent_type] = resp
-                self.mq.send(
-                    sender=AGENT_IDS.get(agent_type, agent_type),
-                    receiver=self.agent_id,
-                    topic="result",
-                    payload={"response": resp, "agent_type": agent_type, "error": str(err) if err else None},
-                    reply_to=task_ids.get(agent_type),
-                )
+                if orchestrator_mq_enabled():
+                    self.mq.send(
+                        sender=AGENT_IDS.get(agent_type, agent_type),
+                        receiver=self.agent_id,
+                        topic="result",
+                        payload={"response": resp, "agent_type": agent_type, "error": str(err) if err else None},
+                        reply_to=task_ids.get(agent_type),
+                    )
 
         result["responses"] = responses
 
@@ -866,7 +870,11 @@ class Orchestrator:
             result["final_answer"] = "\n\n---\n\n".join(parts)
 
         result["elapsed_ms"]  = round((time.time() - start_time) * 1000)
-        result["mq_messages"] = self.mq.get_all_messages_for_display(limit=30)
+        result["mq_messages"] = (
+            self.mq.get_all_messages_for_display(limit=30)
+            if orchestrator_mq_enabled()
+            else []
+        )
         result["finance_export_files"] = self._finance_export_files
 
         return result

@@ -55,18 +55,11 @@ class GmailNotConfiguredError(RuntimeError):
 def refresh_config_from_env() -> None:
     """Reload secrets from os.environ (after .env or Streamlit Secrets hydration)."""
     global OPENAI_API_KEY, GMAIL_EMAIL, GMAIL_APP_PASSWORD
-    global TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO, TWILIO_CONTENT_SID
     global GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, DEMO_MODE, USERS, DATABASE_URL
 
     OPENAI_API_KEY = _env("OPENAI_API_KEY")
     GMAIL_EMAIL = _env("GMAIL_EMAIL")
     GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
-
-    TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
-    TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
-    TWILIO_WHATSAPP_FROM = _env("TWILIO_WHATSAPP_FROM")
-    TWILIO_WHATSAPP_TO = _env("TWILIO_WHATSAPP_TO")
-    TWILIO_CONTENT_SID = _env("TWILIO_CONTENT_SID")
 
     _gcf = _env("GOOGLE_CREDENTIALS_FILE", "credentials.json")
     GOOGLE_CREDENTIALS_FILE = _gcf if _os.path.isabs(_gcf) else _os.path.join(_PROJECT_ROOT, _gcf)
@@ -201,15 +194,19 @@ def is_google_drive_configured() -> bool:
 
 
 def can_manage_background_services(role: str) -> bool:
-    """MCP server + Gmail monitor controls (Admin / IT only)."""
-    return role in ("Admin", "IT Staff")
+    """MCP server controls (Admin / IT only)."""
+    return role in ("Admin", "IT Staff", "Demo User")
 
-# ─── Twilio WhatsApp ───────────────────────────────────────
-TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_FROM = _env("TWILIO_WHATSAPP_FROM")
-TWILIO_WHATSAPP_TO = _env("TWILIO_WHATSAPP_TO")
-TWILIO_CONTENT_SID = _env("TWILIO_CONTENT_SID")
+
+def can_use_email_monitor(role: str) -> bool:
+    """Inbox auto-reply monitor (local deploy + Gmail configured)."""
+    return role in ("Admin", "IT Staff", "Demo User", "HR Manager", "Assistant")
+
+
+def orchestrator_mq_enabled() -> bool:
+    """A2A message queue logging (off by default for faster orchestration)."""
+    return _env("FYP_ENABLE_MQ", "false").lower() in ("1", "true", "yes")
+
 
 # ─── Database ──────────────────────────────────────────────
 DB_PATH = _os.path.join(_PROJECT_ROOT, "database", "fyp_data.db")
@@ -325,7 +322,6 @@ _FULL_TABS = [
     "HR",
     "Finance",
     "Documents",
-    "WhatsApp",
     "History",
 ]
 
@@ -399,5 +395,4 @@ AGENT_IDS = {
     "finance": "agent-finance-001",
     "documents": "agent-docs-001",
     "auto_reply": "agent-autoreply-001",
-    "whatsapp": "agent-whatsapp-001",
 }

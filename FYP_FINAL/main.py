@@ -97,8 +97,8 @@ def run():
 
     _log("=" * 65)
     _log("  Office Automation Agents Pro - FYP v7.0")
-    _log("  Agents: Assistant | IT | Email | HR | Recruitment | Finance | Documents | WhatsApp")
-    _log("  Stack:  LangGraph | OpenAI | MCP | A2A | ChromaDB | SQLite")
+    _log("  Agents: Assistant | IT | Email | HR | Recruitment | Finance | Documents")
+    _log("  Stack:  LangGraph | OpenAI | MCP | ChromaDB | PostgreSQL/SQLite")
     _log("=" * 65)
 
     if has_env:
@@ -109,7 +109,7 @@ def run():
     try:
         from database.sqlite_db import init_db
         init_db()
-        _log("  [ok] SQLite DB initialized")
+        _log("  [ok] Database initialized")
     except Exception as e:
         _log(f"  [!] DB init: {e}")
 
