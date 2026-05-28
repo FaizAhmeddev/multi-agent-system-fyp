@@ -36,7 +36,7 @@ Base = declarative_base()
 class TaskLog(Base):
     __tablename__ = "tasks"
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow)
+    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
     user_name   = Column(String(100))
     user_role   = Column(String(50))
     user_input  = Column(Text)
@@ -49,7 +49,7 @@ class TaskLog(Base):
 class AgentLog(Base):
     __tablename__ = "agent_logs"
     id         = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp  = Column(DateTime, default=datetime.utcnow)
+    timestamp  = Column(DateTime, default=datetime.utcnow, index=True)
     agent_name = Column(String(100))
     action     = Column(String(200))
     input_data = Column(Text)
@@ -61,7 +61,7 @@ class AgentLog(Base):
 class MessageLog(Base):
     __tablename__ = "messages"
     id        = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     msg_id    = Column(String(20))
     sender    = Column(String(100))
     receiver  = Column(String(100))
@@ -73,7 +73,7 @@ class MessageLog(Base):
 class EmailLog(Base):
     __tablename__ = "emails"
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow)
+    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
     direction   = Column(String(10))   # sent | received
     from_addr   = Column(String(200))
     to_addr     = Column(String(200))
@@ -86,7 +86,7 @@ class EmailLog(Base):
 class Candidate(Base):
     __tablename__ = "candidates"
     id             = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp      = Column(DateTime, default=datetime.utcnow)
+    timestamp      = Column(DateTime, default=datetime.utcnow, index=True)
     name           = Column(String(200))
     job_title      = Column(String(200))
     score          = Column(Integer, default=0)
@@ -101,7 +101,7 @@ class Candidate(Base):
 class HRQuery(Base):
     __tablename__ = "hr_queries"
     id        = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     user_name = Column(String(100))
     action    = Column(String(100))
     question  = Column(Text)
@@ -111,7 +111,7 @@ class HRQuery(Base):
 class FinanceRecord(Base):
     __tablename__ = "finance_records"
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow)
+    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
     user_name   = Column(String(100))
     action      = Column(String(100))
     input_data  = Column(Text)
@@ -122,7 +122,7 @@ class FinanceRecord(Base):
 class DocumentMeta(Base):
     __tablename__ = "documents_meta"
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp    = Column(DateTime, default=datetime.utcnow)
+    timestamp    = Column(DateTime, default=datetime.utcnow, index=True)
     file_name    = Column(String(500))
     file_id      = Column(String(200))
     source       = Column(String(50), default="drive")
@@ -135,7 +135,7 @@ class DocumentMeta(Base):
 class ITTicket(Base):
     __tablename__ = "it_tickets"
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow)
+    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
     ticket_id   = Column(String(20))
     user_name   = Column(String(100))
     problem     = Column(Text)
@@ -147,7 +147,7 @@ class ITTicket(Base):
 class Notification(Base):
     __tablename__ = "notifications"
     id        = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     title     = Column(String(200))
     message   = Column(Text)
     level     = Column(String(20), default="info")   # info | warning | error | success
@@ -158,7 +158,7 @@ class Notification(Base):
 class WhatsAppLog(Base):
     __tablename__ = "whatsapp_logs"
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp   = Column(DateTime, default=datetime.utcnow)
+    timestamp   = Column(DateTime, default=datetime.utcnow, index=True)
     direction   = Column(String(10))   # inbound | outbound
     from_number = Column(String(50))
     to_number   = Column(String(50))
@@ -188,7 +188,7 @@ class RecruitmentWorkflow(Base):
 class RecruitmentAuditLog(Base):
     __tablename__ = "recruitment_audit_logs"
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp    = Column(DateTime, default=datetime.utcnow)
+    timestamp    = Column(DateTime, default=datetime.utcnow, index=True)
     workflow_id  = Column(String(64), index=True)
     step         = Column(String(80))
     agent        = Column(String(80))
@@ -216,7 +216,7 @@ class HRGmailShortlistBatch(Base):
     __tablename__ = "hr_gmail_shortlist_batches"
     id              = Column(Integer, primary_key=True, autoincrement=True)
     batch_id        = Column(String(64), unique=True, index=True)
-    timestamp       = Column(DateTime, default=datetime.utcnow)
+    timestamp       = Column(DateTime, default=datetime.utcnow, index=True)
     user_name       = Column(String(100))
     user_role       = Column(String(80))
     status          = Column(String(40), default="pending_send")  # pending_send | sent | cancelled
@@ -270,7 +270,7 @@ class ConversationMessage(Base):
     content          = Column(Text)
     agents_used      = Column(String(200), default="")
     metadata_json    = Column(Text, default="{}")
-    created_at       = Column(DateTime, default=datetime.utcnow)
+    created_at       = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 # ── Engine & Session ──────────────────────────────────────────────────────────
@@ -293,7 +293,21 @@ def get_engine():
                 poolclass=StaticPool,
             )
         else:
-            _engine = create_engine(url, pool_pre_ping=True)
+            # PostgreSQL: ensure the app stays fast under Streamlit reruns
+            # and doesn't hang forever on a bad network/host.
+            _engine = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+                max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+                pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+                pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+                connect_args={
+                    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+                    # Server-side statement timeout (ms). Helps avoid "slow browsing" hangs.
+                    "options": f"-c statement_timeout={int(os.getenv('DB_STATEMENT_TIMEOUT_MS', '15000'))}",
+                },
+            )
         Base.metadata.create_all(_engine)
         seed_app_users_from_config()
     return _engine
@@ -302,7 +316,11 @@ def get_engine():
 def get_session() -> Session:
     global _Session
     if _Session is None:
-        _Session = sessionmaker(bind=get_engine())
+        _Session = sessionmaker(
+            bind=get_engine(),
+            autoflush=False,
+            expire_on_commit=False,
+        )
     return _Session()
 
 
@@ -927,37 +945,67 @@ def list_user_conversations(
 ) -> list:
     """Return recent threads with preview for History / thread picker."""
     try:
+        from sqlalchemy import func, and_
+
         s = get_session()
         convs = (
-            s.query(Conversation)
+            s.query(Conversation.id, Conversation.created_at, Conversation.updated_at)
             .filter_by(username=username, channel=channel)
             .order_by(Conversation.updated_at.desc())
             .limit(limit)
             .all()
         )
+        conv_ids = [c.id for c in convs]
+        if not conv_ids:
+            s.close()
+            return []
+
+        # Last message preview per conversation (single query).
+        last_ts_sq = (
+            s.query(
+                ConversationMessage.conversation_id.label("cid"),
+                func.max(ConversationMessage.created_at).label("max_ts"),
+            )
+            .filter(ConversationMessage.conversation_id.in_(conv_ids))
+            .group_by(ConversationMessage.conversation_id)
+            .subquery()
+        )
+        last_rows = (
+            s.query(ConversationMessage.conversation_id, ConversationMessage.content)
+            .join(
+                last_ts_sq,
+                and_(
+                    ConversationMessage.conversation_id == last_ts_sq.c.cid,
+                    ConversationMessage.created_at == last_ts_sq.c.max_ts,
+                ),
+            )
+            .all()
+        )
+        last_preview = {cid: (content or "")[:120] for cid, content in last_rows}
+
+        # Message counts per conversation (single query).
+        cnt_rows = (
+            s.query(
+                ConversationMessage.conversation_id,
+                func.count(ConversationMessage.id),
+            )
+            .filter(ConversationMessage.conversation_id.in_(conv_ids))
+            .group_by(ConversationMessage.conversation_id)
+            .all()
+        )
+        msg_counts = {cid: int(cnt) for cid, cnt in cnt_rows}
+
         out = []
         for c in convs:
-            preview_row = (
-                s.query(ConversationMessage)
-                .filter_by(conversation_id=c.id)
-                .order_by(ConversationMessage.created_at.desc())
-                .first()
+            out.append(
+                {
+                    "id": c.id,
+                    "updated_at": c.updated_at.strftime("%Y-%m-%d %H:%M") if c.updated_at else "",
+                    "created_at": c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
+                    "preview": last_preview.get(c.id, ""),
+                    "message_count": msg_counts.get(c.id, 0),
+                }
             )
-            preview = ""
-            if preview_row:
-                preview = (preview_row.content or "")[:120]
-            msg_count = (
-                s.query(ConversationMessage)
-                .filter_by(conversation_id=c.id)
-                .count()
-            )
-            out.append({
-                "id": c.id,
-                "updated_at": c.updated_at.strftime("%Y-%m-%d %H:%M") if c.updated_at else "",
-                "created_at": c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
-                "preview": preview,
-                "message_count": msg_count,
-            })
         s.close()
         return out
     except Exception:
