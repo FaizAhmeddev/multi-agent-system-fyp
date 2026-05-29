@@ -262,7 +262,27 @@ def prompt_has_hiring_focus(message: str) -> bool:
     return _prompt_has_hiring_focus((message or "").lower())
 
 
+def _is_employee_onboarding_context(low: str) -> bool:
+    """Multi-step new-hire workflows belong to the orchestrator, not Gmail CV shortlist."""
+    markers = (
+        "onboarding process",
+        "full onboarding",
+        "tasks to perform",
+        "welcome email",
+        "offer letter",
+        "orientation meeting",
+        "employee profile",
+        "payroll entry",
+        "joining the company",
+        "new employee",
+        "complete the full onboarding",
+    )
+    return sum(1 for x in markers if x in low) >= 2
+
+
 def _prompt_has_hiring_focus(low: str) -> bool:
+    if _is_employee_onboarding_context(low):
+        return False
     if any(x in low for x in ("cv", "resume", "curriculum vitae", "applicant", "attachment")):
         return True
     if re.search(r"\bcandidates?\s+(?:for|to\s+hire|matching|with)\b", low):

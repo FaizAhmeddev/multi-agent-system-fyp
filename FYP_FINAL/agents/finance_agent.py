@@ -10,17 +10,15 @@ import os
 
 
 def _get_llm():
-    from langchain_openai import ChatOpenAI
-    from config import OPENAI_API_KEY
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    from tools.llm_client import get_chat_openai
+    return get_chat_openai(temperature=0.2)
 
 
 def _error_msg(action: str, error: Exception, tips: list = None) -> str:
     tips_text = ""
     if tips:
-        tips_text = "\n**Tips:**\n" + "\n".join(f"- {t}" for t in tips)
-    return f"❌ **{action} Error:** {error}{tips_text}"
+        tips_text = "\nTips:\n" + "\n".join(f"- {t}" for t in tips)
+    return f"❌ {action} error: {error}{tips_text}"
 
 
 def answer_finance_query(question: str, context: str = "", user_name: str = "User") -> str:
@@ -28,18 +26,21 @@ def answer_finance_query(question: str, context: str = "", user_name: str = "Use
     try:
         llm = _get_llm()
         context_section = f"\n\nContext:\n{context[:3000]}" if context and context.strip() else ""
-        prompt = f"""You are a professional Finance Assistant.
+        prompt = f"""You are a professional Finance Assistant executing a task from the office orchestrator.
 
 User: {user_name}
-Question: {question}{context_section}
+Task: {question}{context_section}
 
 Provide a clear, accurate, professional answer.
 - Show calculations where relevant
-- Explain concepts in plain language
-- Use bullet points for clarity
-- Note if more information is needed"""
+- Output payroll breakdowns and reports directly in the reply (do not claim files were saved to disk)
+- If salary or other required numbers are missing, say exactly what is missing
+- Use bullet points for clarity"""
         return llm.invoke(prompt).content
     except Exception as e:
+        from config import is_openai_configured, openai_missing_message
+        if not is_openai_configured():
+            return openai_missing_message("Finance Q&A")
         return _error_msg("Finance Q&A", e, tips=["Set OPENAI_API_KEY in your `.env` file (see `.env.example`)."])
 
 

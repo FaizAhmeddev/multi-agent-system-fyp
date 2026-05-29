@@ -43,6 +43,24 @@ load_local_env()
 # ─── OpenAI ────────────────────────────────────────────────
 OPENAI_API_KEY = _env("OPENAI_API_KEY")
 
+
+def is_openai_configured() -> bool:
+    return bool((_env("OPENAI_API_KEY") or OPENAI_API_KEY or "").strip())
+
+
+def openai_missing_message(action: str = "This feature") -> str:
+    env_path = _os.path.join(_PROJECT_ROOT, ".env")
+    hint = (
+        f"Add `OPENAI_API_KEY=sk-...` to **FYP_FINAL/.env** (copy from `.env.example` if needed), "
+        "save the file, then restart the app (Ctrl+C in the terminal, run `python main.py` again)."
+    )
+    if is_hosted_deploy():
+        hint = "Add **OPENAI_API_KEY** in Streamlit **Secrets** (App settings), then redeploy or restart."
+    if _os.path.isfile(env_path):
+        return f"{action} needs an OpenAI API key. Your `.env` file exists but OPENAI_API_KEY is empty.\n\n{hint}"
+    return f"{action} needs an OpenAI API key.\n\n{hint}"
+
+
 # ─── Gmail ─────────────────────────────────────────────────
 GMAIL_EMAIL = _env("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
@@ -378,7 +396,7 @@ ROLE_ORCHESTRATOR_ALLOWLIST = {
     "Admin": None,
     "Demo User": None,
     "HR Manager": ["hr", "recruitment", "email", "hr_gmail"],
-    "Assistant": ["email", "hr_gmail"],
+    "Assistant": ["email", "hr_gmail", "hr"],
     "Finance Manager": ["finance"],
     "IT Staff": ["it_support"],
     "Employee": ["general"],
@@ -410,7 +428,7 @@ ROLE_PORTAL_BANNERS = {
     "HR Manager": """<div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);color:#faf5ff;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #7c3aed">
 <b style="font-size:15px">HR operations portal</b> — use <b>Assistant</b> for inbox fetch, CV shortlist, interview invites, and follow-ups in plain language.</div>""",
     "Assistant": """<div style="background:linear-gradient(135deg,#0f766e,#115e59);color:#ecfdf5;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #14b8a6">
-<b style="font-size:15px">Assistant portal</b> — <b>Email</b> plus <b>Gmail CV shortlist</b> (fetch → rank → <b>approve before send</b>). Other departments stay hidden.</div>""",
+<b style="font-size:15px">Assistant portal</b> — <b>Email</b>, <b>Gmail CV shortlist</b>, and multi-agent tasks via the orchestrator.</div>""",
     "Finance Manager": """<div style="background:linear-gradient(135deg,#14532d,#166534);color:#f0fdf4;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #22c55e">
 <b style="font-size:15px">Finance portal</b> — budgets, expenses, invoices, and reports. Numbers stay in Finance; no HR or IT agent routes.</div>""",
     "IT Staff": """<div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#eff6ff;padding:16px 20px;border-radius:14px;margin-bottom:14px;border:1px solid #3b82f6">

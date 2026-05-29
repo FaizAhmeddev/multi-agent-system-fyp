@@ -7,10 +7,8 @@ Auto-creates IT tickets in SQLite.
 import os
 
 def _get_llm():
-    from langchain_openai import ChatOpenAI
-    from config import OPENAI_API_KEY
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    from tools.llm_client import get_chat_openai
+    return get_chat_openai(temperature=0.3)
 
 IT_KEYWORDS = [
     "computer", "laptop", "pc", "mac", "macbook", "iphone", "android", "phone", "tablet", "ipad",
@@ -63,17 +61,22 @@ def solve_it_problem(state: dict) -> dict:
             if low_signal
             else ""
         )
-        prompt = f"""You are a professional IT Support Agent.
+        prompt = f"""You are a professional IT Support Agent executing a task from the office orchestrator.
 
-Employee "{user_name}" reports: "{problem}"
+Requester: {user_name}
+Task: "{problem}"
 Detected keywords: {', '.join(matched) if matched else '(none — infer from full text)'}{kb_sec}
 {hint}
 
-Provide:
-1. **Diagnosis** (1-2 sentences)
-2. **Step-by-step Solution** (numbered, clear)
-3. **Prevention Tip** (1 sentence)
-4. If hardware repair needed: "Contact IT dept at ext. 100"
+If the task is to create a provisioning / support ticket (new hire laptop, email setup, software):
+- State the ticket summary clearly
+- List setup steps and priority
+- Do not reference saving files to disk
+
+Otherwise provide:
+1. Diagnosis (1-2 sentences)
+2. Step-by-step solution (numbered)
+3. Prevention tip (1 sentence)
 
 Be friendly, professional, concise."""
 

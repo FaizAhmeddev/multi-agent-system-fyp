@@ -10,6 +10,19 @@ from typing import Any
 from tools.hr_gmail_shortlist import strip_hr_gmail_batch_marker
 
 
+def strip_markdown(text: str) -> str:
+    """Plain text for HTML chat bubbles (no raw ** or ###)."""
+    t = text or ""
+    t = re.sub(r"```[\s\S]*?```", "", t)
+    t = re.sub(r"`([^`]+)`", r"\1", t)
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    t = re.sub(r"\*([^*]+)\*", r"\1", t)
+    t = re.sub(r"^#{1,6}\s+", "", t, flags=re.M)
+    t = re.sub(r"^---+\s*$", "", t, flags=re.M)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+
 def strip_internal_markers(text: str) -> str:
     t = strip_hr_gmail_batch_marker(text or "")
     t = re.sub(r"\[\[HR_GMAIL_BATCH_ID:[^\]]+\]\]", "", t, flags=re.I)
@@ -48,7 +61,7 @@ def build_display_text(final_answer: str, ui_payload: dict[str, Any] | None) -> 
         if t == "hr_error":
             return ui_payload.get("message") or "Request could not be completed."
 
-    clean = strip_internal_markers(final_answer or "")
+    clean = strip_markdown(strip_internal_markers(final_answer or ""))
     if not clean:
         return "Done."
     # Collapse noisy markdown headers for generic agents
@@ -61,6 +74,7 @@ def build_display_text(final_answer: str, ui_payload: dict[str, Any] | None) -> 
             continue
         lines.append(line)
     short = "\n".join(lines).strip()
+    short = strip_markdown(short)
     if len(short) > 600:
         return short[:600].rsplit(" ", 1)[0] + "…"
     return short or "Done."

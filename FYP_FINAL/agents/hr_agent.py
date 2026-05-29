@@ -1,18 +1,18 @@
 """
 AGENTS/HR_AGENT.PY
 ===================
-HR Agent — CV screening, interview questions, onboarding, HR Q&A.
+HR Agent — CV screening, interview questions, checklist, HR Q&A, JD drafting.
+Multi-step workflows are handled by the Orchestrator (parallel specialist agents).
 """
 
-import os
 import json
+import re
+
+from tools.llm_client import get_chat_openai
 
 
 def _get_llm(temp=0.3):
-    from langchain_openai import ChatOpenAI
-    from config import OPENAI_API_KEY
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-    return ChatOpenAI(model="gpt-4o-mini", temperature=temp)
+    return get_chat_openai(temperature=temp)
 
 
 def screen_candidates(job_description: str, cvs: list) -> list:
@@ -41,17 +41,17 @@ Evaluate this candidate strictly. Return ONLY valid JSON (no extra text):
 }}"""
         try:
             resp = llm.invoke(prompt)
-            raw  = resp.content.strip().replace("```json", "").replace("```", "").strip()
+            raw = resp.content.strip().replace("```json", "").replace("```", "").strip()
             result = json.loads(raw)
             results.append(result)
         except Exception as e:
             results.append({
-                "name":           cv["name"],
-                "score":          0,
-                "summary":        f"Evaluation error: {e}",
-                "strengths":      [],
-                "weaknesses":     [],
-                "recommendation": "Not Recommended"
+                "name": cv["name"],
+                "score": 0,
+                "summary": f"Evaluation error: {e}",
+                "strengths": [],
+                "weaknesses": [],
+                "recommendation": "Not Recommended",
             })
 
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
@@ -65,9 +65,7 @@ def select_top_candidates_and_email_drafts(
     sender_name: str = "HR Team",
     company: str = "Our Company",
 ) -> str:
-    """
-    Rank candidates against the JD, take the top N, and generate outreach email drafts.
-    """
+    """Rank candidates against the JD, take the top N, and generate outreach email drafts."""
     if not job_description.strip():
         return "Job description is required."
     if not cvs:
@@ -83,7 +81,7 @@ def select_top_candidates_and_email_drafts(
         summary = c.get("summary", "")
         prompt = f"""You are {sender_name} at {company}.
 
-Write one professional recruitment email to **{name}** about the role described below.
+Write one professional recruitment email to {name} about the role described below.
 First line must be exactly: Subject: <concise subject>
 
 Then a blank line, then the email body (max 200 words).
@@ -98,10 +96,7 @@ Tone: warm, professional. No emojis. End with a clear call to reply or schedule 
         except Exception as e:
             body = f"(Draft failed: {e})"
         blocks.append(f"### {i}. {name} (match score {score}/100)\n\n{body}")
-    header = (
-        f"**Shortlist:** top **{len(top)}** of **{len(cvs)}** applicants for this JD.\n\n"
-        "---\n\n"
-    )
+    header = f"Shortlist: top {len(top)} of {len(cvs)} applicants for this JD.\n\n---\n\n"
     return header + "\n\n---\n\n".join(blocks)
 
 
@@ -148,13 +143,16 @@ def answer_hr_query(question: str, user_name: str = "Employee", policy_context: 
     if policy_context:
         context_section = f"\nRelevant HR Policy:\n{policy_context[:2000]}\n"
 
-    prompt = f"""You are a professional HR assistant.
+    prompt = f"""You are a professional HR assistant executing tasks assigned by the office orchestrator.
 
-Employee "{user_name}" asks: "{question}"
+User context: {user_name}
+Task / question:
+{question}
 {context_section}
-Provide a clear, professional, and helpful answer.
-If policy context is available, answer based on it.
-Keep answer concise and practical."""
+Complete every HR item in the request (profiles, offer letters, orientation schedules, summaries).
+Output the deliverables directly in your reply — do not say you saved files to disk.
+If required facts (salary, email, department) are missing from the request, say exactly what is missing.
+Keep answers structured and actionable."""
 
     return llm.invoke(prompt).content
 
@@ -165,7 +163,7 @@ def analyze_cv_batch(cvs: list) -> str:
 
     cv_summaries = []
     for cv in cvs[:10]:
-        cv_summaries.append(f"**{cv['name']}**: {cv['content'][:400]}...")
+        cv_summaries.append(f"{cv['name']}: {cv['content'][:400]}...")
     all_cvs = "\n\n".join(cv_summaries)
 
     prompt = f"""You are an HR analyst reviewing {len(cvs)} CVs.
@@ -174,11 +172,11 @@ CVs:
 {all_cvs}
 
 Provide:
-1. **Talent Pool Quality** (1-2 sentences)
-2. **Common Strengths** across candidates (3-4 points)
-3. **Common Gaps** (3-4 points)
-4. **Diversity Analysis** (experience levels, backgrounds)
-5. **Top 3 Candidates** (names and why)
+1. Talent Pool Quality (1-2 sentences)
+2. Common Strengths across candidates (3-4 points)
+3. Common Gaps (3-4 points)
+4. Diversity Analysis (experience levels, backgrounds)
+5. Top 3 Candidates (names and why)
 
 Be concise and actionable."""
 

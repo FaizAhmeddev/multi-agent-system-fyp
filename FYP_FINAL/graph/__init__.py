@@ -14,7 +14,3 @@ try:
     from .documents_graph import documents_graph
 except Exception:
     pass
-try:
-    from .email_graph import email_graph
-except Exception:
-    pass

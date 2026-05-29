@@ -9,10 +9,8 @@ import re
 
 
 def _get_llm():
-    from langchain_openai import ChatOpenAI
-    from config import OPENAI_API_KEY
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+    from tools.llm_client import get_chat_openai
+    return get_chat_openai(temperature=0.3)
 
 
 def _looks_like_mern_developer_application(subject: str, email_content: str) -> bool:
@@ -47,6 +45,29 @@ Kind regards,
 HR Team"""
 
 
+def compose_office_email(task: str, user_name: str = "HR Team") -> str:
+    """Draft or send-style email from an orchestrator task (not an inbox reply)."""
+    try:
+        llm = _get_llm()
+        prompt = f"""You are a professional office email assistant ({user_name}).
+
+Task:
+{task}
+
+Write the complete email:
+- First line: Subject: <subject>
+- Blank line, then the email body
+- Professional tone, concise
+- If recipient email is mentioned, include "To: <email>" before Subject
+- Do not claim the email was sent unless the task explicitly says it was sent"""
+        return llm.invoke(prompt).content.strip()
+    except Exception as e:
+        from config import is_openai_configured, openai_missing_message
+        if not is_openai_configured():
+            return openai_missing_message("Email drafting")
+        return f"Unable to draft this email: {e}"
+
+
 def generate_reply(state: dict) -> dict:
     """LangGraph node: generate a reply to an email."""
     email_content = state.get("email_content", "")
@@ -77,6 +98,13 @@ Your reply:"""
         state["body"] = response.content
 
     except Exception as e:
-        state["body"] = f"Thank you for your email. We will get back to you shortly.\n\n[Auto-reply error: {e}]"
+        from config import is_openai_configured, openai_missing_message
+        if not is_openai_configured():
+            state["body"] = (
+                "Thank you for your email. We will get back to you shortly.\n\n"
+                + openai_missing_message("Email auto-reply")
+            )
+        else:
+            state["body"] = f"Thank you for your email. We will get back to you shortly.\n\n[Auto-reply error: {e}]"
 
     return state

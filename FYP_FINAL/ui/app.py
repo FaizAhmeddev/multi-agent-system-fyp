@@ -1172,6 +1172,13 @@ if _ti is not None:
             '<span class="badge badge-mcp">MCP</span></div>',
             unsafe_allow_html=True,
         )
+        try:
+            from config import is_openai_configured, openai_missing_message
+
+            if not is_openai_configured():
+                st.error(openai_missing_message("AI features (Assistant, Finance, email auto-reply)"))
+        except Exception:
+            pass
         _allow = get_role_orchestrator_allowlist(st.session_state.user_role)
         if _allow is None:
             st.info(

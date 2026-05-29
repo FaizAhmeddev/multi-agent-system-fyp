@@ -32,7 +32,6 @@ from tools.hr_gmail_shortlist import (
     user_requests_hr_recruitment_follow_up,
 )
 
-
 def _batch_marker(batch_id: str) -> str:
     return f"\n\n{HR_GMAIL_BATCH_MARKER_PREFIX}{batch_id}{HR_GMAIL_BATCH_MARKER_SUFFIX}"
 
@@ -154,6 +153,50 @@ def _looks_like_inbox_browse(low: str) -> bool:
         return True
     if "inbox" in low and re.search(r"\b(?:show|list|fetch|get|read|check)\b", low):
         return True
+    if re.search(r"\b(?:check|open|read)\s+(?:my\s+)?(?:inbox|mailbox)\b", low):
+        return True
+    if re.search(r"\b(?:latest|recent|new)\s+(?:e-?mails?|emails?|messages?)\b", low):
+        return True
+    if re.search(r"\bfetch\s+(?:e-?mails?|emails?|inbox|gmail)\b", low):
+        return True
+    if re.search(r"\b(?:show|get|list)\s+(?:me\s+)?(?:my\s+)?(?:e-?mails?|emails?|inbox)\b", low):
+        return True
+    return False
+
+
+def message_looks_like_gmail_ops(message: str) -> bool:
+    """True when the user wants Gmail inbox / CV shortlist (not generic 'email someone')."""
+    m = (message or "").strip()
+    if len(m) < 4:
+        return False
+    low = m.lower()
+
+    has_gmail_verb = bool(
+        re.search(
+            r"\b(?:fetch|get|show|list|read|check|open|scan|shortlist|screen|rank|"
+            r"inbox|gmail|mailbox|approve\s+and\s+send)\b",
+            low,
+        )
+    )
+
+    if re.search(
+        r"\b(?:department|dept|salary|designation|joining|compensation)\s*:",
+        low,
+    ) and not has_gmail_verb:
+        return False
+
+    if user_requests_hr_gmail_approve_send(m) or user_requests_hr_recruitment_follow_up(m):
+        return True
+    if parse_gmail_shortlist_prompt(m) or build_shortlist_spec_from_message(m):
+        return True
+    if classify_hr_email_intent(m) != "none":
+        return True
+    if _looks_like_inbox_browse(low):
+        return True
+    if has_gmail_verb and re.search(r"\b(?:e-?mails?|emails?|inbox|gmail|mailbox|messages?|cv|cvs)\b", low):
+        return True
+    if re.search(r"\b(?:shortlist|screen|rank)\b.{0,40}\b(?:cv|cvs|resume|candidate|python|developer)\b", low):
+        return True
     return False
 
 
@@ -166,6 +209,11 @@ def classify_hr_email_intent(message: str) -> str:
     if len(m) < 6:
         return "none"
     low = m.lower()
+
+    from tools.hr_gmail_shortlist import _is_employee_onboarding_context
+
+    if _is_employee_onboarding_context(low):
+        return "none"
 
     hiring = prompt_has_hiring_focus(m)
     shortlist_verbs = bool(
@@ -547,6 +595,86 @@ def execute_hr_gmail_agent(
     )
 
 
+def dispatch_hr_gmail_for_orchestrator(
+    *,
+    user_message: str,
+    conversation_history: list[dict[str, str]] | None,
+    user_name: str,
+    user_role: str,
+    start_time: float,
+) -> dict[str, Any] | None:
+    """
+    Single HR-Gmail entry for the orchestrator (inbox, shortlist, approve, follow-up).
+    Replaces duplicate handlers in orchestrator_brain.
+    """
+    msg = (user_message or "").strip()
+    if not msg:
+        return None
+
+    result = try_hr_email_assistant_command(
+        user_message=msg,
+        conversation_history=conversation_history,
+        user_name=user_name,
+        user_role=user_role,
+        start_time=start_time,
+    )
+    if result is not None:
+        return result
+
+    intent = classify_hr_email_intent(msg)
+    elapsed = round((time.time() - start_time) * 1000)
+
+    if intent == "cv_shortlist" or parse_gmail_shortlist_prompt(msg):
+        return _handle_hr_shortlist_command(
+            msg, user_name=user_name, user_role=user_role, elapsed_ms=elapsed
+        )
+
+    if intent == "inbox_browse":
+        espec = parse_email_search_prompt(msg) or {
+            "max_results": 10,
+            "on_date": None,
+            "since_date": None,
+            "sender": "",
+            "subject_contains": "",
+            "candidate_name": "",
+            "body_keyword": "",
+            "classify": False,
+        }
+        sr = run_email_search(espec)
+        if not sr.get("ok"):
+            return _orchestrator_hr_result(
+                final_answer=sr.get("error", "Search failed."),
+                ui_payload={"type": "hr_error", "message": sr.get("error")},
+                elapsed_ms=elapsed,
+            )
+        emails = sr.get("emails") or []
+        ui = build_email_list_ui_payload(emails, filter_hint=sr.get("filter_hint", ""))
+        final = build_display_text(
+            f"Listed {len(emails)} email(s) for {sr.get('filter_hint', 'inbox')}.",
+            ui,
+        )
+        return _orchestrator_hr_result(final_answer=final, ui_payload=ui, elapsed_ms=elapsed)
+
+    if intent == "cv_inventory":
+        inv = parse_cv_inventory_prompt(msg)
+        if inv:
+            inv_res = run_cv_inventory(inv)
+            ui = {
+                "type": "hr_inventory",
+                "total_cvs": inv_res.get("total_cvs", 0),
+                "matched_cvs": inv_res.get("matched_cvs", 0),
+                "skills": inv_res.get("skills") or [],
+                "message": inv_res.get("message", ""),
+            }
+            return _orchestrator_hr_result(
+                final_answer=inv_res.get("message", "Done."),
+                ui_payload=ui,
+                elapsed_ms=elapsed,
+            )
+
+    return None
+
+
 def try_hr_email_assistant_command(
     *,
     user_message: str,
@@ -560,6 +688,11 @@ def try_hr_email_assistant_command(
     """
     msg = (user_message or "").strip()
     if not msg:
+        return None
+
+    from tools.hr_gmail_shortlist import _is_employee_onboarding_context
+
+    if _is_employee_onboarding_context(msg.lower()):
         return None
 
     intent = classify_hr_email_intent(msg)

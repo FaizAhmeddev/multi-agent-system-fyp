@@ -21,5 +21,6 @@ build/
 venv/
 .venv/
 database/chroma_db/
+company_files/
 *.db-journal
 .DS_Store
