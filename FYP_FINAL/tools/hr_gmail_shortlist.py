@@ -171,7 +171,10 @@ def _extract_top_n_from_prompt(low: str) -> int | None:
     """How many candidates to keep, e.g. select 1 python, select two for python."""
     patterns = (
         r"\bselect\s+(?:only\s+)?(?:the\s+)?(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
-        rf"(?:{_TECH_ROLE_RE}|developer|engineer|candidate|people|person)s?\b",
+        r"(?:[\w]+\s+){0,5}?"
+        rf"(?:{_TECH_ROLE_RE}|developer|engineer|candidate|people|person|designer|specialist)s?\b",
+        r"\bselect\s+(?:only\s+)?(?P<n>\d+|one|two|three|four|five)\s+[\w\s]{2,40}?"
+        r"(?:designer|developer|engineer|manager|analyst|specialist|coordinator)\b",
         rf"\bselect\s+(?:only\s+)?(?P<n>\d+|one|two|three|four|five)\s+for\s+(?:{_TECH_ROLE_RE})\b",
         r"\bselect\s+(?:only\s+)?(?:the\s+)?(?:top\s*)?(?P<n>\d+|one|two|three|four|five)\s+candidates?\b",
         r"\b(?:pick|choose|take|shortlist)\s+(?:only\s+)?(?P<n>\d+|one|two|three|four|five)\s+"
@@ -204,16 +207,46 @@ def extract_max_messages_from_prompt(message: str) -> int:
 
 
 def _extract_max_messages_from_prompt(low: str) -> int:
+    found: list[int] = []
     for pat in (
-        r"(?:last|past|recent)\s+(\d+)\s+(?:e-?mails?|emails?|messages?)",
-        r"(?:fetch|get|scan|pull|collect|retrieve)\s+(?:last\s+)?(\d+)\s+(?:e-?mails?|emails?|messages?)",
+        r"(?:last|past|recent|latest)\s+(\d+)\s+(?:candidate\s+)?(?:e-?mails?|emails?|messages?)",
+        r"(?:fetch|get|scan|pull|collect|retrieve)\s+(?:the\s+)?(?:last|latest|recent\s+)?(\d+)\s+(?:candidate\s+)?(?:e-?mails?|emails?|messages?)",
         r"(?:fetch|get|scan)\s+(\d+)\b",
-        r"(\d+)\s+(?:e-?mails?|emails?|messages?)\s+(?:from|in)\s+(?:my\s+)?(?:inbox|gmail|mail)",
+        r"(\d+)\s+(?:candidate\s+)?(?:e-?mails?|emails?|messages?)\s+(?:from|in)\s+(?:my\s+)?(?:inbox|gmail|mail)",
     ):
-        mm = re.search(pat, low, re.I)
-        if mm:
-            return max(5, min(100, int(mm.group(1))))
+        for mm in re.finditer(pat, low, re.I):
+            found.append(int(mm.group(1)))
+    if found:
+        return max(5, min(100, max(found)))
     return 50
+
+
+def message_is_new_shortlist_workflow(message: str) -> bool:
+    """
+    True when this message should run inbox fetch + rank (not send-only follow-up).
+    Includes combined prompts: fetch + select role + send invitations in one line.
+    """
+    m = (message or "").strip()
+    if len(m) < 10:
+        return False
+    if parse_gmail_shortlist_prompt(m) or build_shortlist_spec_from_message(m):
+        return True
+    low = m.lower()
+    if is_inbox_list_only_request(m):
+        return False
+    if re.search(r"\b(?:fetch|scan|pull|get|retrieve)\b", low) and re.search(
+        r"\b(?:select|shortlist|pick|choose|rank|screen)\b", low
+    ):
+        return True
+    if re.search(
+        r"\b(?:select|shortlist|pick|choose)\s+(?:one|two|three|four|five|\d+)\s+",
+        low,
+    ) and re.search(
+        r"\b(?:designer|developer|engineer|manager|analyst|candidate|specialist|textile)\b",
+        low,
+    ):
+        return True
+    return False
 
 
 def is_inbox_list_only_request(message: str) -> bool:
@@ -315,6 +348,22 @@ def _prompt_has_hiring_focus(low: str) -> bool:
         re.I,
     ):
         return True
+    if re.search(
+        r"\b(?:select|shortlist|pick|choose)\s+(?:only\s+)?(?:one|two|three|four|five|\d+|top\s*\d*)\s+"
+        r"[a-z][\w\s]{0,48}?(?:designer|developer|engineer|manager|analyst|officer|assistant|"
+        r"specialist|executive|coordinator|accountant|architect|consultant|textile)\b",
+        low,
+        re.I,
+    ):
+        return True
+    if re.search(r"\btextile\b", low) and re.search(
+        r"\b(?:select|shortlist|designer|candidate|fetch)\b", low
+    ):
+        return True
+    if re.search(r"\bcandidate\s+e-?mails?\b", low) and re.search(
+        r"\b(?:fetch|select|shortlist|hire)\b", low
+    ):
+        return True
     return False
 
 
@@ -349,11 +398,22 @@ def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
     has_select = bool(re.search(r"\b(?:select|shortlist|pick|choose)\b", low))
     has_hiring = _prompt_has_hiring_focus(low)
 
-    is_fetch_flow = has_hiring and (
-        (has_fetch and (has_inbox or re.search(r"\bfetch\s+\d+", low)))
-        or (has_fetch and has_select)
-        or (has_select and has_hiring)
-        or (has_fetch and has_inbox and has_hiring)
+    is_fetch_flow = (
+        (has_hiring and (
+            (has_fetch and (has_inbox or re.search(r"\bfetch\s+\d+", low)))
+            or (has_fetch and has_select)
+            or (has_select and has_hiring)
+            or (has_fetch and has_inbox and has_hiring)
+        ))
+        or (has_select and has_fetch and has_inbox)
+        or (
+            has_select
+            and has_fetch
+            and re.search(
+                r"\b(?:designer|developer|engineer|textile|manager|analyst|specialist|candidate)\b",
+                low,
+            )
+        )
     )
     if not is_fetch_flow:
         return None
@@ -396,6 +456,16 @@ def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
 
 
 def _infer_job_criteria_from_prompt(message: str) -> str:
+    role_pick = re.search(
+        r"(?i)select\s+(?:only\s+)?(?:one|\d+|two|three|four|five)\s+(.+?)"
+        r"(?:,\s*|\.\s+|;\s+|send\s+interview|and\s+send|$)",
+        message,
+    )
+    if role_pick:
+        chunk = role_pick.group(1).strip()
+        if len(chunk) >= 3:
+            return f"{chunk}. Context: {message[:500]}"
+
     tech_dev = re.search(
         rf"(?i)\b({_TECH_ROLE_RE})\s+(?:dev|developer|engineer)s?\b",
         message,
@@ -574,7 +644,10 @@ def is_direct_email_send_to_address(message: str) -> bool:
 def user_requests_hr_gmail_approve_send(message: str) -> bool:
     """
     Chat opt-in to SMTP-send — includes selective targets (Send to Faiz, top 2, etc.).
+    Send-only on an existing batch; not when the same message starts fetch + shortlist.
     """
+    if message_is_new_shortlist_workflow(message):
+        return False
     if parse_gmail_shortlist_prompt(message):
         return False
     if is_direct_email_send_to_address(message):
@@ -619,6 +692,8 @@ def user_requests_hr_recruitment_follow_up(message: str) -> bool:
     """Follow-up on a prior shortlist without re-fetching inbox."""
     low = (message or "").lower().strip()
     if len(low) < 6:
+        return False
+    if message_is_new_shortlist_workflow(message):
         return False
     if parse_gmail_shortlist_prompt(message):
         return False

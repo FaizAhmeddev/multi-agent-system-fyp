@@ -28,6 +28,7 @@ from tools.hr_gmail_shortlist import (
     run_gmail_shortlist_from_user_prompt,
     build_shortlist_spec_from_message,
     is_inbox_list_only_request,
+    message_is_new_shortlist_workflow,
     user_requests_hr_gmail_approve_send,
     user_requests_hr_recruitment_follow_up,
 )
@@ -46,6 +47,8 @@ def wants_auto_send_after_fetch(message: str) -> bool:
         "email her",
         "send invitation",
         "send interview",
+        "send interview invitation",
+        "interview invitation",
         "invite them",
         "mail them",
         "send to shortlisted",
@@ -535,6 +538,29 @@ def execute_hr_gmail_agent(
     msg = (user_message or "").strip()
     intent = classify_hr_email_intent(msg)
 
+    if (
+        intent == "cv_shortlist"
+        or parse_gmail_shortlist_prompt(msg)
+        or build_shortlist_spec_from_message(msg)
+        or message_is_new_shortlist_workflow(msg)
+    ):
+        res = run_gmail_shortlist_from_user_prompt(
+            user_message=msg, user_name=user_name, user_role=user_role
+        )
+        if res.get("ok"):
+            lines = [
+                f"Shortlisted {len(res.get('drafts') or [])} candidate(s) for {res.get('role_title', 'role')}."
+            ]
+            bid = res.get("batch_id") or ""
+            if wants_auto_send_after_fetch(msg) and bid:
+                sr = approve_and_send_shortlist_batch(bid, user_message=msg)
+                if sr.get("ok"):
+                    lines.append(f"Sent {sr.get('emails_sent', 0)} interview invitation(s).")
+                else:
+                    lines.append(sr.get("error") or "Send needs clarification.")
+            return "\n".join(lines) + _batch_marker(bid)
+        return res.get("error", "Shortlist failed.")
+
     if user_requests_hr_recruitment_follow_up(msg) or user_requests_hr_gmail_approve_send(msg):
         fu = handle_hr_recruitment_follow_up(
             user_message=msg,
@@ -716,7 +742,18 @@ def try_hr_email_assistant_command(
 
     elapsed = lambda: round((time.time() - start_time) * 1000)
 
-    # 1) Follow-up on an existing shortlist batch (before new fetch)
+    # 1) New fetch + shortlist (+ optional send in same message) — before send-only follow-up
+    if (
+        classify_hr_email_intent(msg) == "cv_shortlist"
+        or parse_gmail_shortlist_prompt(msg)
+        or build_shortlist_spec_from_message(msg)
+        or message_is_new_shortlist_workflow(msg)
+    ):
+        return _handle_hr_shortlist_command(
+            msg, user_name=user_name, user_role=user_role, elapsed_ms=elapsed()
+        )
+
+    # 2) Follow-up on an existing shortlist batch (no new fetch in this message)
     if user_requests_hr_recruitment_follow_up(msg) or user_requests_hr_gmail_approve_send(msg):
         fu = handle_hr_recruitment_follow_up(
             user_message=msg,
@@ -747,7 +784,7 @@ def try_hr_email_assistant_command(
                 hr_gmail_pending_cleared=bool(fu.get("hr_gmail_pending_cleared")),
             )
 
-    # 2) Plain inbox browse (no recruitment shortlist)
+    # 3) Plain inbox browse (no recruitment shortlist)
     if intent == "inbox_browse":
         espec = parse_email_search_prompt(msg) or {
             "max_results": 10,
@@ -774,7 +811,7 @@ def try_hr_email_assistant_command(
         )
         return _orchestrator_hr_result(final_answer=final, ui_payload=ui, elapsed_ms=elapsed())
 
-    # 3) CV count / inventory (recruitment-related, not full shortlist)
+    # 4) CV count / inventory (recruitment-related, not full shortlist)
     if intent == "cv_inventory":
         inv = parse_cv_inventory_prompt(msg)
         if inv:
@@ -792,7 +829,7 @@ def try_hr_email_assistant_command(
                 elapsed_ms=elapsed(),
             )
 
-    # 4) CV shortlist pipeline
+    # 5) CV shortlist (intent-only fallback)
     if intent == "cv_shortlist":
         return _handle_hr_shortlist_command(
             msg, user_name=user_name, user_role=user_role, elapsed_ms=elapsed()
