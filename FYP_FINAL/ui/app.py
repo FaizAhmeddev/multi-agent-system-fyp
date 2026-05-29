@@ -580,9 +580,10 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
         c3.metric("CVs parsed", stats.get("attachments_parsed", "—"))
         skills = stats.get("required_skills") or []
         c4.metric("Skill filter", ", ".join(skills) if skills else "—")
-        if ui.get("send_result", {}).get("ok"):
+        send_result = ui.get("send_result") or {}
+        if send_result.get("ok"):
             st.success(
-                f"Sent {ui['send_result'].get('emails_sent', 0)} invitation(s) via Gmail."
+                f"Sent {send_result.get('emails_sent', 0)} invitation(s) via Gmail."
             )
         _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
     elif t == "hr_inventory":

@@ -27,6 +27,7 @@ from tools.hr_gmail_shortlist import (
     prompt_has_hiring_focus,
     run_gmail_shortlist_from_user_prompt,
     build_shortlist_spec_from_message,
+    is_inbox_list_only_request,
     user_requests_hr_gmail_approve_send,
     user_requests_hr_recruitment_follow_up,
 )
@@ -139,7 +140,13 @@ def _looks_like_inbox_browse(low: str) -> bool:
         low,
     ):
         return True
-    if re.search(r"\b(?:last|latest|recent)\s+\d+\s+(?:e-?mails?|emails?|messages?)\b", low):
+    if re.search(r"\b(?:last|latest|recent)\s+\d+\s+(?:candidate\s+)?(?:e-?mails?|emails?|messages?)\b", low):
+        return True
+    if re.search(
+        r"\b(?:fetch|get|show|list|read)\s+(?:the\s+)?(?:latest|last|recent)\s+\d+\s+"
+        r"(?:candidate\s+)?(?:e-?mails?|emails?)\b",
+        low,
+    ):
         return True
     if re.search(r"\b(?:fetch|get)\s+(?:the\s+)?(?:last|latest)\s+\d+\b", low):
         return True
@@ -175,6 +182,9 @@ def classify_hr_email_intent(message: str) -> str:
         low,
     ):
         return "cv_inventory"
+
+    if is_inbox_list_only_request(m):
+        return "inbox_browse"
 
     if parse_gmail_shortlist_prompt(m) or build_shortlist_spec_from_message(m):
         return "cv_shortlist"

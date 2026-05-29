@@ -216,13 +216,61 @@ def _extract_max_messages_from_prompt(low: str) -> int:
     return 50
 
 
+def is_inbox_list_only_request(message: str) -> bool:
+    """
+    True when the user wants to list/read recent mail — not run the ATS shortlist pipeline.
+    e.g. "fetch the latest 10 candidate emails" (applicant mail in inbox, not "shortlist candidates").
+    """
+    low = (message or "").lower().strip()
+    if len(low) < 8:
+        return False
+    if re.search(r"\b(?:select|shortlist|pick|choose|rank|screen|hire)\b", low):
+        if re.search(
+            r"\b(?:select|shortlist|pick|choose)\s+(?:\d+|one|two|three|four|five|top)\b",
+            low,
+        ):
+            return False
+        if re.search(rf"\b(?:shortlist|select|rank|screen)\b.{0,40}\b(?:{_TECH_ROLE_RE}|developer|engineer)\b", low):
+            return False
+    if re.search(
+        r"\b(?:latest|last|recent)\s+\d+\s+(?:candidate\s+)?e-?mails?\b",
+        low,
+    ):
+        return True
+    if re.search(
+        r"\b(?:fetch|get|show|list|read)\s+(?:the\s+)?(?:latest|last|recent)\s+\d+\s+"
+        r"(?:candidate\s+)?e-?mails?\b",
+        low,
+    ):
+        return True
+    if re.search(r"\b(?:fetch|get|show|list|read)\b", low) and re.search(
+        r"\b(?:e-?mails?|emails|inbox|gmail|messages?)\b", low
+    ):
+        if re.search(r"\b(?:cv|resume)s?\b", low) and re.search(
+            r"\b(?:shortlist|select|pick|rank|screen)\b", low
+        ):
+            return False
+        if not re.search(r"\b(?:shortlist|select|pick|choose|rank|screen)\b", low):
+            return True
+    return False
+
+
 def prompt_has_hiring_focus(message: str) -> bool:
     """Public wrapper — True when the message is about hiring / CV screening."""
+    if is_inbox_list_only_request(message):
+        return False
     return _prompt_has_hiring_focus((message or "").lower())
 
 
 def _prompt_has_hiring_focus(low: str) -> bool:
-    if any(x in low for x in ("cv", "resume", "candidat", "applicant", "attachment")):
+    if any(x in low for x in ("cv", "resume", "curriculum vitae", "applicant", "attachment")):
+        return True
+    if re.search(r"\bcandidates?\s+(?:for|to\s+hire|matching|with)\b", low):
+        return True
+    if re.search(
+        r"\b(?:shortlist|screen|rank|select|hire)\b.{0,40}\bcandidates?\b",
+        low,
+    ):
         return True
     if re.search(
         rf"\b(?:{_TECH_ROLE_RE})\b.*\b(?:dev|developer|engineer|candidate|role|position)\b",
@@ -261,6 +309,9 @@ def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
     if len(m) < 12:
         return None
     low = m.lower()
+
+    if is_inbox_list_only_request(m):
+        return None
 
     has_inbox = any(
         x in low
@@ -384,6 +435,8 @@ def build_shortlist_spec_from_message(message: str) -> dict[str, Any] | None:
     if len(m) < 12:
         return None
     low = m.lower()
+    if is_inbox_list_only_request(m):
+        return None
     if not _prompt_has_hiring_focus(low):
         return None
     has_action = bool(
