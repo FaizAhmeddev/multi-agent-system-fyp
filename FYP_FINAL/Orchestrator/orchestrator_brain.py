@@ -218,6 +218,188 @@ def _enrich_onboarding_context(
     return block + user_message
 
 
+def _is_capabilities_or_meta_question(message: str) -> bool:
+    """
+    User is asking what the Assistant can do — not requesting HR/IT/finance work.
+    Must route to general only (never run specialist agents with invented demos).
+    """
+    msg = (message or "").lower().strip()
+    if not msg or len(msg) > 600:
+        return False
+    if _has_operational_work_request(msg):
+        return False
+    capability_patterns = (
+        r"what can you do",
+        r"what (?:tasks?|things?) (?:can|do) you",
+        r"which tasks? can you",
+        r"let me know which task",
+        r"what (?:are your|is your) capabilit",
+        r"what (?:services|features) do you offer",
+        r"list (?:your )?(?:tasks|capabilities|features|functions)",
+        r"how can you help(?: me)?",
+        r"what do you support",
+        r"which (?:agents?|modules?|specialists?) can you",
+        r"tell me what you can",
+        r"what are you able to",
+        r"describe your (?:role|functions|capabilities)",
+        r"what kind of (?:work|tasks?) can you",
+        r"what does (?:this |the )?(?:project|app|system|platform) do",
+        r"what is this (?:project|app|system|platform)",
+        r"explain (?:the )?(?:whole |entire )?(?:project|system|platform)",
+        r"what (?:is|are) (?:the )?(?:whole |entire )?project",
+        r"show (?:me )?(?:all )?(?:prompt|task)s? (?:i can|you can|to use)",
+        r"prompt (?:guide|examples?|catalog)",
+        r"assistant (?:tab|guide|help)",
+        r"what can i (?:do|ask) (?:here|in assistant)",
+    )
+    if any(re.search(p, msg) for p in capability_patterns):
+        return True
+    if re.search(r"\b(?:which|what)\s+tasks?\b", msg) and re.search(
+        r"\b(?:can you|do you|you perform|you handle|are you able)\b", msg
+    ):
+        return True
+    return False
+
+
+def _has_operational_work_request(msg: str) -> bool:
+    """True when the user wants real work done, not a meta/capabilities question."""
+    return bool(
+        re.search(
+            r"\b(?:onboard|new employee|welcome email|offer letter|shortlist|fetch\s+last|"
+            r"inbox|create (?:a |an )?ticket|payroll entry|generate pdf|export pdf|"
+            r"screen (?:these )?cv|hire |joining (?:on|date)|complete the full onboarding|"
+            r"tasks to perform|send (?:a )?welcome|approve and send)\b",
+            msg,
+        )
+    )
+
+
+# Agent task catalog — same slugs as intent routing / _CANONICAL (capabilities answers only).
+_AGENT_TASK_CATALOG: dict[str, dict] = {
+    "hr_gmail": {
+        "title": "Gmail / recruitment inbox",
+        "desc": (
+            "Fetch or filter inbox, parse CV attachments, shortlist by skills, draft interview invites, "
+            "approve and send from a batch."
+        ),
+        "examples": [
+            "Fetch the latest 10 candidate emails",
+            "Fetch 20 emails and shortlist two Python developers",
+            "Show emails received on 15 May 2026",
+            "Send interview invitations for Monday at 3 PM",
+            "Approve and send to all recommended candidates",
+        ],
+    },
+    "email": {
+        "title": "Email compose & send",
+        "desc": "Welcome letters, replies, notifications — drafted and sent via Gmail when you provide a recipient.",
+        "examples": [
+            "Send a welcome email to newhire@company.com — start Monday as Software Engineer",
+            "Draft a reply thanking the vendor and ask for revised invoice",
+        ],
+    },
+    "hr": {
+        "title": "HR",
+        "desc": (
+            "Onboarding checklists, offer letters, orientation, policies, interview questions "
+            "(for a **named** new hire — facts you provide, not invented examples)."
+        ),
+        "examples": [
+            "New employee [Name] joining Monday as [Role] — complete full onboarding automatically",
+            "Generate interview questions for a senior Python developer",
+            "Draft an offer letter for Ali, start date 1 June",
+        ],
+    },
+    "recruitment": {
+        "title": "Recruitment (attachments)",
+        "desc": "Upload CVs + job description in chat → parse, rank, shortlist, draft interview emails.",
+        "examples": [
+            "Screen attached CVs for the JD in my message and rank top 3",
+            "Shortlist the best candidate and draft an invite email",
+        ],
+    },
+    "it_support": {
+        "title": "IT support",
+        "desc": "Troubleshooting guidance and IT tickets (laptop, software, access, VPN, etc.).",
+        "examples": [
+            "My laptop is slow — create an IT ticket",
+            "WiFi connects but no internet on VPN",
+        ],
+    },
+    "finance": {
+        "title": "Finance",
+        "desc": "Expenses, budgets, invoices, payroll breakdowns — **PDF / Excel downloads** when you ask to generate or export.",
+        "examples": [
+            "Analyze these expenses and highlight top 5 costs",
+            "Generate quarterly expense PDF and Excel",
+        ],
+    },
+    "documents": {
+        "title": "Documents",
+        "desc": "Google Drive search and summaries when Drive is connected; compare or extract from document text.",
+        "examples": [
+            "Search Google Drive for onboarding policy PDF",
+            "Summarize the security policy document",
+        ],
+    },
+}
+
+
+def build_platform_capabilities_answer(user_name: str = "User", user_role: str = "") -> str:
+    """Deterministic capability list from orchestrator agent catalog — no invented deliverables."""
+    from config import get_role_orchestrator_allowlist, is_gmail_configured, is_google_drive_configured
+
+    all_slugs = tuple(_AGENT_TASK_CATALOG.keys())
+    allow = get_role_orchestrator_allowlist(user_role) if user_role else None
+    if allow is None:
+        allowed = list(all_slugs)
+    else:
+        allowed = [s for s in all_slugs if s in allow]
+
+    lines = [
+        f"Hi {user_name} — **Office Automation Agents Pro** (Assistant / Orchestrator).",
+        "",
+        "Type any office task in plain language. I detect intent, route to the right specialist(s), "
+        "and run them **in parallel** when needed. Results appear as cards below your message.",
+        "",
+        "**Specialists you can invoke from this chat:**",
+        "",
+    ]
+    for slug in all_slugs:
+        if slug not in allowed:
+            continue
+        block = _AGENT_TASK_CATALOG[slug]
+        lines.append(f"- **{block['title']}**: {block['desc']}")
+        lines.append("  Example prompts:")
+        for ex in block["examples"]:
+            lines.append(f'  - "{ex}"')
+        lines.append("")
+
+    blocked = [s for s in all_slugs if s not in allowed]
+    if blocked:
+        titles = [_AGENT_TASK_CATALOG[s]["title"] for s in blocked]
+        lines.append("**Not available for your role:** " + ", ".join(titles) + ".")
+        lines.append("")
+
+    lines += [
+        "**How routing works (this orchestrator):**",
+        "- Keyword + LLM intent → agent list (IT, HR, Finance, Documents, Email, hr_gmail, recruitment)",
+        "- Gmail hiring requests short-circuit to inbox shortlist when the message matches inbox ops",
+        "- Multi-step jobs (e.g. onboard + email) expand to several agents in one turn",
+        "",
+    ]
+    if not is_gmail_configured():
+        lines.append("Note: Gmail needs `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD` in `.env`.")
+    if not is_google_drive_configured():
+        lines.append("Note: Google Drive is optional for document search.")
+    lines.append("")
+    lines.append(
+        "Send your next **real** task when ready — I route and execute specialists; "
+        "I do not run them for this capabilities question."
+    )
+    return "\n".join(lines)
+
+
 def run_general_assistant(
     user_message: str,
     user_name: str = "User",
@@ -255,6 +437,8 @@ def run_general_assistant(
         elif role == "assistant":
             msgs.append(AIMessage(content=text))
     msgs.append(HumanMessage(content=(user_message or "").strip()[:8000]))
+    if _is_capabilities_or_meta_question(user_message):
+        return build_platform_capabilities_answer(user_name)
     try:
         out = llm.invoke(msgs)
         return (out.content or "").strip() or "I'm here if you need anything else."
@@ -353,6 +537,8 @@ def _pre_route_intent(
     if re.search(r"\b(what\s+day|what\s+date|what\s+time|today'?s\s+date|current\s+time)\b", msg):
         return ["general"]
     if re.search(r"^(hi|hello|hey|thanks|thank you|good\s+(morning|afternoon|evening))\b", msg):
+        return ["general"]
+    if _is_capabilities_or_meta_question(user_message):
         return ["general"]
 
     fin_doc = re.search(
@@ -596,6 +782,8 @@ def expand_agents_for_multi_task(
     conversation_history: Optional[List[Dict[str, str]]] = None,
 ) -> list:
     """Include every specialist domain referenced in a multi-step user request."""
+    if _is_capabilities_or_meta_question(message):
+        return ["general"]
     if _is_onboarding_workflow(message, conversation_history):
         return normalize_agent_list(list(set(agents + _onboarding_agent_set())))
 
@@ -665,6 +853,15 @@ def plan_orchestrator_request(
             "limitations": [],
         }
 
+    if _is_capabilities_or_meta_question(user_message):
+        return {
+            "proceed": True,
+            "message": "",
+            "agents": ["general"],
+            "agent_tasks": {},
+            "limitations": [],
+        }
+
     hist = _history_context_block(conversation_history, max_turns=10)
     facts = _extract_onboarding_facts(user_message, conversation_history)
     facts_block = _facts_context_block(facts)
@@ -715,6 +912,7 @@ Rules:
 5. Do not plan to save employee files to a local folder; output content and downloadable PDFs via finance/documents agents.
 6. If an integration is unavailable, add to limitations and still proceed for other tasks when possible.
 7. If the request is impossible or unrelated, proceed false with a clear explanation.
+8. "What can you do?", "which tasks can you perform?", capabilities, or how you can help → agents: ["general"] ONLY. Never run hr/email/finance to demo fake John Doe data.
 
 JSON only:"""
 
@@ -736,6 +934,14 @@ JSON only:"""
             message = message or "I could not determine which specialist agents should handle this request."
         if not proceed and not message:
             message = "I need more information before I can run this request."
+        if _is_capabilities_or_meta_question(user_message):
+            return {
+                "proceed": True,
+                "message": "",
+                "agents": ["general"],
+                "agent_tasks": {},
+                "limitations": [],
+            }
         if onboarding:
             agents = normalize_agent_list(list(set(agents + _onboarding_agent_set())))
             if facts:
@@ -810,6 +1016,7 @@ Available agents (return canonical slugs only):
 - documents: Google Drive search, summarize files, contracts, manuals
 
 Rules:
+0. "What can you do?", "which tasks can you perform?", capabilities, how you can help → ["general"] ONLY.
 1. Use multiple agents when the user clearly asks for several domains in one message (e.g. new hire onboarding with welcome email + IT ticket + payroll → hr, email, it_support, finance).
 2. Gmail inbox list/search/count CVs OR CV shortlist OR "fetch and email python developers" → hr_gmail only (not email+hr).
 3. CV attachments uploaded in chat + hiring language → recruitment only (not hr_gmail).
@@ -993,6 +1200,15 @@ class Orchestrator:
         start_time = time.time()
         self._finance_export_files = None
         self._agent_tasks = {}
+
+        if _is_capabilities_or_meta_question(user_message):
+            cap_answer = build_platform_capabilities_answer(user_name, user_role)
+            return self._scoped_route_result(
+                start_time=start_time,
+                agents_used=["general"],
+                final_answer=cap_answer,
+                responses={"general": cap_answer},
+            )
 
         full_message = build_context_with_attachments(
             _enrich_onboarding_context(user_message, conversation_history),

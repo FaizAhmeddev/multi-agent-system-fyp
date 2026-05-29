@@ -1185,6 +1185,7 @@ if _ti is not None:
                 "**One assistant for everything** — IT, finance, documents, and **HR hiring** in plain language. "
                 "Examples: *Fetch the latest 10 candidate emails*, *fetch 20 and select two for python*, "
                 "*Show emails received on 15 May 2026*, *Send interview invitations for Monday at 3 PM*. "
+                "Ask *What can you do?* in chat for the full task list from the orchestrator. "
                 "Results appear as cards below your message (not raw reports)."
             )
         else:

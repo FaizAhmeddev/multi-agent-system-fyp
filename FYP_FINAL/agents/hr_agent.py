@@ -149,9 +149,10 @@ User context: {user_name}
 Task / question:
 {question}
 {context_section}
-Complete every HR item in the request (profiles, offer letters, orientation schedules, summaries).
+If the user is only asking what the system can do (capabilities, features, which tasks you support), reply briefly that the Assistant chat handles that — do NOT invent sample employees (e.g. John Doe), offer letters, or placeholder profiles.
+Complete every HR item in the request (profiles, offer letters, orientation schedules, summaries) only when the user asked for real HR work.
 Output the deliverables directly in your reply — do not say you saved files to disk.
-If employee facts (salary, email, department, name) appear anywhere in the request or prior thread context, use them — do not ask again.
+If employee facts (salary, email, department, name) appear anywhere in the request or prior thread context, use them — do not ask again and never substitute fictional names.
 Only mention missing facts when they are truly absent from the entire context.
 Keep answers structured and actionable."""
 
