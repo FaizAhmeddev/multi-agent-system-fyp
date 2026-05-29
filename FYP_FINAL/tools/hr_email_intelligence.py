@@ -185,6 +185,11 @@ def message_looks_like_gmail_ops(message: str) -> bool:
     ) and not has_gmail_verb:
         return False
 
+    from tools.hr_gmail_shortlist import is_direct_email_send_to_address
+
+    if is_direct_email_send_to_address(m):
+        return False
+
     if user_requests_hr_gmail_approve_send(m) or user_requests_hr_recruitment_follow_up(m):
         return True
     if parse_gmail_shortlist_prompt(m) or build_shortlist_spec_from_message(m):
@@ -690,9 +695,17 @@ def try_hr_email_assistant_command(
     if not msg:
         return None
 
-    from tools.hr_gmail_shortlist import _is_employee_onboarding_context
+    from tools.hr_gmail_shortlist import (
+        _is_employee_onboarding_context,
+        is_direct_email_send_to_address,
+    )
 
-    if _is_employee_onboarding_context(msg.lower()):
+    thread_low = msg.lower()
+    for entry in conversation_history or []:
+        thread_low += "\n" + (entry.get("content") or "").lower()
+    if _is_employee_onboarding_context(thread_low):
+        return None
+    if is_direct_email_send_to_address(msg):
         return None
 
     intent = classify_hr_email_intent(msg)

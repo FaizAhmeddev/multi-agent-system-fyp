@@ -544,11 +544,40 @@ def strip_hr_gmail_batch_marker(text: str) -> str:
     ).strip()
 
 
+def is_direct_email_send_to_address(message: str) -> bool:
+    """True when the user wants to SMTP-send to an explicit address (not inbox shortlist)."""
+    m = (message or "").strip()
+    if not m or not re.search(r"[\w.+-]+@[\w.-]+\.\w+", m):
+        return False
+    low = m.lower()
+    if any(
+        x in low
+        for x in (
+            "send this email",
+            "send the email",
+            "send email at",
+            "send at ",
+            "deliver to",
+            "dispatch to",
+            "mail to ",
+            "email to ",
+            "send to ",
+        )
+    ):
+        return True
+    if re.search(r"\b(?:send|deliver|dispatch|mail)\b", low) and "@" in m:
+        if not re.search(r"\b(?:shortlist|inbox|fetch|cv|cvs|candidate|python developer)\b", low):
+            return True
+    return False
+
+
 def user_requests_hr_gmail_approve_send(message: str) -> bool:
     """
     Chat opt-in to SMTP-send — includes selective targets (Send to Faiz, top 2, etc.).
     """
     if parse_gmail_shortlist_prompt(message):
+        return False
+    if is_direct_email_send_to_address(message):
         return False
     low = (message or "").lower().strip()
     if len(low) < 8:
@@ -592,6 +621,8 @@ def user_requests_hr_recruitment_follow_up(message: str) -> bool:
     if len(low) < 6:
         return False
     if parse_gmail_shortlist_prompt(message):
+        return False
+    if is_direct_email_send_to_address(message):
         return False
     cues = (
         "send to",

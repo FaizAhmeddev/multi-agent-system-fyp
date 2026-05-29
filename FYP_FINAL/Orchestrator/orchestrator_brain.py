@@ -49,6 +49,175 @@ def _history_context_block(
     return "Previous conversation:\n" + "\n".join(lines) + "\n\nCurrent request:\n"
 
 
+def _thread_blob(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> str:
+    """Concatenate recent thread text for pattern matching."""
+    parts: list[str] = []
+    for h in conversation_history or []:
+        c = (h.get("content") or "").strip()
+        if c:
+            parts.append(c)
+    if (user_message or "").strip():
+        parts.append(user_message.strip())
+    return "\n".join(parts)
+
+
+def _is_onboarding_workflow(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    from tools.hr_gmail_shortlist import _is_employee_onboarding_context
+
+    return _is_employee_onboarding_context(_thread_blob(user_message, conversation_history).lower())
+
+
+def _should_skip_gmail_shortcircuit(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    """Onboarding threads and direct SMTP sends must not hijack the Gmail inbox pipeline."""
+    from tools.hr_gmail_shortlist import is_direct_email_send_to_address
+
+    if _is_onboarding_workflow(user_message, conversation_history):
+        return True
+    if is_direct_email_send_to_address(user_message):
+        return True
+    return False
+
+
+def _extract_onboarding_facts(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> dict[str, str]:
+    """Pull employee facts from the full thread (current message + prior turns)."""
+    blob = _thread_blob(user_message, conversation_history)
+    facts: dict[str, str] = {}
+
+    emails = re.findall(r"[\w.+-]+@[\w.-]+\.\w+", blob)
+    if emails:
+        facts["email"] = emails[-1]
+
+    for pat, key in (
+        (r"salary\s*:?\s*(\d+(?:\.\d+)?)", "salary"),
+        (r"department\s*:?\s*([A-Za-z][A-Za-z0-9\s&/-]{0,40})", "department"),
+        (r"designation\s*:?\s*([A-Za-z][A-Za-z0-9\s/-]{2,50})", "designation"),
+    ):
+        m = re.search(pat, blob, re.I)
+        if m:
+            val = m.group(1).strip().rstrip(".,;")
+            if key == "department":
+                val = val.split("\n")[0].split(" email")[0].strip()
+            facts[key] = val
+
+    for pat in (
+        r"(?:new employee|employee named?|joining(?: the company)?(?: as)?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+        r"\b([A-Z][a-z]+\s+[A-Z][a-z]+)\s+is joining",
+        r"named?\s+([A-Z][a-z]+\s+[A-Z][a-z]+)",
+    ):
+        m = re.search(pat, blob)
+        if m:
+            facts["name"] = m.group(1).strip()
+            break
+
+    role_m = re.search(
+        r"(?:as (?:a|an)\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*(?:!|\.|,|\s+on|\s+joining|\s+starting)",
+        blob,
+    )
+    if role_m and "name" not in facts.get("designation", ""):
+        title = role_m.group(1).strip()
+        if title.lower() not in ("monday", "tuesday", "wednesday", "thursday", "friday"):
+            facts.setdefault("designation", title)
+
+    if re.search(r"\bmonday\b", blob, re.I):
+        facts["joining_day"] = "Monday"
+    date_m = re.search(r"joining date\s*:?\s*([^\n,;]{4,40})", blob, re.I)
+    if date_m:
+        facts["joining_date"] = date_m.group(1).strip()
+
+    return facts
+
+
+def _onboarding_agent_set() -> list[str]:
+    return ["hr", "email", "it_support", "finance", "documents"]
+
+
+def _facts_context_block(facts: dict[str, str]) -> str:
+    if not facts:
+        return ""
+    lines = [f"- {k.replace('_', ' ').title()}: {v}" for k, v in facts.items()]
+    return "Known employee facts from this thread (use these — do not ask again):\n" + "\n".join(lines) + "\n\n"
+
+
+def _parse_composed_email(drafted: str) -> dict[str, str]:
+    """Extract To / Subject / body from a composed email block."""
+    lines = (drafted or "").splitlines()
+    to_addr = ""
+    subject = ""
+    body_lines: list[str] = []
+    in_body = False
+    for line in lines:
+        low = line.strip().lower()
+        if not in_body and low.startswith("to:"):
+            to_addr = line.split(":", 1)[1].strip()
+            continue
+        if not in_body and low.startswith("subject:"):
+            subject = line.split(":", 1)[1].strip()
+            continue
+        if not in_body and subject and not line.strip():
+            in_body = True
+            continue
+        if in_body or subject:
+            body_lines.append(line)
+    body = "\n".join(body_lines).strip()
+    if not body and subject:
+        body = drafted
+    return {"to": to_addr, "subject": subject or "Welcome to the Team", "body": body or drafted}
+
+
+def _smtp_send_office_email(recipient: str, subject: str, body: str) -> str:
+    from tools.gmail_send import send_email
+
+    state = send_email({"recipient": recipient, "subject": subject, "body": body})
+    return (state.get("send_status") or "Send attempted.").strip()
+
+
+def _should_send_onboarding_email(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    from tools.hr_gmail_shortlist import is_direct_email_send_to_address
+
+    blob = _thread_blob(user_message, conversation_history).lower()
+    if is_direct_email_send_to_address(user_message):
+        return True
+    auto_cues = (
+        "automatically",
+        "auto complete",
+        "complete the full onboarding",
+        "send welcome email",
+        "send a welcome",
+        "notify the admin",
+        "tasks to perform",
+    )
+    if any(c in blob for c in auto_cues):
+        return True
+    low = (user_message or "").lower()
+    return bool(re.search(r"\b(?:send|deliver|dispatch|mail)\b", low) and "email" in low)
+
+
+def _enrich_onboarding_context(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> str:
+    facts = _extract_onboarding_facts(user_message, conversation_history)
+    block = _facts_context_block(facts)
+    if not block:
+        return user_message
+    return block + user_message
+
+
 def run_general_assistant(
     user_message: str,
     user_name: str = "User",
@@ -421,8 +590,15 @@ def build_context_with_attachments(user_message: str, attachments: Optional[List
     return "\n".join(parts).strip()
 
 
-def expand_agents_for_multi_task(message: str, agents: list) -> list:
+def expand_agents_for_multi_task(
+    message: str,
+    agents: list,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> list:
     """Include every specialist domain referenced in a multi-step user request."""
+    if _is_onboarding_workflow(message, conversation_history):
+        return normalize_agent_list(list(set(agents + _onboarding_agent_set())))
+
     low = (message or "").lower()
     numbered = len(re.findall(r"(?m)^\s*\d+\.\s", message or ""))
     multi = numbered >= 3 or "tasks to perform" in low or "complete the following" in low
@@ -490,6 +666,9 @@ def plan_orchestrator_request(
         }
 
     hist = _history_context_block(conversation_history, max_turns=10)
+    facts = _extract_onboarding_facts(user_message, conversation_history)
+    facts_block = _facts_context_block(facts)
+    onboarding = _is_onboarding_workflow(user_message, conversation_history)
     caps = []
     if not is_gmail_configured():
         caps.append("Gmail fetch/send is not configured (set GMAIL_EMAIL and GMAIL_APP_PASSWORD in .env).")
@@ -501,7 +680,7 @@ def plan_orchestrator_request(
     prompt = f"""You are the orchestrator brain for an office automation platform.
 Analyze the user's request using the conversation thread. Decide which specialist agents to run IN PARALLEL.
 
-{hist if hist else "(No prior turns.)"}
+{facts_block}{hist if hist else "(No prior turns.)"}
 
 Current user message:
 \"\"\"{(user_message or "")[:12000]}\"\"\"
@@ -511,11 +690,11 @@ System capabilities:
 
 Available agent slugs:
 - hr_gmail: Gmail inbox — fetch/list emails, count CVs, shortlist candidates, send interview invites from inbox
-- email: Draft or compose emails (welcome letters, replies) — does NOT list Gmail inbox
+- email: Compose and send welcome/onboarding emails via Gmail SMTP when recipient is known
 - hr: Employee profiles, offer letters, orientation schedules, HR policy, onboarding content
 - it_support: IT tickets, laptop/software provisioning requests
-- finance: Payroll breakdowns, expenses, invoices, budget reports, export PDF/Excel
-- documents: Google Drive search/summary when configured
+- finance: Payroll breakdowns, expenses, invoices, budget reports, export PDF/Excel in parallel
+- documents: Offer letters, onboarding summaries, Google Drive when configured
 - recruitment: When CV files are attached + hiring workflow
 - general: Greetings, date/time, small talk only
 
@@ -529,12 +708,13 @@ Return ONLY valid JSON:
 }}
 
 Rules:
-1. Multiple agents when the user lists multiple tasks (e.g. full new-hire onboarding → hr + email + it_support + finance).
-2. "fetch last N emails" or "shortlist python developers from inbox" → hr_gmail (one agent can fetch AND email if user asks both).
-3. Never invent salary, email, department, or dates — if required and absent from the thread, set proceed false and ask.
-4. Do not plan to save employee files to a local folder; output content in agent responses.
-5. If an integration is unavailable, add to limitations and still proceed for other tasks when possible.
-6. If the request is impossible or unrelated, proceed false with a clear explanation.
+1. Multiple agents IN PARALLEL when the user lists multiple tasks (full new-hire onboarding → hr, email, it_support, finance, documents).
+2. "fetch last N emails" or "shortlist python developers from inbox" → hr_gmail only (never mix with new-hire onboarding).
+3. Use salary, email, department, name, and dates already present anywhere in the thread — do NOT ask again if they appear above.
+4. For full onboarding requests: proceed true immediately; run all relevant agents even if some details are still missing (note gaps in limitations, not in message).
+5. Do not plan to save employee files to a local folder; output content and downloadable PDFs via finance/documents agents.
+6. If an integration is unavailable, add to limitations and still proceed for other tasks when possible.
+7. If the request is impossible or unrelated, proceed false with a clear explanation.
 
 JSON only:"""
 
@@ -556,6 +736,27 @@ JSON only:"""
             message = message or "I could not determine which specialist agents should handle this request."
         if not proceed and not message:
             message = "I need more information before I can run this request."
+        if onboarding:
+            agents = normalize_agent_list(list(set(agents + _onboarding_agent_set())))
+            if facts:
+                proceed = True
+                message = ""
+            elif not proceed:
+                proceed = True
+                message = ""
+                if not limitations:
+                    limitations = [
+                        "Some employee details were not in the thread; agents will use placeholders where needed."
+                    ]
+            default_tasks = {
+                "hr": "Create employee profile, offer letter text, orientation schedule, onboarding summary.",
+                "email": "Compose and send welcome email with joining instructions to the employee.",
+                "it_support": "Create IT ticket for laptop, official email, and software setup.",
+                "finance": "Generate monthly salary breakdown and initial payroll entry; export PDF.",
+                "documents": "Prepare offer letter and onboarding summary documents.",
+            }
+            for slug, task in default_tasks.items():
+                agent_tasks.setdefault(slug, task)
         return {
             "proceed": proceed,
             "message": message,
@@ -565,7 +766,7 @@ JSON only:"""
         }
     except Exception:
         agents = detect_intent_llm(user_message, conversation_history)
-        agents = expand_agents_for_multi_task(user_message, agents)
+        agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
         return {
             "proceed": True,
             "message": "",
@@ -793,32 +994,25 @@ class Orchestrator:
         self._finance_export_files = None
         self._agent_tasks = {}
 
-        full_message = build_context_with_attachments(user_message, attachments)
+        full_message = build_context_with_attachments(
+            _enrich_onboarding_context(user_message, conversation_history),
+            attachments,
+        )
 
         from tools.hr_email_intelligence import message_looks_like_gmail_ops
 
-        if message_looks_like_gmail_ops(user_message):
-            hr_gmail = self._route_hr_gmail(
-                user_message=user_message,
-                user_name=user_name,
-                user_role=user_role,
-                conversation_history=conversation_history,
-                allowed_agents=allowed_agents,
-                start_time=start_time,
-            )
-            if hr_gmail is not None:
-                return hr_gmail
-
-        hr_gmail = self._route_hr_gmail(
-            user_message=user_message,
-            user_name=user_name,
-            user_role=user_role,
-            conversation_history=conversation_history,
-            allowed_agents=allowed_agents,
-            start_time=start_time,
-        )
-        if hr_gmail is not None:
-            return hr_gmail
+        if not _should_skip_gmail_shortcircuit(user_message, conversation_history):
+            if message_looks_like_gmail_ops(user_message):
+                hr_gmail = self._route_hr_gmail(
+                    user_message=user_message,
+                    user_name=user_name,
+                    user_role=user_role,
+                    conversation_history=conversation_history,
+                    allowed_agents=allowed_agents,
+                    start_time=start_time,
+                )
+                if hr_gmail is not None:
+                    return hr_gmail
 
         plan_limitations: list[str] = []
         if use_llm_intent:
@@ -830,7 +1024,9 @@ class Orchestrator:
                     agents_used=[],
                     final_answer=plan.get("message") or "I need more information to proceed.",
                 )
-            agents = expand_agents_for_multi_task(user_message, plan.get("agents") or [])
+            agents = expand_agents_for_multi_task(
+                user_message, plan.get("agents") or [], conversation_history
+            )
             self._agent_tasks = plan.get("agent_tasks") or {}
             agents = coerce_agents_for_cv_hiring(user_message, attachments, agents)
         else:
@@ -840,7 +1036,7 @@ class Orchestrator:
                 conversation_history=conversation_history,
                 use_llm_intent=False,
             )
-            agents = expand_agents_for_multi_task(user_message, agents)
+            agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
 
         if allowed_agents:
             allow = set(normalize_agent_list(allowed_agents))
@@ -1083,15 +1279,40 @@ class Orchestrator:
                     "send a welcome",
                     "send email to",
                     "email to ",
+                    "send this email",
                 )
-            ):
-                return compose_office_email(contextual, user_name)
+            ) or _is_onboarding_workflow(raw_task, conversation_history):
+                drafted = compose_office_email(contextual, user_name)
+                if _should_send_onboarding_email(raw_task, conversation_history):
+                    facts = _extract_onboarding_facts(raw_task, conversation_history)
+                    parsed = _parse_composed_email(drafted)
+                    recipient = facts.get("email") or parsed.get("to") or ""
+                    if not recipient:
+                        em = re.search(r"[\w.+-]+@[\w.-]+\.\w+", raw_task)
+                        recipient = em.group(0) if em else ""
+                    if recipient:
+                        status = _smtp_send_office_email(
+                            recipient,
+                            parsed.get("subject") or "Welcome to the Team",
+                            parsed.get("body") or drafted,
+                        )
+                        drafted = (
+                            f"{drafted}\n\n---\nEmail delivery (Gmail SMTP)\n{status}\n"
+                            f"Recipient: {recipient}"
+                        )
+                    else:
+                        drafted += (
+                            "\n\n---\nEmail not sent: no recipient address in thread. "
+                            "Include the employee email in your message."
+                        )
+                return drafted
             state = {"email_content": contextual, "sender_name": user_name, "sender_email": ""}
             result = generate_reply(state)
             return result.get("body", "No reply generated.")
 
         elif agent_type == "hr":
             from graph.hr_graph import hr_graph
+
             state = {"action": "hr_query", "query": contextual, "user_name": user_name}
             result = hr_graph.invoke(state)
             return result.get("output", "No HR response.")
@@ -1110,13 +1331,24 @@ class Orchestrator:
                     for a in attachments
                 )
             combined = f"{raw}\n{attach_blob}".strip()
-            if detect_finance_export_intent(combined):
+            onboarding = _is_onboarding_workflow(raw, conversation_history)
+            wants_export = detect_finance_export_intent(combined) or onboarding
+            if wants_export:
+                export_instruction = raw
+                if onboarding:
+                    facts = _extract_onboarding_facts(raw, conversation_history)
+                    export_instruction = (
+                        f"Generate payroll and salary breakdown PDF for new employee onboarding. "
+                        f"Include offer letter summary if applicable. Facts: {facts}"
+                    )
                 fin_state: dict[str, Any] = {
                     "action": "export_documents",
-                    "question": raw,
-                    "context": attach_blob,
-                    "data": attach_blob,
+                    "question": export_instruction,
+                    "export_instruction": export_instruction,
+                    "context": attach_blob or combined,
+                    "data": attach_blob or combined,
                     "user_name": user_name,
+                    "export_formats": ["pdf", "xlsx"] if onboarding else None,
                 }
                 fin_result = finance_graph.invoke(fin_state)
                 files = fin_result.get("export_files") or []
@@ -1125,7 +1357,7 @@ class Orchestrator:
                 out = fin_result.get("output") or ""
                 if files:
                     out += (
-                        "\n\n**Downloads:** use the **Finance document downloads** section below this chat "
+                        "\n\nDownloads: use the Finance document downloads section below this chat "
                         "(same browser session)."
                     )
                 return out
@@ -1135,7 +1367,31 @@ class Orchestrator:
 
         elif agent_type == "documents":
             from graph.documents_graph import documents_graph
-            state  = {"action": "qa", "query": contextual, "user_name": user_name, "documents": []}
+            from tools.finance_document_export import run_finance_document_export
+
+            if _is_onboarding_workflow(raw, conversation_history):
+                facts = _extract_onboarding_facts(raw, conversation_history)
+                doc_req = (
+                    f"Employment offer letter and onboarding summary for new hire. Facts: {facts}. "
+                    f"Full request context:\n{contextual[:8000]}"
+                )
+                res = run_finance_document_export(
+                    user_request=doc_req,
+                    source_data=contextual[:12000],
+                    user_name=user_name,
+                    export_formats=["pdf", "docx"],
+                )
+                files = res.get("export_files") or []
+                if files:
+                    existing = self._finance_export_files or []
+                    self._finance_export_files = existing + files
+                out = res.get("output") or ""
+                if files:
+                    out += (
+                        "\n\nDownloads: use the Finance document downloads section below this chat."
+                    )
+                return out
+            state = {"action": "qa", "query": contextual, "user_name": user_name, "documents": []}
             result = documents_graph.invoke(state)
             return result.get("output", "No documents response.")
 

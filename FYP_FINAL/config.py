@@ -396,7 +396,7 @@ ROLE_ORCHESTRATOR_ALLOWLIST = {
     "Admin": None,
     "Demo User": None,
     "HR Manager": ["hr", "recruitment", "email", "hr_gmail"],
-    "Assistant": ["email", "hr_gmail", "hr"],
+    "Assistant": ["email", "hr_gmail", "hr", "it_support", "finance", "documents"],
     "Finance Manager": ["finance"],
     "IT Staff": ["it_support"],
     "Employee": ["general"],

@@ -151,7 +151,8 @@ Task / question:
 {context_section}
 Complete every HR item in the request (profiles, offer letters, orientation schedules, summaries).
 Output the deliverables directly in your reply — do not say you saved files to disk.
-If required facts (salary, email, department) are missing from the request, say exactly what is missing.
+If employee facts (salary, email, department, name) appear anywhere in the request or prior thread context, use them — do not ask again.
+Only mention missing facts when they are truly absent from the entire context.
 Keep answers structured and actionable."""
 
     return llm.invoke(prompt).content
