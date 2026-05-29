@@ -145,15 +145,11 @@ st.markdown("""<style>
     border-bottom: 2px solid var(--primary) !important;
 }
 
-/* Login */
-.login-wrap { display:flex; justify-content:center; align-items:center; min-height:80vh; }
-.login-card {
-    background: var(--surface); border-radius: 20px; padding: 40px 48px;
-    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.12); max-width: 420px; width:100%;
+/* Auth screens */
+.auth-card {
+    background: var(--surface); border-radius: 16px; padding: 8px 4px;
     border: 1px solid var(--border);
 }
-.login-title { text-align:center; font-size:24px; font-weight:800; color:var(--text); }
-.login-sub { text-align:center; font-size:13px; color:var(--muted); }
 
 /* Header */
 .main-header {
@@ -861,67 +857,15 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LOGIN PAGE
+# AUTH (login · sign-up · forgot password)
 # ══════════════════════════════════════════════════════════════════════════════
 if not st.session_state.logged_in:
-    st.markdown("""
-    <div style="display:flex;justify-content:center;align-items:center;min-height:85vh">
-    <div style="background:white;border-radius:20px;padding:44px 52px;box-shadow:0 20px 60px rgba(0,0,0,0.13);max-width:420px;width:100%;border:1px solid #e2e8f0">
-        <div style="text-align:center;font-size:26px;font-weight:800;color:#1e293b;margin-bottom:4px">Office Automation Pro</div>
-        <div style="text-align:center;font-size:13px;color:#64748b;margin-bottom:30px">Multi-Agent System - FYP v7.0</div>
-    </div></div>""", unsafe_allow_html=True)
+    from ui.auth_pages import render_auth_gate
 
-    col = st.columns([1,1.6,1])[1]
-    with col:
-        st.markdown("")
-        username = st.text_input("Username", placeholder="Your account username", autocomplete="username")
-        password = st.text_input("Password", type="password", placeholder="Your password", autocomplete="current-password")
-        if st.button("Sign In", use_container_width=True):
-            from database.sqlite_db import (
-                authenticate_user,
-                touch_user_session,
-                get_or_create_conversation,
-                load_conversation_ui_messages,
-            )
-
-            user = authenticate_user(username, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.username = user["username"]
-                st.session_state.user_role = user["role"]
-                st.session_state.user_name = user["name"]
-                st.session_state.auth_session_id = _new_auth_session_id()
-                touch_user_session(
-                    st.session_state.auth_session_id,
-                    user["username"],
-                    user["name"],
-                    user["role"],
-                )
-                st.session_state.orch_conversation_id = get_or_create_conversation(
-                    st.session_state.auth_session_id,
-                    user["username"],
-                    "orchestrator",
-                )
-                st.session_state.orch_chat = load_conversation_ui_messages(
-                    st.session_state.orch_conversation_id
-                )
-                _record_login_event(
-                    username=user["username"],
-                    display_name=user["name"],
-                    role=user["role"],
-                    event="login",
-                )
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-        st.caption("Use the account issued by your administrator. Credentials are not shown on this screen.")
-        if is_hosted_deploy():
-            if not (OPENAI_API_KEY or "").strip():
-                st.warning(
-                    "Hosted deploy: add **OPENAI_API_KEY** to Streamlit **Secrets** (same names as `.env.example`). "
-                    "Secrets are applied before the app loads."
-                )
-    st.stop()
+    render_auth_gate(
+        new_session_id_fn=_new_auth_session_id,
+        record_login_fn=_record_login_event,
+    )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN APP (after login)
@@ -990,6 +934,9 @@ with c3:
         for k in ("username", "user_role", "user_name", "auth_session_id"):
             st.session_state[k] = ""
         st.session_state.logged_in = False
+        st.session_state.auth_screen = "login"
+        st.session_state.signup_step = 1
+        st.session_state.forgot_step = 1
         for k in ("orch_conversation_id", "coord_conversation_id", "docs_conversation_id"):
             st.session_state[k] = None
         st.session_state.orch_chat = []

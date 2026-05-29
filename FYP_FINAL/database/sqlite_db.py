@@ -217,11 +217,30 @@ class HRGmailShortlistBatch(Base):
 class AppUser(Base):
     """Application users (synced from config.USERS on init)."""
     __tablename__ = "app_users"
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    username           = Column(String(100), unique=True, index=True)
+    password           = Column(String(256))
+    role               = Column(String(80))
+    display_name       = Column(String(200))
+    email              = Column(String(200), default="")
+    phone              = Column(String(32), default="")
+    is_system_account  = Column(Boolean, default=False)
+    email_verified     = Column(Boolean, default=False)
+    phone_verified     = Column(Boolean, default=False)
+    created_at         = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthOtp(Base):
+    """One-time codes for signup and password reset."""
+    __tablename__ = "auth_otps"
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    username     = Column(String(100), unique=True, index=True)
-    password     = Column(String(256))
-    role         = Column(String(80))
-    display_name = Column(String(200))
+    username     = Column(String(100), index=True, default="")
+    channel      = Column(String(20))   # email | phone
+    destination  = Column(String(200))
+    purpose      = Column(String(20))   # signup | reset
+    code         = Column(String(12))
+    expires_at   = Column(DateTime, index=True)
+    used         = Column(Boolean, default=False)
     created_at   = Column(DateTime, default=datetime.utcnow)
 
 
@@ -297,8 +316,39 @@ def get_engine():
                 },
             )
         Base.metadata.create_all(_engine)
+        _migrate_auth_schema(_engine)
         seed_app_users_from_config()
     return _engine
+
+
+def _migrate_auth_schema(engine) -> None:
+    """Add auth columns to app_users on existing SQLite/PostgreSQL databases."""
+    try:
+        from sqlalchemy import inspect, text
+
+        insp = inspect(engine)
+        if "app_users" not in insp.get_table_names():
+            return
+        existing = {c["name"] for c in insp.get_columns("app_users")}
+        alters = []
+        if "email" not in existing:
+            alters.append("ADD COLUMN email VARCHAR(200) DEFAULT ''")
+        if "phone" not in existing:
+            alters.append("ADD COLUMN phone VARCHAR(32) DEFAULT ''")
+        bool_def = "FALSE" if engine.dialect.name == "postgresql" else "0"
+        if "is_system_account" not in existing:
+            alters.append(f"ADD COLUMN is_system_account BOOLEAN DEFAULT {bool_def}")
+        if "email_verified" not in existing:
+            alters.append(f"ADD COLUMN email_verified BOOLEAN DEFAULT {bool_def}")
+        if "phone_verified" not in existing:
+            alters.append(f"ADD COLUMN phone_verified BOOLEAN DEFAULT {bool_def}")
+        if alters:
+            with engine.begin() as conn:
+                for clause in alters:
+                    conn.execute(text(f"ALTER TABLE app_users {clause}"))
+        Base.metadata.create_all(engine)
+    except Exception:
+        pass
 
 
 def get_session() -> Session:
@@ -797,6 +847,7 @@ def seed_app_users_from_config() -> None:
         s = get_session()
         if s.query(AppUser).count() > 0:
             s.close()
+            _sync_system_accounts_flags()
             return
         for uname, data in USERS.items():
             s.add(
@@ -805,8 +856,27 @@ def seed_app_users_from_config() -> None:
                     password=data.get("password", ""),
                     role=data.get("role", ""),
                     display_name=data.get("name", uname),
+                    is_system_account=True,
+                    email_verified=True,
+                    phone_verified=True,
                 )
             )
+        s.commit()
+        s.close()
+    except Exception:
+        pass
+
+
+def _sync_system_accounts_flags() -> None:
+    """Mark seeded config accounts as system-managed (no self-service password reset)."""
+    try:
+        from config import USERS
+
+        s = get_session()
+        for uname in USERS:
+            row = s.query(AppUser).filter_by(username=uname).one_or_none()
+            if row:
+                row.is_system_account = True
         s.commit()
         s.close()
     except Exception:
@@ -1134,3 +1204,232 @@ def load_conversation_openai_history(
         return out
     except Exception:
         return []
+
+
+# ── Auth: signup, OTP, password reset ─────────────────────────────────────────
+
+
+def is_system_account(username: str) -> bool:
+    """Built-in / admin-provisioned accounts cannot self-reset passwords."""
+    username = (username or "").strip()
+    if not username:
+        return False
+    try:
+        from config import USERS
+
+        if username in USERS:
+            return True
+    except Exception:
+        pass
+    try:
+        s = get_session()
+        row = s.query(AppUser).filter_by(username=username).one_or_none()
+        s.close()
+        if row and row.is_system_account:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def get_app_user(username: str) -> dict | None:
+    username = (username or "").strip()
+    if not username:
+        return None
+    try:
+        s = get_session()
+        row = s.query(AppUser).filter_by(username=username).one_or_none()
+        s.close()
+        if not row:
+            return None
+        return {
+            "username": row.username,
+            "role": row.role,
+            "name": row.display_name or row.username,
+            "email": (row.email or "").strip(),
+            "phone": (row.phone or "").strip(),
+            "is_system_account": bool(row.is_system_account),
+        }
+    except Exception:
+        return None
+
+
+def username_exists(username: str) -> bool:
+    username = (username or "").strip()
+    if not username:
+        return False
+    try:
+        from config import USERS
+
+        if username in USERS:
+            return True
+    except Exception:
+        pass
+    try:
+        s = get_session()
+        exists = s.query(AppUser).filter_by(username=username).count() > 0
+        s.close()
+        return exists
+    except Exception:
+        return False
+
+
+def email_exists(email: str, exclude_username: str = "") -> bool:
+    email = (email or "").strip().lower()
+    if not email:
+        return False
+    try:
+        s = get_session()
+        q = s.query(AppUser).filter(AppUser.email.ilike(email))
+        if exclude_username:
+            q = q.filter(AppUser.username != exclude_username)
+        found = q.count() > 0
+        s.close()
+        return found
+    except Exception:
+        return False
+
+
+def _normalize_phone(phone: str) -> str:
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    if not digits:
+        return ""
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if digits.startswith("92") and not (phone or "").strip().startswith("+"):
+        return f"+{digits}"
+    if (phone or "").strip().startswith("+"):
+        return "+" + digits
+    return f"+{digits}" if digits else ""
+
+
+def register_app_user(
+    username: str,
+    password: str,
+    email: str,
+    phone: str,
+    display_name: str,
+    role: str = "Employee",
+) -> tuple[bool, str]:
+    username = (username or "").strip()
+    email = (email or "").strip().lower()
+    phone = _normalize_phone(phone)
+    display_name = (display_name or username).strip()
+    if not username or not password or not email or not phone:
+        return False, "All fields are required."
+    if username_exists(username):
+        return False, "Username is already taken."
+    if email_exists(email):
+        return False, "Email is already registered."
+    try:
+        s = get_session()
+        s.add(
+            AppUser(
+                username=username[:100],
+                password=password[:256],
+                role=(role or "Employee")[:80],
+                display_name=display_name[:200],
+                email=email[:200],
+                phone=phone[:32],
+                is_system_account=False,
+                email_verified=True,
+                phone_verified=True,
+            )
+        )
+        s.commit()
+        s.close()
+        return True, "Account created."
+    except Exception as e:
+        return False, f"Could not create account: {e}"
+
+
+def update_app_user_password(username: str, new_password: str) -> tuple[bool, str]:
+    username = (username or "").strip()
+    if not username or not new_password:
+        return False, "Invalid password."
+    if is_system_account(username):
+        return False, "This account is managed by an administrator."
+    try:
+        s = get_session()
+        row = s.query(AppUser).filter_by(username=username).one_or_none()
+        if not row:
+            s.close()
+            return False, "Account not found."
+        row.password = new_password[:256]
+        s.commit()
+        s.close()
+        return True, "Password updated."
+    except Exception as e:
+        return False, f"Could not update password: {e}"
+
+
+def create_auth_otp(
+    username: str,
+    channel: str,
+    destination: str,
+    purpose: str,
+    code: str,
+    ttl_seconds: int = 600,
+) -> bool:
+    try:
+        from datetime import timedelta
+
+        s = get_session()
+        s.query(AuthOtp).filter_by(
+            username=username[:100],
+            channel=channel[:20],
+            purpose=purpose[:20],
+            used=False,
+        ).update({"used": True})
+        s.add(
+            AuthOtp(
+                username=username[:100],
+                channel=channel[:20],
+                destination=(destination or "")[:200],
+                purpose=purpose[:20],
+                code=str(code)[:12],
+                expires_at=datetime.utcnow() + timedelta(seconds=ttl_seconds),
+                used=False,
+            )
+        )
+        s.commit()
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def verify_auth_otp(
+    username: str,
+    channel: str,
+    purpose: str,
+    code: str,
+) -> bool:
+    code = (code or "").strip()
+    if not code:
+        return False
+    try:
+        s = get_session()
+        row = (
+            s.query(AuthOtp)
+            .filter_by(
+                username=username[:100],
+                channel=channel[:20],
+                purpose=purpose[:20],
+                used=False,
+            )
+            .order_by(AuthOtp.created_at.desc())
+            .first()
+        )
+        if not row or row.code != code:
+            s.close()
+            return False
+        if row.expires_at and row.expires_at < datetime.utcnow():
+            s.close()
+            return False
+        row.used = True
+        s.commit()
+        s.close()
+        return True
+    except Exception:
+        return False
