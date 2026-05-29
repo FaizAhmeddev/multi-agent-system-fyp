@@ -6,6 +6,7 @@ Used by the unified Assistant (no separate Recruitment tab).
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from typing import Any
 
