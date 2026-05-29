@@ -39,6 +39,8 @@ def build_display_text(final_answer: str, ui_payload: dict[str, Any] | None) -> 
             n = ui_payload.get("count", 0)
             hint = ui_payload.get("filter_hint") or "inbox"
             return f"Found {n} email(s) matching {hint}."
+        if t == "hr_inventory":
+            return ui_payload.get("message") or "CV count complete."
         if t == "email_send":
             if ui_payload.get("ok"):
                 return f"Sent {ui_payload.get('emails_sent', 0)} email(s) successfully."

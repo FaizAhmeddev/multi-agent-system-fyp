@@ -585,6 +585,19 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
                 f"Sent {ui['send_result'].get('emails_sent', 0)} invitation(s) via Gmail."
             )
         _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
+    elif t == "hr_inventory":
+        st.markdown(
+            '<div class="sec-hdr sec-blue" style="margin-top:12px">CV inventory</div>',
+            unsafe_allow_html=True,
+        )
+        c1, c2 = st.columns(2)
+        c1.metric("CV attachments scanned", ui.get("total_cvs", 0))
+        c2.metric("Matching filter", ui.get("matched_cvs", 0))
+        skills = ui.get("skills") or []
+        if skills:
+            st.caption(f"Skills: {', '.join(skills)}")
+        if ui.get("message"):
+            st.info(ui.get("message"))
     elif t == "email_list":
         st.markdown(
             '<div class="sec-hdr sec-blue" style="margin-top:12px">Inbox results</div>',

@@ -198,6 +198,11 @@ def _extract_top_n_from_prompt(low: str) -> int | None:
     return None
 
 
+def extract_max_messages_from_prompt(message: str) -> int:
+    """How many recent inbox messages to scan (from natural language)."""
+    return _extract_max_messages_from_prompt((message or "").lower())
+
+
 def _extract_max_messages_from_prompt(low: str) -> int:
     for pat in (
         r"(?:last|past|recent)\s+(\d+)\s+(?:e-?mails?|emails?|messages?)",
@@ -209,6 +214,11 @@ def _extract_max_messages_from_prompt(low: str) -> int:
         if mm:
             return max(5, min(100, int(mm.group(1))))
     return 50
+
+
+def prompt_has_hiring_focus(message: str) -> bool:
+    """Public wrapper — True when the message is about hiring / CV screening."""
+    return _prompt_has_hiring_focus((message or "").lower())
 
 
 def _prompt_has_hiring_focus(low: str) -> bool:
@@ -258,7 +268,12 @@ def parse_gmail_shortlist_prompt(message: str) -> dict[str, Any] | None:
     )
     has_fetch = any(
         x in low
-        for x in ("fetch", "scan", "pull", "get", "retrieve", "collect", "read last", "last ", "find ")
+        for x in ("fetch", "scan", "pull", "retrieve", "collect", "read last")
+    ) or bool(
+        re.search(
+            r"\b(?:fetch|get|scan|pull|find)\s+(?:the\s+)?(?:last|latest|recent|\d+)",
+            low,
+        )
     )
     has_select = bool(re.search(r"\b(?:select|shortlist|pick|choose)\b", low))
     has_hiring = _prompt_has_hiring_focus(low)
@@ -360,15 +375,72 @@ def format_hr_gmail_orchestrator_reply(res: dict[str, Any]) -> str:
     return summary + marker
 
 
+def build_shortlist_spec_from_message(message: str) -> dict[str, Any] | None:
+    """
+    Relaxed shortlist spec when the user clearly wants recruitment from Gmail
+    but phrasing does not match the strict ``parse_gmail_shortlist_prompt`` rules.
+    """
+    m = (message or "").strip()
+    if len(m) < 12:
+        return None
+    low = m.lower()
+    if not _prompt_has_hiring_focus(low):
+        return None
+    has_action = bool(
+        re.search(
+            r"\b(?:select|shortlist|pick|choose|rank|screen|hire|find|fetch|scan|pull)\b",
+            low,
+        )
+    )
+    if not has_action:
+        return None
+
+    max_messages = _extract_max_messages_from_prompt(low)
+    top_n = _extract_top_n_from_prompt(low)
+    if top_n is None:
+        top_n = 5
+
+    interview_when = "To be scheduled — confirm by reply."
+    im = re.search(
+        r"(?i)(interview\s+(?:on\s+|at\s+)?[^.;]{5,140}|"
+        r"(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
+        r"[^.;\n]{0,100}(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?)",
+        m,
+    )
+    if im:
+        interview_when = im.group(1).strip()[:220]
+
+    company = "Our Company"
+    cm = re.search(r"(?i)company\s*[:\-]\s*([^.;,\n]{2,80})", m)
+    if cm:
+        company = cm.group(1).strip()[:120]
+
+    return {
+        "max_messages": max_messages,
+        "top_n": top_n,
+        "job_criteria": _infer_job_criteria_from_prompt(m),
+        "interview_when": interview_when,
+        "company": company,
+        "user_message": m,
+    }
+
+
 def run_gmail_shortlist_from_user_prompt(
     *,
     user_message: str,
     user_name: str,
     user_role: str,
 ) -> dict[str, Any]:
-    spec = parse_gmail_shortlist_prompt(user_message)
+    spec = parse_gmail_shortlist_prompt(user_message) or build_shortlist_spec_from_message(user_message)
     if not spec:
-        return {"ok": False, "error": "Not recognized as a Gmail inbox CV shortlist request."}
+        return {
+            "ok": False,
+            "error": (
+                "I could not tell which role or CV action you want. "
+                "Try: “Fetch the last 20 emails and shortlist 2 Python developers” or "
+                "“How many Python CVs are in the last 30 emails?”"
+            ),
+        }
     return run_gmail_shortlist_pipeline(
         job_criteria=spec["job_criteria"],
         interview_when=spec["interview_when"],
@@ -417,21 +489,24 @@ def user_requests_hr_gmail_approve_send(message: str) -> bool:
         "send pending interview",
         "send gmail shortlist",
         "send the gmail shortlist",
-        "send to ",
-        "email ",
-        "invite ",
-        "mail ",
-        "email all",
         "send to all",
+        "email all",
         "send to everyone",
+        "send invitations",
+        "send invitation",
         "top 1",
         "top 2",
         "top 3",
         "top 4",
         "top 5",
-        "recommended",
+        "recommended candidates",
+        "recommended only",
     )
     if any(p in low for p in phrases):
+        return True
+    if re.search(r"\bsend\s+to\s+(?:all|everyone|recommended|top\s+\d+)\b", low):
+        return True
+    if re.search(r"\b(?:email|invite|mail)\s+(?:all|them|him|her|top\s+\d+)\b", low):
         return True
     if re.search(r"\b(?:send|email|invite)\s+(?:to\s+)?[a-z]{3,}", low):
         return True

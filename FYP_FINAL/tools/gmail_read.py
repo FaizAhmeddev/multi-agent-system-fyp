@@ -189,13 +189,17 @@ def search_inbox_messages(
     max_results = max(1, min(50, int(max_results or 10)))
     try:
         mail = _connect_imap()
-        criteria = ["ALL"]
-        if since_date:
+        criteria: list[str] = ["ALL"]
+        if on_date:
+            d = on_date if isinstance(on_date, date_cls) else on_date
+            criteria = ["ON", d.strftime("%d-%b-%Y")]
+        elif since_date:
             d = since_date if isinstance(since_date, date_cls) else since_date
             criteria = ["SINCE", d.strftime("%d-%b-%Y")]
         status, data = mail.search(None, *criteria)
         mail_ids = data[0].split() if data and data[0] else []
-        scan = mail_ids[-max(200, max_results * 8) :] if mail_ids else []
+        scan_cap = 500 if on_date else max(200, max_results * 8)
+        scan = mail_ids[-scan_cap:] if mail_ids else []
 
         sender_l = (sender or "").lower()
         sub_l = (subject_contains or "").lower()

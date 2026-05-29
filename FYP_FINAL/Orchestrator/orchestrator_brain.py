@@ -176,8 +176,12 @@ def _keyword_score(msg: str, keywords: list, weight: int = 1) -> int:
 
 def _pre_route_intent(user_message: str) -> list | None:
     """Fast, deterministic routing for common phrasing before LLM/keywords."""
+    from tools.hr_email_intelligence import classify_hr_email_intent
     from tools.hr_gmail_shortlist import parse_gmail_shortlist_prompt
 
+    hr_mail_intent = classify_hr_email_intent(user_message)
+    if hr_mail_intent in ("inbox_browse", "cv_inventory", "cv_shortlist"):
+        return ["hr_gmail"]
     if parse_gmail_shortlist_prompt(user_message):
         return ["hr_gmail"]
 
@@ -454,9 +458,9 @@ User message: "{user_message}"
 
 Available agents (return canonical slugs only):
 - general: greetings, thanks, date/time, small talk, clarifying questions, follow-ups that do NOT require running Gmail/IT/HR/Finance/Drive tools
-- hr_gmail: fetch Gmail inbox CVs, rank candidates for a role, draft interview emails (approval before SMTP send). Follow-up "approve and send" after a shortlist → hr_gmail
+- hr_gmail: Gmail inbox for HR — list/search emails by date, count CVs by skill, OR fetch inbox CVs + rank/shortlist + draft interview emails. Follow-up "approve and send" after a shortlist → hr_gmail. Use hr_gmail for "fetch last 10 emails", "emails on 20 May", "how many Python CVs", and recruitment shortlist — NOT for unrelated chitchat.
 - it_support: computer, laptop, wifi, printer, software install, errors, VPN, passwords (IT hardware/software)
-- email: compose/send/reply to a specific person, read inbox (NOT bulk CV shortlist from Gmail — use hr_gmail for that)
+- email: compose/send/reply to a specific person (NOT inbox listing or CV shortlist — use hr_gmail for Gmail inbox operations)
 - hr: HR policies, leave, onboarding, employee questions, simple CV Q&A without Gmail fetch
 - recruitment: user attached CV/resume files AND wants screen/rank/shortlist/interview email workflow
 - finance: expenses, invoices, budgets, revenue, tax, payroll reports, export PDF/Excel/CSV financial documents
@@ -464,16 +468,21 @@ Available agents (return canonical slugs only):
 
 Rules:
 1. Pick the MINIMUM agents needed (usually one). Use multiple only when the user clearly asks for two domains in one message.
-2. Bulk Gmail CV fetch + shortlist → hr_gmail only (not email+hr).
-3. CV attachments + hiring language → recruitment only.
+2. Gmail inbox list/search/count CVs OR CV shortlist → hr_gmail only (not email+hr). Plain "fetch last 10 emails" without hiring → hr_gmail (inbox). Hiring shortlist → hr_gmail. Non-recruitment questions → general or hr, NOT hr_gmail.
+3. CV attachments uploaded in chat + hiring language → recruitment only (not hr_gmail).
 4. "Salary" in a budget/expense/invoice context → finance; in hiring/employee context → hr.
 5. Follow-up approval to send interview emails after hr_gmail shortlist → hr_gmail.
 
 Respond with ONLY a JSON array of agent slugs.
 Examples:
   "what day is it today?" → ["general"]
+  "fetch last 10 emails" → ["hr_gmail"]
+  "show emails received on 20 May 2026" → ["hr_gmail"]
+  "how many Python CVs in the last 30 emails" → ["hr_gmail"]
   "fetch last 40 emails with CVs and select 5 Python developers" → ["hr_gmail"]
   "approve and send" (after shortlist in thread) → ["hr_gmail"]
+  "what is our leave policy?" → ["hr"]
+  "thanks" → ["general"]
   "my laptop is very slow" → ["it_support"]
   "draft a reply to the client email" → ["email"]
   "what is our leave policy?" → ["hr"]
@@ -901,14 +910,14 @@ class Orchestrator:
             return run_general_assistant(raw, user_name, conversation_history)
 
         if agent_type == "hr_gmail":
-            from tools.hr_gmail_shortlist import run_gmail_shortlist_from_user_prompt, format_hr_gmail_orchestrator_reply
+            from tools.hr_email_intelligence import execute_hr_gmail_agent
 
-            res = run_gmail_shortlist_from_user_prompt(
+            return execute_hr_gmail_agent(
                 user_message=raw,
+                conversation_history=conversation_history,
                 user_name=user_name,
                 user_role=user_role or "User",
             )
-            return format_hr_gmail_orchestrator_reply(res)
 
         if agent_type == "it_support":
             from graph.it_graph import it_graph
