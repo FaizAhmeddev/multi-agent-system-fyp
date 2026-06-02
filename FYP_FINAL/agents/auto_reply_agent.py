@@ -58,7 +58,7 @@ Write the complete email:
 - First line: Subject: <subject>
 - Blank line, then the email body
 - Professional tone, concise
-- If recipient email is mentioned, include "To: <email>" before Subject
+- Do NOT invent or guess a recipient email address. Omit a "To:" line unless the task includes an explicit verified address.
 - Do not claim the email was sent unless the task explicitly says it was sent"""
         return llm.invoke(prompt).content.strip()
     except Exception as e:

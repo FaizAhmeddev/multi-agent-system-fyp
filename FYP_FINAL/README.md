@@ -88,7 +88,7 @@ The MCP (Model Context Protocol) HTTP server exposes tools (default `localhost:8
 ## ⚙️ Configuration
 
 1. Copy `FYP_FINAL/.env.example` to `FYP_FINAL/.env`.
-2. Set at least `OPENAI_API_KEY` and any integrations you use (Gmail, Twilio, etc.).
+2. Set at least `OPENAI_API_KEY` and any integrations you use, such as Gmail.
 
 ```env
 OPENAI_API_KEY=sk-...

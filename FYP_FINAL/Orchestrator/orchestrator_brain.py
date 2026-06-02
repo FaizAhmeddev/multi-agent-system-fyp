@@ -150,6 +150,202 @@ def _facts_context_block(facts: dict[str, str]) -> str:
     return "Known employee facts from this thread (use these — do not ask again):\n" + "\n".join(lines) + "\n\n"
 
 
+def _parse_compose_recipient_name(message: str) -> str:
+    """Extract a person name from 'email to …' / interview-invite phrasing."""
+    m = (message or "").strip()
+    if not m:
+        return ""
+    patterns = (
+        r"\b(?:email|mail|send|write|invite)\s+(?:an?\s+)?(?:e-?mail\s+)?to\s+"
+        r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})",
+        r"\b(?:interview|invite|notify)\b.*\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})",
+        r"\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b.*\b(?:interview|invite)\b",
+    )
+    for pat in patterns:
+        hit = re.search(pat, m, re.I)
+        if hit:
+            name = hit.group(1).strip()
+            if name.lower() not in ("the", "all", "everyone", "recommended"):
+                return name
+    loose = re.search(
+        r"\b(?:email|mail|send|write|compose)\s+(?:an?\s+)?(?:e-?mail\s+)?(?:to\s+)?"
+        r"([a-z][a-z.'-]*(?:\s+[a-z][a-z.'-]*){0,3})\b",
+        m,
+        re.I,
+    )
+    if loose:
+        name = loose.group(1).strip()
+        bad = {
+            "email", "mail", "message", "reply", "interview", "invite", "invitation",
+            "the", "all", "everyone", "recommended", "client", "candidate",
+        }
+        if name.lower() not in bad and "@" not in name:
+            return " ".join(part.capitalize() for part in name.split())
+    return ""
+
+
+def _emails_in_user_text_only(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> list[str]:
+    """Email addresses the user typed — never from assistant drafts."""
+    found: list[str] = []
+    for h in conversation_history or []:
+        if (h.get("role") or "").strip() != "user":
+            continue
+        found.extend(re.findall(r"[\w.+-]+@[\w.-]+\.\w+", h.get("content") or ""))
+    found.extend(re.findall(r"[\w.+-]+@[\w.-]+\.\w+", user_message or ""))
+    return found
+
+
+def _interview_schedule_needs_clarification(message: str) -> bool:
+    """True when interview time is missing or commonly ambiguous (e.g. 12 am vs noon)."""
+    low = (message or "").lower()
+    if not re.search(r"\b(?:interview|invite|schedule|meeting)\b", low):
+        return False
+    if re.search(r"\b12\s*(?::00)?\s*am\b", low):
+        return True
+    if re.search(
+        r"\b(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+        low,
+    ) and re.search(r"\bat\s+\d{1,2}(?::\d{2})?\b", low):
+        if not re.search(r"\b(?:am|pm|a\.m\.|p\.m\.)\b", low):
+            return True
+    if re.search(r"\bat\s+\d{1,2}\s*(?:o'?clock)?\s*(?:for|to)\b", low):
+        if not re.search(r"\b(?:am|pm|a\.m\.|p\.m\.)\b", low):
+            return True
+    return False
+
+
+def _compose_request_active(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    """True for compose-to-person now or a send/confirm follow-up on that thread."""
+    from tools.hr_gmail_shortlist import is_compose_email_to_person
+
+    msg = (user_message or "").strip()
+    if is_compose_email_to_person(msg):
+        return True
+    blob = _thread_blob(msg, conversation_history)
+    if is_compose_email_to_person(blob):
+        if _user_confirmed_compose_send(msg, conversation_history) or _emails_in_user_text_only(
+            msg, conversation_history
+        ):
+            return True
+    return False
+
+
+def validate_compose_email_request(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> dict[str, Any]:
+    """
+    Pre-flight for one-off SMTP compose (not inbox shortlist).
+    Returns ok, clarify_message, recipient_email, recipient_name, draft_only.
+    """
+    msg = (user_message or "").strip()
+    if not _compose_request_active(msg, conversation_history):
+        return {"ok": True, "clarify_message": "", "recipient_email": "", "recipient_name": "", "draft_only": False}
+
+    if _is_onboarding_workflow(msg, conversation_history):
+        return {"ok": True, "clarify_message": "", "recipient_email": "", "recipient_name": "", "draft_only": False}
+
+    user_emails = _emails_in_user_text_only(msg, conversation_history)
+    explicit = user_emails[-1] if user_emails else ""
+    name = _parse_compose_recipient_name(msg) or _parse_compose_recipient_name(
+        _thread_blob(msg, conversation_history)
+    )
+    confirmed = _user_confirmed_compose_send(msg, conversation_history)
+    questions: list[str] = []
+
+    schedule_blob = _thread_blob(msg, conversation_history)
+    if _interview_schedule_needs_clarification(schedule_blob) and not re.search(
+        r"\b(?:am|pm|a\.m\.|p\.m\.|noon|midnight)\b",
+        msg,
+        re.I,
+    ):
+        questions.append(
+            "Please confirm the interview time (e.g. **12:00 PM noon** vs **12:00 AM midnight** tomorrow)."
+        )
+
+    recipient_email = explicit
+    if not recipient_email and name:
+        try:
+            from tools.email_search import find_email_by_name
+
+            matches = find_email_by_name(name)
+        except Exception:
+            matches = []
+        if not matches:
+            questions.append(
+                f"I could not find an email address for **{name}** in your Gmail inbox/sent mail. "
+                "Please provide their email address."
+            )
+        elif len(matches) == 1:
+            recipient_email = matches[0].get("email") or ""
+            display = matches[0].get("name") or name
+            if not explicit and not confirmed:
+                questions.append(
+                    f"I found **{display}** at `{recipient_email}`. "
+                    "Reply **send** (or include their email if this is wrong) to deliver the message."
+                )
+        else:
+            if not explicit:
+                opts = "\n".join(
+                    f"- **{c.get('name', name)}** — `{c.get('email', '')}`" for c in matches[:8]
+                )
+                extra = f"\n- …and {len(matches) - 8} more" if len(matches) > 8 else ""
+                questions.append(
+                    f"I found multiple contacts matching **{name}**. Which recipient should I use?\n{opts}{extra}"
+                )
+            recipient_email = explicit
+
+    elif not recipient_email and not name and not confirmed:
+        questions.append(
+            "Who should receive this email? Please provide the recipient's **full name** or **email address**."
+        )
+
+    if questions and not (confirmed and recipient_email and not _interview_schedule_needs_clarification(schedule_blob)):
+        return {
+            "ok": False,
+            "clarify_message": "Before I send anything, I need to confirm:\n\n"
+            + "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions)),
+            "recipient_email": recipient_email,
+            "recipient_name": name,
+            "draft_only": True,
+        }
+
+    ready = bool(recipient_email) and (
+        explicit or confirmed or not name
+    )
+    return {
+        "ok": ready,
+        "clarify_message": "",
+        "recipient_email": recipient_email,
+        "recipient_name": name,
+        "draft_only": not ready,
+    }
+
+
+def _user_confirmed_compose_send(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    """User explicitly opted in to send after a prior draft/clarification."""
+    low = (user_message or "").lower().strip()
+    if re.search(r"[\w.+-]+@[\w.-]+\.\w+", user_message or ""):
+        if re.search(r"\b(?:send|yes|confirm|go ahead|deliver|dispatch)\b", low):
+            return True
+    confirm_only = (
+        r"^(?:yes|yep|yeah|confirm|confirmed|send(?:\s+it)?|go ahead|"
+        r"please send|ok send|looks good)\.?$"
+    )
+    if re.match(confirm_only, low):
+        return True
+    return False
+
+
 def _parse_composed_email(drafted: str) -> dict[str, str]:
     """Extract To / Subject / body from a composed email block."""
     lines = (drafted or "").splitlines()
@@ -400,6 +596,144 @@ def build_platform_capabilities_answer(user_name: str = "User", user_role: str =
     return "\n".join(lines)
 
 
+def _looks_like_one_off_email_request(message: str) -> bool:
+    """Broad SMTP compose/send detection, including lowercase names."""
+    low = (message or "").lower().strip()
+    if not low:
+        return False
+    if re.search(r"\b(?:fetch|list|read|show|search)\b.*\b(?:inbox|emails?|gmail)\b", low):
+        return False
+    return bool(
+        re.search(
+            r"\b(?:send|compose|write|draft|mail|email)\b.{0,80}\b(?:to|for)\b",
+            low,
+        )
+        or re.search(r"\bemail\s+to\s+[a-z0-9_.+-]+", low)
+        or re.search(r"\b(?:send|email|mail)\s+(?:him|her|them)\b", low)
+    )
+
+
+def _looks_like_dashboard_request(message: str) -> bool:
+    low = (message or "").lower()
+    return bool(
+        re.search(r"\b(?:make|create|build|show|generate|prepare)\b.{0,60}\bdashboards?\b", low)
+        or re.search(r"\bdashboards?\b", low)
+    )
+
+
+def _dashboard_guidance(message: str) -> str:
+    low = (message or "").lower()
+    if any(k in low for k in ("finance", "expense", "budget", "invoice", "revenue", "sales", "profit", "cost")):
+        return (
+            "Dashboard creation is available in the **Finance** tab. "
+            "Open **Finance**, upload or paste your finance data, then use the dashboard/report controls there. "
+            "From Assistant I can still answer finance questions, analyze data, or generate PDF/Excel reports."
+        )
+    return (
+        "Dashboard building is not executed directly inside the Assistant chat. "
+        "For finance dashboards, go to the **Finance** tab and create the dashboard from there. "
+        "For other dashboards, tell me the domain and data source, and I can route analysis or explain which tab to use."
+    )
+
+
+def _looks_like_export_request(message: str) -> bool:
+    low = (message or "").lower()
+    return bool(
+        re.search(r"\b(?:generate|create|make|export|download|prepare|build)\b.{0,80}\b(?:pdf|excel|xlsx|csv|docx|word|report|summary)\b", low)
+        or re.search(r"\b(?:pdf|excel|xlsx|csv|docx)\b.{0,60}\b(?:report|summary|invoice|budget|expense|finance|payroll)\b", low)
+    )
+
+
+def _has_substantive_export_data(message: str, attachments: Optional[List[Dict[str, Any]]] = None) -> bool:
+    if attachments:
+        return any((a.get("content") or "").strip() for a in attachments)
+    text = (message or "").strip()
+    if "|" in text and "\n" in text:
+        return True
+    if re.search(r"\b\d+(?:,\d{3})*(?:\.\d+)?\b", text) and len(text.split()) >= 10:
+        return True
+    return bool(re.search(r"\b(?:invoice|expense|budget|payroll|salary|revenue|sales|profit|loss)\b", text, re.I))
+
+
+def _assistant_preflight_result(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[dict]:
+    """
+    Deterministic guardrail before LLM planning.
+    Returns a route-result-like dict with proceed/message/agents/agent_tasks when it can decide.
+    """
+    msg = (user_message or "").strip()
+    low = msg.lower()
+    if not msg:
+        return {
+            "proceed": False,
+            "message": "Please type the task you want me to perform.",
+            "agents": [],
+            "agent_tasks": {},
+            "limitations": [],
+        }
+
+    if _looks_like_dashboard_request(msg):
+        return {
+            "proceed": False,
+            "message": _dashboard_guidance(msg),
+            "agents": [],
+            "agent_tasks": {},
+            "limitations": [],
+        }
+
+    if _looks_like_one_off_email_request(msg) and not _is_onboarding_workflow(msg, conversation_history):
+        compose_check = validate_compose_email_request(msg, conversation_history)
+        if not compose_check.get("ok"):
+            return {
+                "proceed": False,
+                "message": compose_check.get("clarify_message")
+                or "Please provide the recipient email address before I compose or send this email.",
+                "agents": [],
+                "agent_tasks": {},
+                "limitations": [],
+            }
+        task = msg
+        resolved = (compose_check.get("recipient_email") or "").strip()
+        if resolved:
+            task = f"{msg}\n\n[Resolved recipient for send: {resolved}]"
+        return {
+            "proceed": True,
+            "message": "",
+            "agents": ["email"],
+            "agent_tasks": {"email": task},
+            "limitations": [],
+        }
+
+    if _looks_like_export_request(msg):
+        if not _has_substantive_export_data(msg, attachments):
+            return {
+                "proceed": False,
+                "message": (
+                    "I can generate the PDF/Excel/report from Assistant, but I need the source data first. "
+                    "Please paste the invoice, expense, budget, payroll, or sales data, or attach a file."
+                ),
+                "agents": [],
+                "agent_tasks": {},
+                "limitations": [],
+            }
+        agent = "finance" if re.search(
+            r"\b(?:finance|financial|invoice|expense|budget|payroll|salary|revenue|sales|profit|loss|tax|pkr|usd)\b",
+            low,
+        ) else "documents"
+        return {
+            "proceed": True,
+            "message": "",
+            "agents": [agent],
+            "agent_tasks": {agent: msg},
+            "limitations": [],
+        }
+
+    return None
+
+
 def run_general_assistant(
     user_message: str,
     user_name: str = "User",
@@ -410,6 +744,21 @@ def run_general_assistant(
     Uses thread history so the next turn can refer to the previous reply (real multi-turn).
     """
     from datetime import datetime
+
+    msg_low = (user_message or "").strip().lower()
+    if any(k in msg_low for k in ("load dataset", "seed database", "populate collection", "load all datasets")):
+        try:
+            from data_loader.loader import load_all_datasets
+            results = load_all_datasets()
+            formatted = []
+            for name, r in results.items():
+                if "error" in r:
+                    formatted.append(f"- {name}: Failed ({r['error']})")
+                else:
+                    formatted.append(f"- {name}: Successfully embedded {r.get('embedded', 0)} entries.")
+            return "Database Seeding Status\n\n" + "\n".join(formatted)
+        except Exception as e:
+            return f"Database seeding failed: {e}"
 
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -441,7 +790,10 @@ def run_general_assistant(
         return build_platform_capabilities_answer(user_name)
     try:
         out = llm.invoke(msgs)
-        return (out.content or "").strip() or "I'm here if you need anything else."
+        # Sanitize LLM output to ASCII for Windows console
+        content = (out.content or "").strip()
+        clean = content.encode('ascii', errors='ignore').decode()
+        return clean or "I'm here if you need anything else."
     except Exception as e:
         return f"I couldn't reach the language model ({e}). Current local time: {now}."
 
@@ -514,10 +866,16 @@ def _pre_route_intent(
     """Fast, deterministic routing for common phrasing before LLM/keywords."""
     from tools.hr_email_intelligence import classify_hr_email_intent
     from tools.hr_gmail_shortlist import (
+        is_compose_email_to_person,
         parse_gmail_shortlist_prompt,
         user_requests_hr_gmail_approve_send,
         user_requests_hr_recruitment_follow_up,
     )
+
+    if (is_compose_email_to_person(user_message) or _looks_like_one_off_email_request(user_message)) and not _is_onboarding_workflow(
+        user_message, conversation_history
+    ):
+        return ["email"]
 
     hr_mail_intent = classify_hr_email_intent(user_message)
     if hr_mail_intent in ("inbox_browse", "cv_inventory", "cv_shortlist"):
@@ -539,6 +897,8 @@ def _pre_route_intent(
     if re.search(r"^(hi|hello|hey|thanks|thank you|good\s+(morning|afternoon|evening))\b", msg):
         return ["general"]
     if _is_capabilities_or_meta_question(user_message):
+        return ["general"]
+    if _looks_like_dashboard_request(user_message):
         return ["general"]
 
     fin_doc = re.search(
@@ -776,6 +1136,48 @@ def build_context_with_attachments(user_message: str, attachments: Optional[List
     return "\n".join(parts).strip()
 
 
+def apply_routing_corrections(
+    user_message: str,
+    agents: List[str],
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> List[str]:
+    """
+    Deterministic routing fixes after LLM planning.
+    Prevents compose-to-person prompts from being sent to hr_gmail inbox pipeline.
+    """
+    from tools.hr_gmail_shortlist import is_compose_email_to_person
+    from tools.hr_email_intelligence import message_looks_like_gmail_ops
+
+    msg = (user_message or "").strip()
+    if not msg:
+        return agents
+
+    if (is_compose_email_to_person(msg) or _looks_like_one_off_email_request(msg)) and not _is_onboarding_workflow(msg, conversation_history):
+        cleaned = [a for a in agents if a not in ("hr_gmail", "recruitment", "hr")]
+        if "email" not in cleaned:
+            cleaned.append("email")
+        return normalize_agent_list(cleaned) if cleaned else ["email"]
+
+    if _should_skip_gmail_shortcircuit(msg, conversation_history):
+        cleaned = [a for a in agents if a != "hr_gmail"]
+        return normalize_agent_list(cleaned) if cleaned else agents
+
+    low = msg.lower()
+    if message_looks_like_gmail_ops(msg) and re.search(
+        r"\b(?:fetch|shortlist|inbox|last\s+\d+\s+(?:e-?mails?|emails?))\b", low
+    ):
+        cleaned = [a for a in agents if a not in ("email", "hr")]
+        if "hr_gmail" not in cleaned:
+            cleaned.append("hr_gmail")
+        return normalize_agent_list(cleaned) if cleaned else ["hr_gmail"]
+
+    if _cv_attachment_count(attachments) >= 1:
+        return coerce_agents_for_cv_hiring(msg, attachments, agents)
+
+    return agents
+
+
 def expand_agents_for_multi_task(
     message: str,
     agents: list,
@@ -862,6 +1264,26 @@ def plan_orchestrator_request(
             "limitations": [],
         }
 
+    preflight = _assistant_preflight_result(user_message, conversation_history)
+    if preflight is not None:
+        return preflight
+
+    from tools.hr_gmail_shortlist import is_compose_email_to_person
+
+    compose_check = validate_compose_email_request(user_message, conversation_history)
+    if (is_compose_email_to_person(user_message) or _looks_like_one_off_email_request(user_message)) and not _is_onboarding_workflow(
+        user_message, conversation_history
+    ):
+        if not compose_check.get("ok"):
+            return {
+                "proceed": False,
+                "message": compose_check.get("clarify_message")
+                or "I need a few details before I can send this email.",
+                "agents": [],
+                "agent_tasks": {},
+                "limitations": [],
+            }
+
     hist = _history_context_block(conversation_history, max_turns=10)
     facts = _extract_onboarding_facts(user_message, conversation_history)
     facts_block = _facts_context_block(facts)
@@ -907,6 +1329,8 @@ Return ONLY valid JSON:
 Rules:
 1. Multiple agents IN PARALLEL when the user lists multiple tasks (full new-hire onboarding → hr, email, it_support, finance, documents).
 2. "fetch last N emails" or "shortlist python developers from inbox" → hr_gmail only (never mix with new-hire onboarding).
+2b. "Email to [Person Name] for interview" or schedule interview invite to a named person → email agent ONLY (not hr_gmail). hr_gmail is for inbox fetch/shortlist, not one-off SMTP compose.
+2c. For one-off compose/send to a named person: proceed false if recipient email is unknown, multiple Gmail matches exist, interview time is ambiguous (e.g. "12 am" or "tomorrow at 12" without AM/PM), or the user has not confirmed send. Ask naturally — never invent or guess an email address.
 3. Use salary, email, department, name, and dates already present anywhere in the thread — do NOT ask again if they appear above.
 4. For full onboarding requests: proceed true immediately; run all relevant agents even if some details are still missing (note gaps in limitations, not in message).
 5. Do not plan to save employee files to a local folder; output content and downloadable PDFs via finance/documents agents.
@@ -963,6 +1387,25 @@ JSON only:"""
             }
             for slug, task in default_tasks.items():
                 agent_tasks.setdefault(slug, task)
+        agents = apply_routing_corrections(
+            user_message, agents, conversation_history, attachments=None
+        )
+        if is_compose_email_to_person(user_message) and not _is_onboarding_workflow(
+            user_message, conversation_history
+        ):
+            compose_check = validate_compose_email_request(user_message, conversation_history)
+            if not compose_check.get("ok"):
+                proceed = False
+                message = compose_check.get("clarify_message") or message
+                agents = []
+            else:
+                agent_tasks.setdefault("email", (user_message or "").strip())
+                resolved = (compose_check.get("recipient_email") or "").strip()
+                if resolved:
+                    agent_tasks["email"] = (
+                        f"{user_message.strip()}\n\n"
+                        f"[Resolved recipient for send: {resolved}]"
+                    )
         return {
             "proceed": proceed,
             "message": message,
@@ -973,6 +1416,7 @@ JSON only:"""
     except Exception:
         agents = detect_intent_llm(user_message, conversation_history)
         agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
+        agents = apply_routing_corrections(user_message, agents, conversation_history)
         return {
             "proceed": True,
             "message": "",
@@ -1051,11 +1495,19 @@ JSON array only:"""
 
         agents = json.loads(text)
         if isinstance(agents, list) and agents:
-            return normalize_agent_list(agents)
+            return apply_routing_corrections(
+                user_message,
+                normalize_agent_list(agents),
+                conversation_history,
+            )
     except Exception:
         pass
 
-    return detect_intent(user_message)  # fallback to keyword
+    return apply_routing_corrections(
+        user_message,
+        detect_intent(user_message),
+        conversation_history,
+    )
 
 
 # ── Orchestrator Core ─────────────────────────────────────────────────────────
@@ -1200,6 +1652,7 @@ class Orchestrator:
         start_time = time.time()
         self._finance_export_files = None
         self._agent_tasks = {}
+        forced_agents: Optional[List[str]] = None
 
         if _is_capabilities_or_meta_question(user_message):
             cap_answer = build_platform_capabilities_answer(user_name, user_role)
@@ -1210,6 +1663,21 @@ class Orchestrator:
                 responses={"general": cap_answer},
             )
 
+        preflight = _assistant_preflight_result(user_message, conversation_history, attachments)
+        if preflight is not None:
+            if not preflight.get("proceed"):
+                return self._scoped_route_result(
+                    start_time=start_time,
+                    agents_used=[],
+                    final_answer=preflight.get("message") or "I need more information to proceed.",
+                    responses={},
+                )
+            self._agent_tasks = preflight.get("agent_tasks") or {}
+            forced_agents = normalize_agent_list(preflight.get("agents") or [])
+            if forced_agents and forced_agents != ["general"]:
+                forced_agents = coerce_agents_for_cv_hiring(user_message, attachments, forced_agents)
+                use_llm_intent = False
+
         full_message = build_context_with_attachments(
             _enrich_onboarding_context(user_message, conversation_history),
             attachments,
@@ -1217,7 +1685,7 @@ class Orchestrator:
 
         from tools.hr_email_intelligence import message_looks_like_gmail_ops
 
-        if not _should_skip_gmail_shortcircuit(user_message, conversation_history):
+        if not use_llm_intent and not _should_skip_gmail_shortcircuit(user_message, conversation_history):
             if message_looks_like_gmail_ops(user_message):
                 hr_gmail = self._route_hr_gmail(
                     user_message=user_message,
@@ -1231,7 +1699,9 @@ class Orchestrator:
                     return hr_gmail
 
         plan_limitations: list[str] = []
-        if use_llm_intent:
+        if forced_agents:
+            agents = forced_agents
+        elif use_llm_intent:
             plan = plan_orchestrator_request(user_message, conversation_history)
             plan_limitations = plan.get("limitations") or []
             if not plan.get("proceed"):
@@ -1244,7 +1714,12 @@ class Orchestrator:
                 user_message, plan.get("agents") or [], conversation_history
             )
             self._agent_tasks = plan.get("agent_tasks") or {}
+            agents = apply_routing_corrections(
+                user_message, agents, conversation_history, attachments
+            )
             agents = coerce_agents_for_cv_hiring(user_message, attachments, agents)
+            if not self._agent_tasks.get("email") and agents == ["email"]:
+                self._agent_tasks["email"] = user_message.strip()
         else:
             agents = self._resolve_agents(
                 user_message=user_message,
@@ -1253,6 +1728,9 @@ class Orchestrator:
                 use_llm_intent=False,
             )
             agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
+            agents = apply_routing_corrections(
+                user_message, agents, conversation_history, attachments
+            )
 
         if allowed_agents:
             allow = set(normalize_agent_list(allowed_agents))
@@ -1342,33 +1820,59 @@ class Orchestrator:
                 agent_type, resp, err = fut.result()
                 responses[agent_type] = resp
                 if orchestrator_mq_enabled():
+                    payload_resp = resp.get("final_answer", "") if isinstance(resp, dict) else resp
                     self.mq.send(
                         sender=AGENT_IDS.get(agent_type, agent_type),
                         receiver=self.agent_id,
                         topic="result",
-                        payload={"response": resp, "agent_type": agent_type, "error": str(err) if err else None},
+                        payload={"response": payload_resp, "agent_type": agent_type, "error": str(err) if err else None},
                         reply_to=task_ids.get(agent_type),
                     )
 
-        result["responses"] = responses
+        # Collect structured fields and flatten responses
+        responses_flat = {}
+        finance_export_files = []
+        ui_payload = None
+        bid = None
+        hr_gmail_pending_cleared = False
+
+        for at in agents:
+            if at in responses:
+                val = responses[at]
+                if isinstance(val, dict):
+                    responses_flat[at] = val.get("final_answer", "")
+                    if val.get("ui_payload"):
+                        ui_payload = val["ui_payload"]
+                    if val.get("hr_gmail_batch_id"):
+                        bid = val["hr_gmail_batch_id"]
+                    if val.get("hr_gmail_pending_cleared"):
+                        hr_gmail_pending_cleared = True
+                    if val.get("finance_export_files"):
+                        finance_export_files.extend(val["finance_export_files"])
+                else:
+                    responses_flat[at] = val
+
+        result["responses"] = responses_flat
 
         from tools.hr_gmail_shortlist import extract_hr_gmail_batch_id, strip_hr_gmail_batch_marker
 
-        bid = None
-        for _at, txt in responses.items():
-            b = extract_hr_gmail_batch_id(txt or "")
-            if b:
-                bid = b
-                break
+        if not bid:
+            for _at, txt in responses_flat.items():
+                b = extract_hr_gmail_batch_id(txt or "")
+                if b:
+                    bid = b
+                    break
         if bid:
             result["hr_gmail_batch_id"] = bid
-        for k in list(responses.keys()):
-            responses[k] = strip_hr_gmail_batch_marker(responses[k] or "")
+        if hr_gmail_pending_cleared:
+            result["hr_gmail_pending_cleared"] = True
+
+        for k in list(responses_flat.keys()):
+            responses_flat[k] = strip_hr_gmail_batch_marker(responses_flat[k] or "")
 
         from tools.assistant_display import build_display_text, build_hr_shortlist_ui_payload
         from database.sqlite_db import hr_shortlist_get_batch
 
-        ui_payload = result.get("ui_payload")
         if bid and not ui_payload:
             try:
                 row = hr_shortlist_get_batch(bid)
@@ -1391,7 +1895,7 @@ class Orchestrator:
             result["ui_payload"] = ui_payload
 
         # 4. Merge responses (stable order matching original agent list)
-        ordered = [(at, responses[at]) for at in agents if at in responses]
+        ordered = [(at, responses_flat[at]) for at in agents if at in responses_flat]
         if len(ordered) == 1:
             result["final_answer"] = ordered[0][1]
         else:
@@ -1439,7 +1943,7 @@ class Orchestrator:
             if orchestrator_mq_enabled()
             else []
         )
-        result["finance_export_files"] = self._finance_export_files
+        result["finance_export_files"] = finance_export_files if finance_export_files else None
 
         return result
 
@@ -1465,8 +1969,31 @@ class Orchestrator:
             return run_general_assistant(raw, user_name, conversation_history)
 
         if agent_type == "hr_gmail":
-            from tools.hr_email_intelligence import execute_hr_gmail_agent
+            from tools.hr_gmail_shortlist import is_compose_email_to_person
+            from tools.hr_email_intelligence import dispatch_hr_gmail_for_orchestrator, execute_hr_gmail_agent
 
+            if is_compose_email_to_person(raw) and not _is_onboarding_workflow(
+                raw, conversation_history
+            ):
+                return self._invoke_agent(
+                    "email",
+                    contextual,
+                    user_name,
+                    user_message_raw=raw,
+                    attachments=attachments,
+                    conversation_history=conversation_history,
+                    user_role=user_role,
+                )
+
+            res = dispatch_hr_gmail_for_orchestrator(
+                user_message=raw,
+                conversation_history=conversation_history,
+                user_name=user_name,
+                user_role=user_role or "User",
+                start_time=time.time(),
+            )
+            if res is not None:
+                return res
             return execute_hr_gmail_agent(
                 user_message=raw,
                 conversation_history=conversation_history,
@@ -1484,28 +2011,68 @@ class Orchestrator:
             from agents.auto_reply_agent import compose_office_email, generate_reply
 
             raw_task = (user_message_raw or user_message or "").strip()
+            from tools.hr_gmail_shortlist import is_compose_email_to_person
+
             low = raw_task.lower()
-            if any(
-                x in low
-                for x in (
-                    "welcome email",
-                    "draft",
-                    "compose",
-                    "write an email",
-                    "send a welcome",
-                    "send email to",
-                    "email to ",
-                    "send this email",
+            if (
+                is_compose_email_to_person(raw_task)
+                or any(
+                    x in low
+                    for x in (
+                        "welcome email",
+                        "draft",
+                        "compose",
+                        "write an email",
+                        "send a welcome",
+                        "send email to",
+                        "email to ",
+                        "send this email",
+                        "interview",
+                        "invitation",
+                    )
                 )
-            ) or _is_onboarding_workflow(raw_task, conversation_history):
+                or _is_onboarding_workflow(raw_task, conversation_history)
+            ):
                 drafted = compose_office_email(contextual, user_name)
-                if _should_send_onboarding_email(raw_task, conversation_history):
-                    facts = _extract_onboarding_facts(raw_task, conversation_history)
-                    parsed = _parse_composed_email(drafted)
-                    recipient = facts.get("email") or parsed.get("to") or ""
-                    if not recipient:
-                        em = re.search(r"[\w.+-]+@[\w.-]+\.\w+", raw_task)
-                        recipient = em.group(0) if em else ""
+                parsed = _parse_composed_email(drafted)
+                compose_preflight = validate_compose_email_request(
+                    raw_task, conversation_history
+                )
+                is_compose = is_compose_email_to_person(raw_task) and not _is_onboarding_workflow(
+                    raw_task, conversation_history
+                )
+                may_send = _should_send_onboarding_email(raw_task, conversation_history)
+                if is_compose:
+                    may_send = (
+                        compose_preflight.get("ok")
+                        and not compose_preflight.get("draft_only")
+                        and (
+                            _user_confirmed_compose_send(raw_task, conversation_history)
+                            or bool(_emails_in_user_text_only(raw_task, conversation_history))
+                        )
+                    )
+                elif re.search(r"\b(?:email|send|mail|invite)\b", low):
+                    may_send = may_send or bool(
+                        _emails_in_user_text_only(raw_task, conversation_history)
+                    )
+
+                if may_send:
+                    user_emails = _emails_in_user_text_only(raw_task, conversation_history)
+                    resolved = (compose_preflight.get("recipient_email") or "").strip()
+                    resolved_m = re.search(
+                        r"\[Resolved recipient for send:\s*([^\]]+)\]",
+                        contextual or "",
+                    )
+                    if resolved_m:
+                        resolved = resolved_m.group(1).strip()
+                    recipient = ""
+                    if user_emails:
+                        recipient = user_emails[-1]
+                    elif resolved:
+                        recipient = resolved
+                    elif not is_compose:
+                        facts = _extract_onboarding_facts(raw_task, conversation_history)
+                        recipient = facts.get("email") or ""
                     if recipient:
                         status = _smtp_send_office_email(
                             recipient,
@@ -1518,9 +2085,15 @@ class Orchestrator:
                         )
                     else:
                         drafted += (
-                            "\n\n---\nEmail not sent: no recipient address in thread. "
-                            "Include the employee email in your message."
+                            "\n\n---\nEmail not sent: no verified recipient address. "
+                            "Provide the recipient email or reply **send** after confirming the match above."
                         )
+                elif is_compose:
+                    drafted += (
+                        "\n\n---\n**Draft only — not sent yet.** "
+                        "Confirm the recipient and interview time, then reply **send** "
+                        "(or include the correct email address)."
+                    )
                 return drafted
             state = {"email_content": contextual, "sender_name": user_name, "sender_email": ""}
             result = generate_reply(state)
@@ -1568,15 +2141,13 @@ class Orchestrator:
                 }
                 fin_result = finance_graph.invoke(fin_state)
                 files = fin_result.get("export_files") or []
-                if files:
-                    self._finance_export_files = files
                 out = fin_result.get("output") or ""
                 if files:
                     out += (
                         "\n\nDownloads: use the Finance document downloads section below this chat "
                         "(same browser session)."
                     )
-                return out
+                return {"final_answer": out, "finance_export_files": files}
             state = {"action": "query", "question": contextual, "context": attach_blob, "user_name": user_name}
             fin_result = finance_graph.invoke(state)
             return fin_result.get("output", "No finance response.")
@@ -1584,6 +2155,35 @@ class Orchestrator:
         elif agent_type == "documents":
             from graph.documents_graph import documents_graph
             from tools.finance_document_export import run_finance_document_export
+
+            msg_low = raw.lower()
+            if any(k in msg_low for k in ("load drive", "sync google drive", "load files from drive", "import drive")):
+                from tools.mcp_drive_client import DriveClient
+                from database.vector_db import embed_documents
+                from database.sqlite_db import get_session, DocumentMeta
+                try:
+                    client = DriveClient()
+                    docs = client.load_documents(max_results=50)
+                    if docs:
+                        res = embed_documents(docs, "documents")
+                        try:
+                            s = get_session()
+                            for d in docs:
+                                s.add(DocumentMeta(
+                                    file_name=d.get("file", ""),
+                                    content_len=len(d.get("content", "")),
+                                    source="drive",
+                                    embedded=True
+                                ))
+                            s.commit()
+                            s.close()
+                        except Exception:
+                            pass
+                        return f"✅ Successfully synced and loaded {len(docs)} documents from Google Drive and embedded them in ChromaDB."
+                    else:
+                        return "📂 Google Drive synced, but no files were found or credentials are not configured."
+                except Exception as e:
+                    return f"❌ Google Drive sync failed: {e}"
 
             if _is_onboarding_workflow(raw, conversation_history):
                 facts = _extract_onboarding_facts(raw, conversation_history)
@@ -1598,15 +2198,12 @@ class Orchestrator:
                     export_formats=["pdf", "docx"],
                 )
                 files = res.get("export_files") or []
-                if files:
-                    existing = self._finance_export_files or []
-                    self._finance_export_files = existing + files
                 out = res.get("output") or ""
                 if files:
                     out += (
                         "\n\nDownloads: use the Finance document downloads section below this chat."
                     )
-                return out
+                return {"final_answer": out, "finance_export_files": files}
             state = {"action": "qa", "query": contextual, "user_name": user_name, "documents": []}
             result = documents_graph.invoke(state)
             return result.get("output", "No documents response.")

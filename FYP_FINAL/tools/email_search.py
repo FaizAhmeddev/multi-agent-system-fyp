@@ -8,8 +8,24 @@ it finds Huzaifa's email from past conversations.
 
 import imaplib
 import email
+import re
 from email.utils import parseaddr
 from config import GMAIL_EMAIL, GMAIL_APP_PASSWORD
+
+
+def _name_matches_query(display_name: str, addr: str, query: str) -> bool:
+    """Match full name, first name, or all tokens (e.g. Huzaifa Imran)."""
+    q = (query or "").lower().strip()
+    if not q:
+        return False
+    dn = (display_name or "").lower()
+    ad = (addr or "").lower()
+    if q in dn or q in ad:
+        return True
+    parts = [p for p in re.split(r"\s+", q) if len(p) > 1]
+    if len(parts) >= 2:
+        return all(p in dn or p in ad for p in parts)
+    return parts[0] in dn if parts else False
 
 
 def find_email_by_name(name: str) -> list:
@@ -45,14 +61,14 @@ def find_email_by_name(name: str) -> list:
 
                         # Check From field
                         from_name, from_addr = parseaddr(msg.get("From", ""))
-                        if name_lower in from_name.lower() or name_lower in from_addr.lower():
+                        if _name_matches_query(from_name, from_addr, name_lower):
                             if from_addr and from_addr != GMAIL_EMAIL:
                                 found[from_addr] = from_name or from_addr
 
                         # Check To field
                         to_field = msg.get("To", "")
                         to_name, to_addr = parseaddr(to_field)
-                        if name_lower in to_name.lower() or name_lower in to_addr.lower():
+                        if _name_matches_query(to_name, to_addr, name_lower):
                             if to_addr and to_addr != GMAIL_EMAIL:
                                 found[to_addr] = to_name or to_addr
 

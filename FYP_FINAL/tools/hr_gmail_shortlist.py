@@ -614,31 +614,71 @@ def strip_hr_gmail_batch_marker(text: str) -> str:
     ).strip()
 
 
-def is_direct_email_send_to_address(message: str) -> bool:
-    """True when the user wants to SMTP-send to an explicit address (not inbox shortlist)."""
+def is_compose_email_to_person(message: str) -> bool:
+    """
+    True when the user wants to compose/send email to a named person (SMTP), not Gmail inbox ops.
+    Works with or without an @ address in the message.
+    """
     m = (message or "").strip()
-    if not m or not re.search(r"[\w.+-]+@[\w.-]+\.\w+", m):
+    if len(m) < 8:
         return False
     low = m.lower()
-    if any(
-        x in low
-        for x in (
-            "send this email",
-            "send the email",
-            "send email at",
-            "send at ",
-            "deliver to",
-            "dispatch to",
-            "mail to ",
-            "email to ",
-            "send to ",
-        )
+
+    if re.search(
+        r"\b(?:fetch|shortlist|inbox|approve\s+and\s+send|scan\s+inbox|from\s+(?:the\s+)?inbox|"
+        r"last\s+\d+\s+(?:e-?mails?|emails?|messages?)|python\s+developer)\b",
+        low,
     ):
-        return True
-    if re.search(r"\b(?:send|deliver|dispatch|mail)\b", low) and "@" in m:
-        if not re.search(r"\b(?:shortlist|inbox|fetch|cv|cvs|candidate|python developer)\b", low):
+        return False
+
+    has_addr = bool(re.search(r"[\w.+-]+@[\w.-]+\.\w+", m))
+    if has_addr:
+        if any(
+            x in low
+            for x in (
+                "send this email",
+                "send the email",
+                "send email at",
+                "send at ",
+                "deliver to",
+                "dispatch to",
+                "mail to ",
+                "email to ",
+                "send to ",
+            )
+        ):
             return True
+        if re.search(r"\b(?:send|deliver|dispatch|mail)\b", low):
+            if not re.search(
+                r"\b(?:shortlist|inbox|fetch|cv|cvs|candidate|python developer)\b", low
+            ):
+                return True
+
+    if re.search(
+        r"\b(?:email|mail|write|send)\s+(?:an?\s+)?(?:e-?mail\s+)?to\s+"
+        r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}",
+        m,
+    ):
+        if not re.search(
+            r"\b(?:shortlist|batch|candidates?|recommended|top\s+\d+|all\s+candidates?)\b", low
+        ):
+            return True
+
+    if re.search(r"\binterview\b", low) and re.search(
+        r"\b(?:email|send|invite|notify|schedule|mail)\b", low
+    ):
+        if re.search(r"\bto\s+[A-Za-z]", m) and not re.search(
+            r"\b(?:shortlist|candidates?|batch|recommended|top\s+\d+|all\s+candidates?)\b",
+            low,
+        ):
+            return True
+
     return False
+
+
+def is_direct_email_send_to_address(message: str) -> bool:
+    """True when the user wants to SMTP-send (not inbox shortlist)."""
+    return is_compose_email_to_person(message)
 
 
 def user_requests_hr_gmail_approve_send(message: str) -> bool:
@@ -650,7 +690,7 @@ def user_requests_hr_gmail_approve_send(message: str) -> bool:
         return False
     if parse_gmail_shortlist_prompt(message):
         return False
-    if is_direct_email_send_to_address(message):
+    if is_compose_email_to_person(message) or is_direct_email_send_to_address(message):
         return False
     low = (message or "").lower().strip()
     if len(low) < 8:
@@ -683,8 +723,14 @@ def user_requests_hr_gmail_approve_send(message: str) -> bool:
         return True
     if re.search(r"\b(?:email|invite|mail)\s+(?:all|them|him|her|top\s+\d+)\b", low):
         return True
+    # Only match "send/email/invite to [person]" when there is explicit shortlist/batch/candidate context.
+    # This prevents "Email to Huzaifa for interview" from being mistaken as a shortlist approval.
     if re.search(r"\b(?:send|email|invite)\s+(?:to\s+)?[a-z]{3,}", low):
-        return True
+        if re.search(
+            r"\b(?:shortlist|batch|candidates?|recommended|interview\s+invitation|all\s+candidates?)\b",
+            low,
+        ):
+            return True
     return False
 
 
@@ -697,7 +743,7 @@ def user_requests_hr_recruitment_follow_up(message: str) -> bool:
         return False
     if parse_gmail_shortlist_prompt(message):
         return False
-    if is_direct_email_send_to_address(message):
+    if is_compose_email_to_person(message) or is_direct_email_send_to_address(message):
         return False
     cues = (
         "send to",
@@ -717,8 +763,13 @@ def user_requests_hr_recruitment_follow_up(message: str) -> bool:
     )
     if any(c in low for c in cues):
         return True
+    # Only match "send/email/invite to [person]" when there is explicit shortlist/candidate context.
     if re.search(r"\b(?:send|email|invite)\s+(?:to\s+)?[a-z]{3,}", low):
-        return True
+        if re.search(
+            r"\b(?:shortlist|batch|candidates?|recommended|interview\s+invitation)\b",
+            low,
+        ):
+            return True
     return False
 
 

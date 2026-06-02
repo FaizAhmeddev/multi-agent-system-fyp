@@ -65,10 +65,6 @@ def openai_missing_message(action: str = "This feature") -> str:
 GMAIL_EMAIL = _env("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
 
-# ─── Twilio (SMS OTP) ──────────────────────────────────────
-TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_FROM = _env("TWILIO_PHONE_FROM")
 FYP_ADMIN_CONTACT_EMAIL = _env("FYP_ADMIN_CONTACT_EMAIL", "administrator@company.com")
 
 
@@ -80,15 +76,11 @@ def refresh_config_from_env() -> None:
     """Reload secrets from os.environ (after .env or Streamlit Secrets hydration)."""
     global OPENAI_API_KEY, GMAIL_EMAIL, GMAIL_APP_PASSWORD
     global GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, DEMO_MODE, USERS, DATABASE_URL
-    global TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_FROM
     global FYP_ADMIN_CONTACT_EMAIL
 
     OPENAI_API_KEY = _env("OPENAI_API_KEY")
     GMAIL_EMAIL = _env("GMAIL_EMAIL")
     GMAIL_APP_PASSWORD = _env("GMAIL_APP_PASSWORD").replace(" ", "")
-    TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
-    TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
-    TWILIO_PHONE_FROM = _env("TWILIO_PHONE_FROM")
     FYP_ADMIN_CONTACT_EMAIL = _env("FYP_ADMIN_CONTACT_EMAIL", "administrator@company.com")
 
     _gcf = _env("GOOGLE_CREDENTIALS_FILE", "credentials.json")
@@ -107,13 +99,6 @@ def refresh_config_from_env() -> None:
         "demo": {"password": _env("FYP_PASSWORD_DEMO", "demo123"), "role": "Admin", "name": "Demo User"},
         "assistant": {"password": _env("FYP_PASSWORD_ASSISTANT", "assistant123"), "role": "Assistant", "name": "Office Assistant"},
     }
-
-
-def is_twilio_configured() -> bool:
-    sid = (_env("TWILIO_ACCOUNT_SID") or TWILIO_ACCOUNT_SID or "").strip()
-    token = (_env("TWILIO_AUTH_TOKEN") or TWILIO_AUTH_TOKEN or "").strip()
-    frm = (_env("TWILIO_PHONE_FROM") or TWILIO_PHONE_FROM or "").strip()
-    return bool(sid and token and frm)
 
 
 def admin_contact_message() -> str:

@@ -1315,7 +1315,7 @@ def register_app_user(
     email = (email or "").strip().lower()
     phone = _normalize_phone(phone)
     display_name = (display_name or username).strip()
-    if not username or not password or not email or not phone:
+    if not username or not password or not email:
         return False, "All fields are required."
     if username_exists(username):
         return False, "Username is already taken."
@@ -1333,7 +1333,7 @@ def register_app_user(
                 phone=phone[:32],
                 is_system_account=False,
                 email_verified=True,
-                phone_verified=True,
+                phone_verified=bool(phone),
             )
         )
         s.commit()

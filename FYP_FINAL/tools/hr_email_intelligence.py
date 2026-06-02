@@ -188,9 +188,9 @@ def message_looks_like_gmail_ops(message: str) -> bool:
     ) and not has_gmail_verb:
         return False
 
-    from tools.hr_gmail_shortlist import is_direct_email_send_to_address
+    from tools.hr_gmail_shortlist import is_compose_email_to_person, is_direct_email_send_to_address
 
-    if is_direct_email_send_to_address(m):
+    if is_compose_email_to_person(m) or is_direct_email_send_to_address(m):
         return False
 
     if user_requests_hr_gmail_approve_send(m) or user_requests_hr_recruitment_follow_up(m):
@@ -218,7 +218,13 @@ def classify_hr_email_intent(message: str) -> str:
         return "none"
     low = m.lower()
 
-    from tools.hr_gmail_shortlist import _is_employee_onboarding_context
+    from tools.hr_gmail_shortlist import (
+        _is_employee_onboarding_context,
+        is_compose_email_to_person,
+    )
+
+    if is_compose_email_to_person(m):
+        return "none"
 
     if _is_employee_onboarding_context(low):
         return "none"
@@ -723,6 +729,7 @@ def try_hr_email_assistant_command(
 
     from tools.hr_gmail_shortlist import (
         _is_employee_onboarding_context,
+        is_compose_email_to_person,
         is_direct_email_send_to_address,
     )
 
@@ -731,7 +738,7 @@ def try_hr_email_assistant_command(
         thread_low += "\n" + (entry.get("content") or "").lower()
     if _is_employee_onboarding_context(thread_low):
         return None
-    if is_direct_email_send_to_address(msg):
+    if is_compose_email_to_person(msg) or is_direct_email_send_to_address(msg):
         return None
 
     intent = classify_hr_email_intent(msg)
@@ -774,7 +781,11 @@ def try_hr_email_assistant_command(
             elif not fu.get("ok") and "No shortlist batch" in (fu.get("final_answer") or ""):
                 ui = {
                     "type": "hr_error",
-                    "message": "Run a fetch first, e.g. fetch the last 20 emails and shortlist Python developers.",
+                    "message": (
+                        "No CV shortlist batch in this thread. "
+                        "For inbox hiring, try: fetch the last 20 emails and shortlist Python developers. "
+                        "To email one person directly, say: Email to [name] at address@company.com — interview tomorrow at 3 PM."
+                    ),
                 }
             return _orchestrator_hr_result(
                 final_answer=fu.get("final_answer", ""),
