@@ -1,5 +1,5 @@
 """
-UI/APP.PY — Office Automation Agents Pro v7.0 — FYP FINAL
+UI/APP.PY 
 ==========================================================
 Tabs: Login | Assistant (orchestrator) | Dashboard | specialist tools | History
 """

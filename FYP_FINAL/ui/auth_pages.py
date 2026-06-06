@@ -32,7 +32,6 @@ def _auth_brand() -> None:
         """
         <div class="auth-brand">
             <h1>Office Automation Pro</h1>
-            <p>Multi-Agent System · FYP v7.0</p>
         </div>
         """,
         unsafe_allow_html=True,
