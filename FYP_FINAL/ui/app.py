@@ -911,8 +911,6 @@ else:
         from tools.gmail_auto_reply_monitor import get_pending_logs, is_running, start_monitor, stop_monitor
 
         st.session_state.monitor_import_error = ""
-        for lg in get_pending_logs():
-            st.session_state.monitor_log.append(lg)
     except Exception as _mon_ex:
         st.session_state.monitor_import_error = str(_mon_ex)
 
@@ -969,6 +967,15 @@ def _cached_vector_stats():
     return collection_stats()
 
 
+def _drain_monitor_logs() -> None:
+    """Pull background monitor log lines into session state (main thread only)."""
+    try:
+        for lg in get_pending_logs():
+            st.session_state.monitor_log.append(lg)
+    except Exception:
+        pass
+
+
 def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
     """Gmail IMAP auto-reply — Email and IT tabs (local + Gmail configured)."""
     if not can_use_email_monitor(st.session_state.user_role or ""):
@@ -982,47 +989,51 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
         st.info("Auto-reply monitor runs on **local** installs only (not Streamlit Cloud).")
     elif not _gmail_ok:
         st.warning(gmail_setup_hint())
-    b1, b2 = st.columns(2)
-    with b1:
-        if st.button(
-            "▶️ Start monitor",
-            use_container_width=True,
-            disabled=_hosted or is_running() or not _gmail_ok,
-            key=f"{key_prefix}_on",
-        ):
+
+    toggle_key = f"{key_prefix}_auto_reply_on"
+    if toggle_key not in st.session_state:
+        st.session_state[toggle_key] = is_running()
+
+    want_on = st.toggle(
+        "Auto-reply monitor",
+        key=toggle_key,
+        disabled=_hosted or not _gmail_ok,
+        help="ON — automatically reply to new inbox emails every 30s. OFF — no auto-replies.",
+    )
+
+    running = is_running()
+    if not _hosted and _gmail_ok and want_on != running:
+        if want_on:
             ok, msg = start_monitor()
             st.session_state.monitor_log.append(msg)
             if ok:
+                st.session_state[toggle_key] = True
                 st.success(msg)
             else:
+                st.session_state[toggle_key] = False
                 st.error(msg)
-            st.rerun()
-    with b2:
-        if st.button(
-            "⏹️ Stop",
-            use_container_width=True,
-            disabled=_hosted or not is_running(),
-            key=f"{key_prefix}_off",
-        ):
+        else:
             stop_monitor()
-            st.session_state.monitor_log.append("Stopping monitor…")
-            st.rerun()
+            st.session_state[toggle_key] = False
+            st.session_state.monitor_log.append("Auto-reply monitor stopped.")
+        st.rerun()
+
     if is_running():
         st.markdown(
             '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply active</b> — checking inbox every 30s</div>',
+            'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ON</b> — checking inbox every 30s</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             '<div style="background:#f1f5f9;border:1px solid #cbd5e1;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">⚪ <b>Auto-reply off</b></div>',
+            'border-radius:8px;margin:8px 0">⚪ <b>Auto-reply OFF</b></div>',
             unsafe_allow_html=True,
         )
-    for lg in get_pending_logs():
-        st.session_state.monitor_log.append(lg)
+
+    _drain_monitor_logs()
     if st.session_state.monitor_log:
-        with st.expander("📋 Activity log", expanded=is_running()):
+        with st.expander("📋 Activity log", expanded=False):
             for log in reversed(st.session_state.monitor_log[-25:]):
                 st.caption(log)
 

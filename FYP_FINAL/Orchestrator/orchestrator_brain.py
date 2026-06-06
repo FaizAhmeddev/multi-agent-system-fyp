@@ -78,11 +78,29 @@ def _should_skip_gmail_shortcircuit(
     conversation_history: Optional[List[Dict[str, str]]] = None,
 ) -> bool:
     """Onboarding threads and direct SMTP sends must not hijack the Gmail inbox pipeline."""
-    from tools.hr_gmail_shortlist import is_direct_email_send_to_address
-
     if _is_onboarding_workflow(user_message, conversation_history):
         return True
-    if is_direct_email_send_to_address(user_message):
+    if _is_compose_to_person_request(user_message, conversation_history):
+        return True
+    return False
+
+
+def _is_compose_to_person_request(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    """True when the user wants to compose/send to a named person (not inbox fetch/shortlist)."""
+    from tools.hr_gmail_shortlist import is_compose_email_to_person
+
+    msg = (user_message or "").strip()
+    if not msg or _is_onboarding_workflow(msg, conversation_history):
+        return False
+    if is_compose_email_to_person(msg) or _looks_like_one_off_email_request(msg):
+        return True
+    if _compose_request_active(msg, conversation_history):
+        low = msg.lower()
+        if re.search(r"\b(?:fetch|shortlist|inbox|batch|approve\s+and\s+send)\b", low):
+            return False
         return True
     return False
 
@@ -271,35 +289,43 @@ def validate_compose_email_request(
 
     recipient_email = explicit
     if not recipient_email and name:
-        try:
-            from tools.email_search import find_email_by_name
+        from config import is_gmail_configured
 
-            matches = find_email_by_name(name)
-        except Exception:
-            matches = []
-        if not matches:
-            questions.append(
-                f"I could not find an email address for **{name}** in your Gmail inbox/sent mail. "
-                "Please provide their email address."
-            )
-        elif len(matches) == 1:
-            recipient_email = matches[0].get("email") or ""
-            display = matches[0].get("name") or name
-            if not explicit and not confirmed:
+        if is_gmail_configured():
+            try:
+                from tools.email_search import find_email_by_name
+
+                matches = find_email_by_name(name)
+            except Exception:
+                matches = []
+            if not matches:
                 questions.append(
-                    f"I found **{display}** at `{recipient_email}`. "
-                    "Reply **send** (or include their email if this is wrong) to deliver the message."
+                    f"I could not find an email address for **{name}** in your Gmail inbox/sent mail. "
+                    "Please provide their email address."
                 )
+            elif len(matches) == 1:
+                recipient_email = matches[0].get("email") or ""
+                display = matches[0].get("name") or name
+                if not explicit and not confirmed:
+                    questions.append(
+                        f"I found **{display}** at `{recipient_email}`. "
+                        "Reply **send** (or include their email if this is wrong) to deliver the message."
+                    )
+            else:
+                if not explicit:
+                    opts = "\n".join(
+                        f"- **{c.get('name', name)}** — `{c.get('email', '')}`" for c in matches[:8]
+                    )
+                    extra = f"\n- …and {len(matches) - 8} more" if len(matches) > 8 else ""
+                    questions.append(
+                        f"I found multiple contacts matching **{name}**. Which recipient should I use?\n{opts}{extra}"
+                    )
+                recipient_email = explicit
         else:
-            if not explicit:
-                opts = "\n".join(
-                    f"- **{c.get('name', name)}** — `{c.get('email', '')}`" for c in matches[:8]
-                )
-                extra = f"\n- …and {len(matches) - 8} more" if len(matches) > 8 else ""
-                questions.append(
-                    f"I found multiple contacts matching **{name}**. Which recipient should I use?\n{opts}{extra}"
-                )
-            recipient_email = explicit
+            questions.append(
+                f"Please provide the email address for **{name}** "
+                "(Gmail is not configured for automatic contact lookup)."
+            )
 
     elif not recipient_email and not name and not confirmed:
         questions.append(
@@ -684,28 +710,22 @@ def _assistant_preflight_result(
             "limitations": [],
         }
 
-    if _looks_like_one_off_email_request(msg) and not _is_onboarding_workflow(msg, conversation_history):
+    if _is_compose_to_person_request(msg, conversation_history):
         compose_check = validate_compose_email_request(msg, conversation_history)
-        if not compose_check.get("ok"):
-            return {
-                "proceed": False,
-                "message": compose_check.get("clarify_message")
-                or "Please provide the recipient email address before I compose or send this email.",
-                "agents": [],
-                "agent_tasks": {},
-                "limitations": [],
-            }
         task = msg
         resolved = (compose_check.get("recipient_email") or "").strip()
         if resolved:
             task = f"{msg}\n\n[Resolved recipient for send: {resolved}]"
-        return {
+        out = {
             "proceed": True,
             "message": "",
             "agents": ["email"],
             "agent_tasks": {"email": task},
             "limitations": [],
         }
+        if not compose_check.get("ok") and compose_check.get("clarify_message"):
+            out["clarify_prefix"] = compose_check["clarify_message"]
+        return out
 
     if _looks_like_export_request(msg):
         if not _has_substantive_export_data(msg, attachments):
@@ -872,9 +892,7 @@ def _pre_route_intent(
         user_requests_hr_recruitment_follow_up,
     )
 
-    if (is_compose_email_to_person(user_message) or _looks_like_one_off_email_request(user_message)) and not _is_onboarding_workflow(
-        user_message, conversation_history
-    ):
+    if _is_compose_to_person_request(user_message, conversation_history):
         return ["email"]
 
     hr_mail_intent = classify_hr_email_intent(user_message)
@@ -1153,11 +1171,8 @@ def apply_routing_corrections(
     if not msg:
         return agents
 
-    if (is_compose_email_to_person(msg) or _looks_like_one_off_email_request(msg)) and not _is_onboarding_workflow(msg, conversation_history):
-        cleaned = [a for a in agents if a not in ("hr_gmail", "recruitment", "hr")]
-        if "email" not in cleaned:
-            cleaned.append("email")
-        return normalize_agent_list(cleaned) if cleaned else ["email"]
+    if _is_compose_to_person_request(msg, conversation_history):
+        return ["email"]
 
     if _should_skip_gmail_shortcircuit(msg, conversation_history):
         cleaned = [a for a in agents if a != "hr_gmail"]
@@ -1178,6 +1193,20 @@ def apply_routing_corrections(
     return agents
 
 
+def _finalize_agent_routing(
+    user_message: str,
+    agents: List[str],
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> List[str]:
+    """Last routing pass before parallel execution — prevents hr_gmail + email double-runs."""
+    agents = apply_routing_corrections(user_message, agents, conversation_history, attachments)
+    agents = coerce_agents_for_cv_hiring(user_message, attachments, agents)
+    if _is_compose_to_person_request(user_message, conversation_history):
+        return ["email"]
+    return normalize_agent_list(agents)
+
+
 def expand_agents_for_multi_task(
     message: str,
     agents: list,
@@ -1188,6 +1217,9 @@ def expand_agents_for_multi_task(
         return ["general"]
     if _is_onboarding_workflow(message, conversation_history):
         return normalize_agent_list(list(set(agents + _onboarding_agent_set())))
+
+    if _is_compose_to_person_request(message, conversation_history):
+        return ["email"]
 
     low = (message or "").lower()
     numbered = len(re.findall(r"(?m)^\s*\d+\.\s", message or ""))
@@ -1270,19 +1302,22 @@ def plan_orchestrator_request(
 
     from tools.hr_gmail_shortlist import is_compose_email_to_person
 
-    compose_check = validate_compose_email_request(user_message, conversation_history)
-    if (is_compose_email_to_person(user_message) or _looks_like_one_off_email_request(user_message)) and not _is_onboarding_workflow(
-        user_message, conversation_history
-    ):
-        if not compose_check.get("ok"):
-            return {
-                "proceed": False,
-                "message": compose_check.get("clarify_message")
-                or "I need a few details before I can send this email.",
-                "agents": [],
-                "agent_tasks": {},
-                "limitations": [],
-            }
+    if _is_compose_to_person_request(user_message, conversation_history):
+        compose_check = validate_compose_email_request(user_message, conversation_history)
+        task = (user_message or "").strip()
+        resolved = (compose_check.get("recipient_email") or "").strip()
+        if resolved:
+            task = f"{task}\n\n[Resolved recipient for send: {resolved}]"
+        out = {
+            "proceed": True,
+            "message": "",
+            "agents": ["email"],
+            "agent_tasks": {"email": task},
+            "limitations": [],
+        }
+        if not compose_check.get("ok") and compose_check.get("clarify_message"):
+            out["clarify_prefix"] = compose_check["clarify_message"]
+        return out
 
     hist = _history_context_block(conversation_history, max_turns=10)
     facts = _extract_onboarding_facts(user_message, conversation_history)
@@ -1390,33 +1425,33 @@ JSON only:"""
         agents = apply_routing_corrections(
             user_message, agents, conversation_history, attachments=None
         )
-        if is_compose_email_to_person(user_message) and not _is_onboarding_workflow(
-            user_message, conversation_history
-        ):
+        clarify_prefix = ""
+        if _is_compose_to_person_request(user_message, conversation_history):
+            proceed = True
+            message = ""
+            agents = ["email"]
             compose_check = validate_compose_email_request(user_message, conversation_history)
-            if not compose_check.get("ok"):
-                proceed = False
-                message = compose_check.get("clarify_message") or message
-                agents = []
-            else:
-                agent_tasks.setdefault("email", (user_message or "").strip())
-                resolved = (compose_check.get("recipient_email") or "").strip()
-                if resolved:
-                    agent_tasks["email"] = (
-                        f"{user_message.strip()}\n\n"
-                        f"[Resolved recipient for send: {resolved}]"
-                    )
+            agent_tasks.setdefault("email", (user_message or "").strip())
+            resolved = (compose_check.get("recipient_email") or "").strip()
+            if resolved:
+                agent_tasks["email"] = (
+                    f"{user_message.strip()}\n\n"
+                    f"[Resolved recipient for send: {resolved}]"
+                )
+            if not compose_check.get("ok") and compose_check.get("clarify_message"):
+                clarify_prefix = compose_check["clarify_message"]
         return {
             "proceed": proceed,
             "message": message,
             "agents": agents,
             "agent_tasks": {k: str(v) for k, v in agent_tasks.items() if normalize_agent_slug(k)},
             "limitations": [str(x) for x in limitations],
+            "clarify_prefix": clarify_prefix,
         }
     except Exception:
         agents = detect_intent_llm(user_message, conversation_history)
         agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
-        agents = apply_routing_corrections(user_message, agents, conversation_history)
+        agents = _finalize_agent_routing(user_message, agents, conversation_history)
         return {
             "proceed": True,
             "message": "",
@@ -1653,6 +1688,7 @@ class Orchestrator:
         self._finance_export_files = None
         self._agent_tasks = {}
         forced_agents: Optional[List[str]] = None
+        clarify_prefix = ""
 
         if _is_capabilities_or_meta_question(user_message):
             cap_answer = build_platform_capabilities_answer(user_name, user_role)
@@ -1674,6 +1710,7 @@ class Orchestrator:
                 )
             self._agent_tasks = preflight.get("agent_tasks") or {}
             forced_agents = normalize_agent_list(preflight.get("agents") or [])
+            clarify_prefix = (preflight.get("clarify_prefix") or "").strip()
             if forced_agents and forced_agents != ["general"]:
                 forced_agents = coerce_agents_for_cv_hiring(user_message, attachments, forced_agents)
                 use_llm_intent = False
@@ -1714,10 +1751,8 @@ class Orchestrator:
                 user_message, plan.get("agents") or [], conversation_history
             )
             self._agent_tasks = plan.get("agent_tasks") or {}
-            agents = apply_routing_corrections(
-                user_message, agents, conversation_history, attachments
-            )
-            agents = coerce_agents_for_cv_hiring(user_message, attachments, agents)
+            if not clarify_prefix:
+                clarify_prefix = (plan.get("clarify_prefix") or "").strip()
             if not self._agent_tasks.get("email") and agents == ["email"]:
                 self._agent_tasks["email"] = user_message.strip()
         else:
@@ -1728,9 +1763,12 @@ class Orchestrator:
                 use_llm_intent=False,
             )
             agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
-            agents = apply_routing_corrections(
-                user_message, agents, conversation_history, attachments
-            )
+
+        agents = _finalize_agent_routing(
+            user_message, agents, conversation_history, attachments
+        )
+        if not self._agent_tasks.get("email") and agents == ["email"]:
+            self._agent_tasks.setdefault("email", user_message.strip())
 
         if allowed_agents:
             allow = set(normalize_agent_list(allowed_agents))
@@ -1917,6 +1955,10 @@ class Orchestrator:
         from tools.assistant_display import build_display_text, strip_markdown
 
         result["final_answer"] = strip_markdown(result.get("final_answer", ""))
+        if clarify_prefix:
+            result["final_answer"] = (
+                clarify_prefix + "\n\n---\n\n" + (result.get("final_answer") or "")
+            ).strip()
         if plan_limitations:
             lim = "\n".join(f"- {x}" for x in plan_limitations)
             result["final_answer"] = (

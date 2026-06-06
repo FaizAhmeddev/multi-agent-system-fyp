@@ -41,7 +41,7 @@ def _do_monitor():
 
     while _monitor_running:
         try:
-            mail = imaplib.IMAP4_SSL("imap.gmail.com")
+            mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
             mail.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
             mail.select("inbox")
 
@@ -129,9 +129,18 @@ def start_monitor() -> tuple[bool, str]:
 
 
 def stop_monitor():
-    global _monitor_running
+    """Stop background IMAP monitor and release stuck running state."""
+    global _monitor_running, _monitor_thread
     _monitor_running = False
+    if _monitor_thread is not None and _monitor_thread.is_alive():
+        _monitor_thread.join(timeout=2.0)
+    _monitor_thread = None
 
 
-def is_running():
+def is_running() -> bool:
+    """True only when the background monitor thread is actually alive."""
+    global _monitor_running, _monitor_thread
+    if _monitor_running and _monitor_thread is not None and not _monitor_thread.is_alive():
+        _monitor_running = False
+        _monitor_thread = None
     return _monitor_running

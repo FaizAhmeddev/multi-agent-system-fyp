@@ -51,10 +51,9 @@ def find_email_by_name(name: str) -> list:
                     continue
 
                 mail_ids = data[0].split()
-                # Check last 100 emails only for speed
-                recent = mail_ids[-100:] if len(mail_ids) > 100 else mail_ids
+                recent = mail_ids[-30:] if len(mail_ids) > 30 else mail_ids
 
-                for num in recent:
+                for num in reversed(recent):
                     try:
                         status, msg_data = mail.fetch(num, "(RFC822)")
                         msg = email.message_from_bytes(msg_data[0][1])
