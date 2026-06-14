@@ -14,6 +14,7 @@ import os
 import re
 import time
 import threading
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
@@ -24,11 +25,13 @@ from message_queue.queue import message_queue
 
 
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+_log = logging.getLogger("orchestrator.routing")
 
 # ── LLM for intent detection ──────────────────────────────────────────────────
 
 def _get_llm():
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    from tools.llm_client import get_chat_openai
+    return get_chat_openai(temperature=0)
 
 
 def _history_context_block(
@@ -450,35 +453,42 @@ def _is_capabilities_or_meta_question(message: str) -> bool:
         return False
     if _has_operational_work_request(msg):
         return False
+    # Document/task-specific "what does X include" is not a platform-capabilities question.
+    if re.search(
+        r"\b(?:offer letter|document|policy|contract|onboard|employee|payroll|invoice|"
+        r"expense|cv|resume|candidate|ticket|wifi|laptop|drive|folder|attachment)\b",
+        msg,
+    ):
+        return False
     capability_patterns = (
-        r"what can you do",
-        r"what (?:tasks?|things?) (?:can|do) you",
-        r"which tasks? can you",
-        r"let me know which task",
-        r"what (?:are your|is your) capabilit",
-        r"what (?:services|features) do you offer",
-        r"list (?:your )?(?:tasks|capabilities|features|functions)",
-        r"how can you help(?: me)?",
-        r"what do you support",
-        r"which (?:agents?|modules?|specialists?) can you",
-        r"tell me what you can",
-        r"what are you able to",
-        r"describe your (?:role|functions|capabilities)",
-        r"what kind of (?:work|tasks?) can you",
-        r"what does (?:this |the )?(?:project|app|system|platform) do",
-        r"what is this (?:project|app|system|platform)",
-        r"explain (?:the )?(?:whole |entire )?(?:project|system|platform)",
-        r"what (?:is|are) (?:the )?(?:whole |entire )?project",
-        r"show (?:me )?(?:all )?(?:prompt|task)s? (?:i can|you can|to use)",
-        r"prompt (?:guide|examples?|catalog)",
-        r"assistant (?:tab|guide|help)",
-        r"what can i (?:do|ask) (?:here|in assistant)",
+        r"what can you do(?:\s+for me|\s+here|\s+in assistant)?\s*[?.!]?\s*$",
+        r"what (?:tasks?|things?) (?:can|do) you(?: perform| handle| do)?(?:\s+for me|\s+here)?\s*[?.!]?\s*$",
+        r"^which tasks? can you(?: perform| handle| do)?",
+        r"^let me know which task",
+        r"what (?:are your|is your) capabilit(?:ies|y)(?:\s+as an assistant|\s+here)?",
+        r"what (?:services|features) do you offer(?:\s+as an assistant)?",
+        r"^list (?:your )?(?:tasks|capabilities|features|functions)\b",
+        r"^how can you help(?: me)?(?:\s+with this (?:app|platform|system|assistant))?",
+        r"^what do you support(?:\s+in this (?:app|platform|assistant))?",
+        r"which (?:agents?|modules?|specialists?) can you(?: use| access| run)?",
+        r"^tell me what you can(?: do)?(?:\s+here|\s+in assistant)?",
+        r"^what are you able to(?: do)?(?:\s+here|\s+in assistant)?",
+        r"^describe your (?:role|functions|capabilities)(?:\s+as an assistant)?",
+        r"^what kind of (?:work|tasks?) can you(?: perform| handle| do)?(?:\s+here|\s+in assistant)?",
+        r"what does (?:this |the )?(?:project|app|system|platform|assistant) do",
+        r"^what is this (?:project|app|system|platform|assistant)",
+        r"^explain (?:the )?(?:whole |entire )?(?:project|system|platform|assistant)",
+        r"^what (?:is|are) (?:the )?(?:whole |entire )?project",
+        r"^show (?:me )?(?:all )?(?:prompt|task)s? (?:i can|you can|to use)",
+        r"^prompt (?:guide|examples?|catalog)",
+        r"^assistant (?:tab|guide|help)",
+        r"^what can i (?:do|ask) (?:here|in assistant)",
     )
     if any(re.search(p, msg) for p in capability_patterns):
         return True
     if re.search(r"\b(?:which|what)\s+tasks?\b", msg) and re.search(
         r"\b(?:can you|do you|you perform|you handle|are you able)\b", msg
-    ):
+    ) and not re.search(r"\b(?:onboard|employee|hire|ticket|email|expense|invoice|cv|resume)\b", msg):
         return True
     return False
 
@@ -488,12 +498,23 @@ def _has_operational_work_request(msg: str) -> bool:
     return bool(
         re.search(
             r"\b(?:onboard|new employee|welcome email|offer letter|shortlist|fetch\s+last|"
-            r"inbox|create (?:a |an )?ticket|payroll entry|generate pdf|export pdf|"
-            r"screen (?:these )?cv|hire |joining (?:on|date)|complete the full onboarding|"
-            r"tasks to perform|send (?:a )?welcome|approve and send)\b",
+            r"inbox|create (?:a |an )?(?:it )?ticket|payroll entry|generate pdf|export pdf|"
+            r"screen (?:these )?cv|screen attached|rank candidates|compare (?:these )?(?:cv|resume|document)|"
+            r"hire |joining (?:on|date|monday|tuesday|wednesday|thursday|friday)|"
+            r"complete (?:the )?full onboarding|tasks to perform|send (?:a )?welcome|approve and send|"
+            r"interview questions|job description|orientation|analyze (?:these )?expense|"
+            r"expense report|invoice summary|budget vs actual|revenue|profit margin|"
+            r"summarize (?:this |the )?(?:pdf|document|policy|contract)|extract (?:from )?(?:pdf|document)|"
+            r"search (?:google )?drive|compare documents|not working|reset password|vpn|wifi|"
+            r"won't connect|can't connect|broken|issue with|laptop|software engineer)\b",
             msg,
         )
     )
+
+
+def _is_short_general_query(msg: str) -> bool:
+    """Short chitchat/date queries only — longer messages may embed real tasks."""
+    return len((msg or "").split()) <= 6 and not _has_operational_work_request(msg)
 
 
 # Agent task catalog — same slugs as intent routing / _CANONICAL (capabilities answers only).
@@ -640,10 +661,23 @@ def _looks_like_one_off_email_request(message: str) -> bool:
 
 
 def _looks_like_dashboard_request(message: str) -> bool:
+    """True only when the user asks about the Streamlit Dashboard tab / system health — not data summaries."""
     low = (message or "").lower()
+    if _has_operational_work_request(low):
+        return False
+    if re.search(
+        r"\b(?:finance|expense|budget|invoice|revenue|sales|profit|cost|expenses|payroll)\b",
+        low,
+    ):
+        return False
     return bool(
-        re.search(r"\b(?:make|create|build|show|generate|prepare)\b.{0,60}\bdashboards?\b", low)
-        or re.search(r"\bdashboards?\b", low)
+        re.search(r"\b(?:open|go to|show me|where is|use)\b.{0,40}\b(?:the\s+)?dashboard\b", low)
+        or re.search(r"\b(?:system|agent|mcp|health|status)\b.{0,40}\bdashboard\b", low)
+        or re.search(r"\bdashboard\s+(?:tab|page|view|screen|panel)\b", low)
+        or re.search(
+            r"\b(?:make|create|build|generate|prepare)\b.{0,60}\bdashboards?\b.{0,40}\b(?:in|on|from)\b.{0,20}\b(?:streamlit|ui|tab|app)\b",
+            low,
+        )
     )
 
 
@@ -833,20 +867,24 @@ IT_KEYWORDS = [
     "restart", "freeze", "not working", "broken", "connection",
     "vpn", "access", "reset", "boot", "driver", "it support", "technical",
     "device", "hardware", "monitor", "cable", "usb", "mouse",
-    "blue screen", "bsod", "cannot connect", "won't turn on",
+    "blue screen", "bsod", "cannot connect", "won't connect", "can't connect",
+    "won't turn on", "it ticket", "create ticket", "ticket",
 ]
 
 HR_KEYWORDS = [
     "hr", "hire", "recruit", "cv", "resume", "candidate", "interview",
     "onboard", "onboarding", "employee", "salary", "leave", "policy",
     "payroll", "job description", "staff", "screening", "shortlist",
-    "performance", "appraisal", "human resources", "vacancy", "position"
+    "performance", "appraisal", "human resources", "vacancy", "position",
+    "interview questions", "orientation", "offer letter", "new hire",
 ]
 
 RECRUITMENT_KEYWORDS = [
     "orchestration", "multi-agent recruitment", "shortlist and email",
     "interview invitation", "uploaded 10", "uploaded ten", "parallel agents",
     "candidate matching", "jd match", "rank candidates", "workflow",
+    "screen attached", "compare cvs", "compare resumes", "rank attached",
+    "screen candidates", "attached cv", "attached resume",
 ]
 
 FINANCE_KEYWORDS = [
@@ -855,12 +893,15 @@ FINANCE_KEYWORDS = [
     "ledger", "cash flow", "report", "spending", "pkr", "usd", "money",
     "salary", "payable", "receivable", "quarterly", "fiscal", "audit",
     "generate pdf", "generate excel", "generate xlsx", "export pdf", "export excel",
+    "analyze expense", "top 5 cost", "budget vs actual", "expense report",
+    "invoice summary", "profit margin",
 ]
 
 DOCS_KEYWORDS = [
     "document", "file", "pdf", "drive", "google drive", "folder",
     "search document", "find file", "summarize", "contract", "policy",
-    "manual", "report", "doc", "read file", "extract", "compare doc"
+    "manual", "report", "doc", "read file", "extract", "compare doc",
+    "search drive", "compare documents", "onboarding policy",
 ]
 
 
@@ -905,19 +946,30 @@ def _pre_route_intent(
     if not msg:
         return ["general"]
 
-    if user_requests_hr_gmail_approve_send(user_message) or user_requests_hr_recruitment_follow_up(
-        user_message
+    if _is_short_general_query(msg) and re.search(
+        r"\b(what\s+day|what\s+date|what\s+time|today'?s\s+date|current\s+time)\b", msg
     ):
-        return ["hr_gmail"]
-
-    if re.search(r"\b(what\s+day|what\s+date|what\s+time|today'?s\s+date|current\s+time)\b", msg):
         return ["general"]
-    if re.search(r"^(hi|hello|hey|thanks|thank you|good\s+(morning|afternoon|evening))\b", msg):
+    if _is_short_general_query(msg) and re.search(
+        r"^(hi|hello|hey|thanks|thank you|good\s+(morning|afternoon|evening))\b", msg
+    ):
         return ["general"]
     if _is_capabilities_or_meta_question(user_message):
         return ["general"]
     if _looks_like_dashboard_request(user_message):
         return ["general"]
+
+    if re.search(
+        r"\b(?:analyze|highlight|summarize|compare).{0,50}\b(?:expenses?|costs?|budget|invoice|financial)\b",
+        msg,
+    ) or re.search(r"\b(?:expense report|top \d+ costs?|budget vs actual)\b", msg):
+        return ["finance"]
+
+    if not re.search(r"\b(?:expenses?|budget|invoice|costs?|finance|financial|payroll|revenue)\b", msg):
+        if user_requests_hr_gmail_approve_send(user_message) or user_requests_hr_recruitment_follow_up(
+            user_message
+        ):
+            return ["hr_gmail"]
 
     fin_doc = re.search(
         r"\b(generate|export|create|download)\b.*\b(pdf|xlsx|excel|csv|word|docx|report)\b",
@@ -1343,13 +1395,13 @@ System capabilities:
 {cap_block}
 
 Available agent slugs:
-- hr_gmail: Gmail inbox — fetch/list emails, count CVs, shortlist candidates, send interview invites from inbox
-- email: Compose and send welcome/onboarding emails via Gmail SMTP when recipient is known
-- hr: Employee profiles, offer letters, orientation schedules, HR policy, onboarding content
-- it_support: IT tickets, laptop/software provisioning requests
-- finance: Payroll breakdowns, expenses, invoices, budget reports, export PDF/Excel in parallel
-- documents: Offer letters, onboarding summaries, Google Drive when configured
-- recruitment: When CV files are attached + hiring workflow
+- hr_gmail: Gmail inbox — fetch/list emails, count CVs, shortlist candidates, send interview invites from inbox (e.g. "fetch last 10 candidate emails", "shortlist Python developers from inbox")
+- email: Compose and send welcome/onboarding emails via Gmail SMTP when recipient is known (e.g. "send welcome email to name@company.com")
+- hr: Employee profiles, offer letters, orientation schedules, HR policy, onboarding content, interview questions (e.g. "generate interview questions for senior Python developer", "complete full onboarding for new hire")
+- it_support: IT tickets, laptop/software/VPN/WiFi troubleshooting (e.g. "laptop won't connect to WiFi, create IT ticket", "reset password", "VPN not working")
+- finance: Payroll breakdowns, expenses, invoices, budget reports, analyze costs, export PDF/Excel (e.g. "analyze expenses and highlight top 5 costs", "budget vs actual")
+- documents: Google Drive search, summarize/extract/compare documents (e.g. "search Google Drive for onboarding policy PDF", "summarize this contract")
+- recruitment: When CV files are attached + hiring workflow — parse, rank, shortlist, draft interview emails (e.g. "compare these CVs", "rank attached resumes", "screen candidates for this JD")
 - general: Greetings, date/time, small talk only
 
 Return ONLY valid JSON:
@@ -1371,7 +1423,7 @@ Rules:
 5. Do not plan to save employee files to a local folder; output content and downloadable PDFs via finance/documents agents.
 6. If an integration is unavailable, add to limitations and still proceed for other tasks when possible.
 7. If the request is impossible or unrelated, proceed false with a clear explanation.
-8. "What can you do?", "which tasks can you perform?", capabilities, or how you can help → agents: ["general"] ONLY. Never run hr/email/finance to demo fake John Doe data.
+8. "What can you do?", "which tasks can you perform?", capabilities, or how you can help → agents: ["general"] ONLY when the message is purely meta with no concrete task. If the message combines a capability question with a concrete task (names, dates, attachments, specific data), treat it as an operational request and route to the appropriate specialist(s) — ignore rule 8.
 
 JSON only:"""
 
@@ -1448,7 +1500,8 @@ JSON only:"""
             "limitations": [str(x) for x in limitations],
             "clarify_prefix": clarify_prefix,
         }
-    except Exception:
+    except Exception as exc:
+        _log.warning("plan_orchestrator_request LLM fallback: %s", exc)
         agents = detect_intent_llm(user_message, conversation_history)
         agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
         agents = _finalize_agent_routing(user_message, agents, conversation_history)
@@ -1546,6 +1599,38 @@ JSON array only:"""
 
 
 # ── Orchestrator Core ─────────────────────────────────────────────────────────
+
+def _log_route_trace(
+    *,
+    user_message: str,
+    user_role: str,
+    allowed_agents: Optional[List[str]],
+    routing_path: str,
+    agents_before_filter: List[str],
+    agents_after_filter: Optional[List[str]] = None,
+    blocked: Optional[List[str]] = None,
+    agents_used: Optional[List[str]] = None,
+    final_answer: str = "",
+    pre_route_hint: Optional[List[str]] = None,
+) -> None:
+    """INFO-level routing diagnostics for Assistant tab debugging."""
+    preview = (final_answer or "")[:200]
+    _log.info(
+        "route trace | path=%s | role=%s | allowlist=%s | pre_route_hint=%s | "
+        "msg=%r | agents_before_filter=%s | agents_after_filter=%s | blocked=%s | "
+        "agents_used=%s | answer_preview=%r",
+        routing_path,
+        user_role or "(none)",
+        allowed_agents,
+        pre_route_hint,
+        (user_message or "")[:500],
+        agents_before_filter,
+        agents_after_filter if agents_after_filter is not None else agents_before_filter,
+        blocked or [],
+        agents_used if agents_used is not None else agents_after_filter,
+        preview,
+    )
+
 
 class Orchestrator:
     """
@@ -1689,9 +1774,22 @@ class Orchestrator:
         self._agent_tasks = {}
         forced_agents: Optional[List[str]] = None
         clarify_prefix = ""
+        routing_path = "plan_orchestrator_request"
+        pre_route_hint = _pre_route_intent(user_message, conversation_history)
 
         if _is_capabilities_or_meta_question(user_message):
+            routing_path = "_is_capabilities_or_meta_question"
             cap_answer = build_platform_capabilities_answer(user_name, user_role)
+            _log_route_trace(
+                user_message=user_message,
+                user_role=user_role,
+                allowed_agents=allowed_agents,
+                routing_path=routing_path,
+                agents_before_filter=["general"],
+                agents_used=["general"],
+                final_answer=cap_answer,
+                pre_route_hint=pre_route_hint,
+            )
             return self._scoped_route_result(
                 start_time=start_time,
                 agents_used=["general"],
@@ -1701,11 +1799,23 @@ class Orchestrator:
 
         preflight = _assistant_preflight_result(user_message, conversation_history, attachments)
         if preflight is not None:
+            routing_path = "_assistant_preflight_result"
             if not preflight.get("proceed"):
+                msg_out = preflight.get("message") or "I need more information to proceed."
+                _log_route_trace(
+                    user_message=user_message,
+                    user_role=user_role,
+                    allowed_agents=allowed_agents,
+                    routing_path=f"{routing_path}:blocked",
+                    agents_before_filter=[],
+                    agents_used=[],
+                    final_answer=msg_out,
+                    pre_route_hint=pre_route_hint,
+                )
                 return self._scoped_route_result(
                     start_time=start_time,
                     agents_used=[],
-                    final_answer=preflight.get("message") or "I need more information to proceed.",
+                    final_answer=msg_out,
                     responses={},
                 )
             self._agent_tasks = preflight.get("agent_tasks") or {}
@@ -1724,6 +1834,7 @@ class Orchestrator:
 
         if not use_llm_intent and not _should_skip_gmail_shortcircuit(user_message, conversation_history):
             if message_looks_like_gmail_ops(user_message):
+                routing_path = "hr_gmail_shortcut:message_looks_like_gmail_ops"
                 hr_gmail = self._route_hr_gmail(
                     user_message=user_message,
                     user_name=user_name,
@@ -1733,19 +1844,42 @@ class Orchestrator:
                     start_time=start_time,
                 )
                 if hr_gmail is not None:
+                    _log_route_trace(
+                        user_message=user_message,
+                        user_role=user_role,
+                        allowed_agents=allowed_agents,
+                        routing_path=routing_path,
+                        agents_before_filter=["hr_gmail"],
+                        agents_used=hr_gmail.get("agents_used") or ["hr_gmail"],
+                        final_answer=hr_gmail.get("final_answer") or "",
+                        pre_route_hint=pre_route_hint,
+                    )
                     return hr_gmail
 
         plan_limitations: list[str] = []
         if forced_agents:
+            routing_path = "_assistant_preflight_result:forced_agents"
             agents = forced_agents
         elif use_llm_intent:
+            routing_path = "plan_orchestrator_request"
             plan = plan_orchestrator_request(user_message, conversation_history)
             plan_limitations = plan.get("limitations") or []
             if not plan.get("proceed"):
+                msg_out = plan.get("message") or "I need more information to proceed."
+                _log_route_trace(
+                    user_message=user_message,
+                    user_role=user_role,
+                    allowed_agents=allowed_agents,
+                    routing_path=f"{routing_path}:blocked",
+                    agents_before_filter=[],
+                    agents_used=[],
+                    final_answer=msg_out,
+                    pre_route_hint=pre_route_hint,
+                )
                 return self._scoped_route_result(
                     start_time=start_time,
                     agents_used=[],
-                    final_answer=plan.get("message") or "I need more information to proceed.",
+                    final_answer=msg_out,
                 )
             agents = expand_agents_for_multi_task(
                 user_message, plan.get("agents") or [], conversation_history
@@ -1756,6 +1890,9 @@ class Orchestrator:
             if not self._agent_tasks.get("email") and agents == ["email"]:
                 self._agent_tasks["email"] = user_message.strip()
         else:
+            routing_path = "_pre_route_intent_or_keyword_detect_intent"
+            if pre_route_hint is not None:
+                routing_path = "_pre_route_intent"
             agents = self._resolve_agents(
                 user_message=user_message,
                 attachments=attachments,
@@ -1764,12 +1901,14 @@ class Orchestrator:
             )
             agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
 
+        agents_before_filter = list(agents)
         agents = _finalize_agent_routing(
             user_message, agents, conversation_history, attachments
         )
         if not self._agent_tasks.get("email") and agents == ["email"]:
             self._agent_tasks.setdefault("email", user_message.strip())
 
+        blocked: list[str] = []
         if allowed_agents:
             allow = set(normalize_agent_list(allowed_agents))
             allow.add("general")
@@ -1778,18 +1917,32 @@ class Orchestrator:
             if not agents:
                 if "general" in allow:
                     agents = ["general"]
+                    routing_path = f"{routing_path}:allowlist_fallback_general"
                 else:
                     elapsed = round((time.time() - start_time) * 1000)
                     allowed_txt = ", ".join(sorted(allow - {"general"})) or "none"
+                    final_blocked = (
+                        "**Outside your department scope**\n\n"
+                        f"This request matched: **{', '.join(blocked) or 'restricted agents'}**, but your role may use: "
+                        f"**{allowed_txt}** (plus general chat).\n\n"
+                        "Try rephrasing for your department tab, or ask an **Administrator** for broader access."
+                    )
+                    _log_route_trace(
+                        user_message=user_message,
+                        user_role=user_role,
+                        allowed_agents=allowed_agents,
+                        routing_path=f"{routing_path}:allowlist_blocked",
+                        agents_before_filter=agents_before_filter,
+                        agents_after_filter=[],
+                        blocked=blocked,
+                        agents_used=[],
+                        final_answer=final_blocked,
+                        pre_route_hint=pre_route_hint,
+                    )
                     return {
                         "agents_used": [],
                         "responses": {},
-                        "final_answer": (
-                            "**Outside your department scope**\n\n"
-                            f"This request matched: **{', '.join(blocked) or 'restricted agents'}**, but your role may use: "
-                            f"**{allowed_txt}** (plus general chat).\n\n"
-                            "Try rephrasing for your department tab, or ask an **Administrator** for broader access."
-                        ),
+                        "final_answer": final_blocked,
                         "task_ids": {},
                         "elapsed_ms": elapsed,
                         "mq_messages": self.mq.get_all_messages_for_display(limit=30),
@@ -1986,6 +2139,19 @@ class Orchestrator:
             else []
         )
         result["finance_export_files"] = finance_export_files if finance_export_files else None
+
+        _log_route_trace(
+            user_message=user_message,
+            user_role=user_role,
+            allowed_agents=allowed_agents,
+            routing_path=routing_path,
+            agents_before_filter=agents_before_filter,
+            agents_after_filter=agents,
+            blocked=blocked,
+            agents_used=agents,
+            final_answer=result.get("final_answer") or "",
+            pre_route_hint=pre_route_hint,
+        )
 
         return result
 

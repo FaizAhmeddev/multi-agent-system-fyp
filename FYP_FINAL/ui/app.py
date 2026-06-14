@@ -10,6 +10,12 @@ if ROOT not in sys.path:
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+try:
+    from utils.logging_config import configure_logging
+    configure_logging()
+except Exception:
+    pass
+
 # Local dev: load FYP_FINAL/.env before Streamlit / config read credentials
 try:
     from config import load_local_env

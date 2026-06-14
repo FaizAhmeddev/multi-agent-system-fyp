@@ -73,6 +73,12 @@ def run():
     _ensure_env_file()
     has_env = _load_secrets()
 
+    try:
+        from utils.logging_config import configure_logging
+        configure_logging()
+    except Exception as e:
+        _log(f"  [!] Logging setup: {e}")
+
     import logging
 
     for _lg in (

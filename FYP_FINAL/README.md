@@ -174,6 +174,13 @@ FYP_FINAL/
 6. **💰 Finance** — Q&A, expense analysis, invoices, reports, budget comparison
 7. **📂 Documents** — Load Google Drive docs, then search/Q&A/summarize/extract/compare
 
+### Assistant / Orchestrator troubleshooting
+
+If a request isn't routed to the expected agent, check `FYP_FINAL/logs/orchestrator.log`
+for the routing decision trace (pre-route hint / preflight / LLM plan / allowlist filter).
+Each Assistant message logs `path`, `agents_before_filter`, `agents_after_filter`,
+`blocked`, and `agents_used`.
+
 ---
 
 ## 🐛 Changes from V23 → V6.0 (FYP Final)
