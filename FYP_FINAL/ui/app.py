@@ -215,260 +215,7 @@ st.markdown("""<style>
     border-bottom: none !important;
 }
 
-/* ===== Auth / login screen (enterprise portal) ===== */
-body:has(.auth-page-wrap) [data-testid="stSidebar"],
-body:has(.auth-page-wrap) [data-testid="stHeader"],
-body:has(.auth-page-wrap) footer,
-body:has(.auth-page-wrap) [data-testid="stToolbar"] {
-    display: none !important;
-}
-body:has(.auth-page-wrap) .main .block-container {
-    max-width: 100% !important;
-    padding: 0 !important;
-}
-body:has(.auth-page-wrap) .stApp {
-    background: #050816 !important;
-    background-image:
-        radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 184, 166, 0.22), transparent 55%),
-        radial-gradient(ellipse 70% 55% at 85% 75%, rgba(124, 58, 237, 0.20), transparent 50%),
-        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(244, 63, 94, 0.08), transparent 45%) !important;
-}
-.auth-page-wrap {
-    min-height: 100vh;
-    display: flex;
-    align-items: stretch;
-    padding: 0;
-}
-.auth-hero-panel {
-    position: relative;
-    border-radius: 0 28px 28px 0;
-    padding: 3rem 2.5rem;
-    background: linear-gradient(155deg, #0f766e 0%, #1e3a8a 42%, #5b21b6 100%);
-    color: #f8fafc;
-    overflow: hidden;
-    min-height: 520px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-shadow: 0 30px 60px -20px rgba(15, 118, 110, 0.45);
-}
-.auth-hero-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.14), transparent 42%),
-        radial-gradient(circle at 80% 70%, rgba(45, 212, 191, 0.18), transparent 40%);
-    pointer-events: none;
-}
-.auth-hero-panel::after {
-    content: "";
-    position: absolute;
-    width: 320px;
-    height: 320px;
-    right: -80px;
-    bottom: -80px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.10);
-}
-.auth-hero-inner { position: relative; z-index: 1; }
-.auth-hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.22);
-    color: #ccfbf1;
-    margin-bottom: 1.25rem;
-}
-.auth-hero-logo {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.25);
-    backdrop-filter: blur(8px);
-    margin-bottom: 1.25rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-}
-.auth-hero-panel h1 {
-    font-size: 2rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    margin: 0 0 0.5rem;
-    line-height: 1.15;
-    color: #ffffff;
-}
-.auth-hero-panel p {
-    font-size: 15px;
-    color: rgba(226, 232, 240, 0.88);
-    margin: 0 0 1.75rem;
-    line-height: 1.6;
-    max-width: 340px;
-}
-.auth-feature-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-.auth-feature-list li {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13.5px;
-    font-weight: 500;
-    color: rgba(241, 245, 249, 0.92);
-}
-.auth-feature-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.18);
-    flex-shrink: 0;
-}
-.auth-form-shell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1.5rem;
-    min-height: 520px;
-}
-.auth-card {
-    width: 100%;
-    max-width: 420px;
-    background: rgba(15, 23, 42, 0.72);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 22px;
-    padding: 2rem 1.75rem 1.5rem;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    box-shadow:
-        0 24px 48px -12px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.auth-card-header { margin-bottom: 1.25rem; }
-.auth-card-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    margin-bottom: 0.85rem;
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.25), rgba(99, 102, 241, 0.25));
-    border: 1px solid rgba(45, 212, 191, 0.35);
-}
-.auth-card-header h2 {
-    font-size: 1.45rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: #f1f5f9;
-    margin: 0 0 0.35rem;
-}
-.auth-card-header p {
-    font-size: 13.5px;
-    color: #94a3b8;
-    margin: 0;
-    line-height: 1.5;
-}
-.auth-demo-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 0.85rem;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-size: 12px;
-    color: #99f6e4;
-    background: rgba(20, 184, 166, 0.12);
-    border: 1px solid rgba(45, 212, 191, 0.25);
-}
-.auth-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(148,163,184,0.25), transparent);
-    margin: 1.25rem 0 0.75rem;
-}
-.auth-footer-note {
-    text-align: center;
-    font-size: 11.5px;
-    color: #64748b;
-    margin-top: 1rem;
-}
-body:has(.auth-page-wrap) .stTextInput label,
-body:has(.auth-page-wrap) [data-testid="stWidgetLabel"] p {
-    color: #cbd5e1 !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
-}
-body:has(.auth-page-wrap) .stTextInput input {
-    background: rgba(2, 6, 23, 0.65) !important;
-    border: 1px solid rgba(148, 163, 184, 0.22) !important;
-    border-radius: 12px !important;
-    color: #f8fafc !important;
-    padding: 0.65rem 0.85rem !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
-}
-body:has(.auth-page-wrap) .stTextInput input:focus {
-    border-color: #2dd4bf !important;
-    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18) !important;
-}
-body:has(.auth-page-wrap) .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #14b8a6, #6366f1) !important;
-    border: none !important;
-    border-radius: 12px !important;
-    padding: 0.7rem 1.25rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.01em !important;
-    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.35) !important;
-}
-body:has(.auth-page-wrap) .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #0d9488, #4f46e5) !important;
-    box-shadow: 0 12px 28px rgba(99, 102, 241, 0.4) !important;
-}
-body:has(.auth-page-wrap) .stButton > button:not([kind="primary"]) {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(148, 163, 184, 0.2) !important;
-    color: #e2e8f0 !important;
-    border-radius: 12px !important;
-}
-body:has(.auth-page-wrap) .stButton > button:not([kind="primary"]):hover {
-    background: rgba(51, 65, 85, 0.75) !important;
-    border-color: rgba(45, 212, 191, 0.35) !important;
-    color: #ffffff !important;
-}
-body:has(.auth-page-wrap) [data-testid="stVerticalBlockBorderWrapper"] {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-}
-body:has(.auth-page-wrap) .stCaption,
-body:has(.auth-page-wrap) [data-testid="stCaptionContainer"] {
-    color: #94a3b8 !important;
-}
-@media (max-width: 900px) {
-    .auth-hero-panel { border-radius: 0; min-height: auto; padding: 2rem 1.5rem; }
-    .auth-form-shell { min-height: auto; padding: 1.5rem 1rem 2.5rem; }
-}
+/* Auth login styles are injected from ui/auth_pages.py when the login gate is shown */
 
 /* Floating Glassmorphic Header */
 .main-header {
@@ -1028,11 +775,11 @@ for k, v in _defs.items():
 
 # â”€â”€ Per-agent quick-chat (the pinned bottom bar feeds these) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _AGENT_CHAT = {
-    "Email":      ("coord_chat", "ðŸ“§", "Ask the Email agent â€” e.g. 'email Ahmed about the 3pm meeting'â€¦"),
-    "Documents":  ("docs_chat",  "ðŸ“‚", "Ask anything about your loaded documentsâ€¦"),
-    "IT Support": ("it_chat",    "ðŸ› ï¸", "Describe your IT problemâ€¦"),
-    "HR":         ("hr_chat",    "ðŸ‘¥", "Ask the HR agent â€” policies, process, leavesâ€¦"),
-    "Finance":    ("fin_chat",   "ðŸ’°", "Ask the Finance agent â€” tax, budgets, expensesâ€¦"),
+    "Email":      ("coord_chat", "Email", "Ask the Email agent, for example: email Ahmed about the 3pm meeting."),
+    "Documents":  ("docs_chat",  "Documents", "Ask anything about your loaded documents."),
+    "IT Support": ("it_chat",    "IT", "Describe your IT problem."),
+    "HR":         ("hr_chat",    "HR", "Ask the HR agent about policies, processes, or leave."),
+    "Finance":    ("fin_chat",   "Finance", "Ask the Finance agent about tax, budgets, or expenses."),
 }
 
 
@@ -1079,8 +826,8 @@ def _agent_answer(tab: str, prompt: str, user_name: str) -> str:
                     "name": c["name"], "email": c["email"],
                     "subject": f"Message from {user_name}", "body": reply.get("body", prompt),
                 }
-                return f"ðŸ“§ Found **{c['name']}** ({c['email']}). Drafted a message â€” review & confirm below."
-            return f"ðŸ” Could not find **{m.group(1)}**'s email. Provide the address directly."
+                return f"Found **{c['name']}** ({c['email']}). Drafted a message - review and confirm below."
+            return f"Could not find **{m.group(1)}**'s email. Provide the address directly."
         reply = generate_reply({"email_content": prompt, "sender_name": user_name})
         return reply.get("body", "")
     return "Unsupported agent."
@@ -1635,19 +1382,19 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
     if is_running():
         st.markdown(
             '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">ðŸŸ¢ <b>Auto-reply ON</b> â€” checking inbox every 30s</div>',
+            'border-radius:8px;margin:8px 0">ON <b>Auto-reply ON</b> - checking inbox every 30s</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
             '<div style="background:var(--surface-2);border:1px solid var(--border);padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">âšª <b>Auto-reply OFF</b></div>',
+            'border-radius:8px;margin:8px 0">OFF <b>Auto-reply OFF</b></div>',
             unsafe_allow_html=True,
         )
 
     _drain_monitor_logs()
     if st.session_state.monitor_log:
-        with st.expander("ðŸ“‹ Activity log", expanded=False):
+        with st.expander("Activity log", expanded=False):
             for log in reversed(st.session_state.monitor_log[-25:]):
                 st.caption(log)
 
@@ -1700,17 +1447,17 @@ with st.sidebar:
     _db_label = "PostgreSQL" if use_postgresql_database() else "SQLite"
     st.markdown(
         '<div class="side-brand">'
-        '<div class="side-logo">🤖</div>'
+        '<div class="side-logo">OA</div>'
         '<div class="side-brand-text">'
         '<div class="side-title">Office Automation</div>'
-        '<div class="side-sub">Multi-Agent · A2A · MCP</div>'
+        '<div class="side-sub">Multi-Agent | A2A | MCP</div>'
         "</div></div>",
         unsafe_allow_html=True,
     )
 
     st.markdown('<div class="side-nav-label">KIET Workspace</div>', unsafe_allow_html=True)
     for _lbl in tab_labels:
-        _icon = _NAV_ICONS.get(_lbl, "•")
+        _icon = _NAV_ICONS.get(_lbl, "Tab")
         _is_active = st.session_state.active_tab == _lbl
         if st.button(
             f"{_icon}  {_lbl}",
@@ -1743,7 +1490,7 @@ with st.sidebar:
         f'<div class="side-user-text"><div class="side-user-name">{_unm}</div>'
         f'<div class="side-user-role">{_rol}</div></div>'
         f"</div>"
-        f'<div class="side-stack">Stack · SQLite · LangGraph Â· OpenAI</div>',
+        f'<div class="side-stack">Stack | SQLite | LangGraph | OpenAI</div>',
         unsafe_allow_html=True,
     )
 
@@ -1778,7 +1525,7 @@ _MAIN = st.container()
 
 with _MAIN:
     # Page heading + role banner
-    _icon = _NAV_ICONS.get(active_tab, "•")
+    _icon = _NAV_ICONS.get(active_tab, "Workspace")
     st.markdown(
         f'<div class="page-head"><span class="page-head-icon">{_icon}</span>'
         f'<span class="page-head-title">{_hesc(active_tab or "")}</span></div>',
@@ -2332,7 +2079,7 @@ if active_tab == "IT Support":
 
         with c2:
             _render_email_auto_monitor_panel(key_prefix="it_mon")
-            st.markdown('<div class="sec-hdr" style="margin-top:14px">ðŸŽ« Recent IT Tickets</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-hdr" style="margin-top:14px">Recent IT Tickets</div>', unsafe_allow_html=True)
             try:
                 from database.sqlite_db import get_session
                 from database.sqlite_db import ITTicket
@@ -2365,7 +2112,7 @@ if active_tab == "Email":
         st.caption(
             "Tip: use **Assistant** for email-related tasks routed with other domains; this tab is for drafts, inbox, and confirm-send flows."
         )
-        st.markdown('<div class="sec-hdr sec-teal">ðŸ“§ Email Coordinator <span class="badge badge-a2a">A2A</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal">Email Coordinator <span class="badge badge-a2a">A2A</span></div>', unsafe_allow_html=True)
         _render_email_auto_monitor_panel(key_prefix="email_mon")
         st.divider()
 
@@ -2373,7 +2120,7 @@ if active_tab == "Email":
 
         if st.session_state.pending_email:
             p = st.session_state.pending_email
-            st.warning(f"**ðŸ“§ Ready to Send**\n\n**To:** {p.get('name','')} `{p.get('email','')}`\n**Subject:** {p.get('subject','')}\n\n{p.get('body','')[:300]}...")
+            st.warning(f"**Ready to Send**\n\n**To:** {p.get('name','')} `{p.get('email','')}`\n**Subject:** {p.get('subject','')}\n\n{p.get('body','')[:300]}...")
             cy, cn = st.columns(2)
             with cy:
                 if st.button("âœ… Confirm & Send", use_container_width=True, key="send_yes"):
@@ -2382,19 +2129,19 @@ if active_tab == "Email":
                         from database.sqlite_db import log_email
                         send_email({"recipient":p["email"],"subject":p["subject"],"body":p["body"]})
                         log_email("sent", __import__("config").GMAIL_EMAIL, p["email"], p["subject"], p["body"])
-                        st.session_state.coord_chat.append({"role":"agent","content":f"âœ… Email sent to {p.get('name',p['email'])}!"})
+                        st.session_state.coord_chat.append({"role":"agent","content":f"Email sent to {p.get('name',p['email'])}!"})
                         st.session_state.pending_email = None; st.rerun()
                     except Exception as e:
                         st.error(f"Send failed: {e}")
             with cn:
-                if st.button("âŒ Cancel", use_container_width=True, key="send_no"):
+                if st.button("Cancel", use_container_width=True, key="send_no"):
                     st.session_state.pending_email = None; st.rerun()
 
-        st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">ðŸ“¥ Read Inbox</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">Read Inbox</div>', unsafe_allow_html=True)
         if not is_gmail_configured():
             st.warning("Gmail is not configured.")
         inbox_count = st.number_input("How many emails to fetch", min_value=1, max_value=30, value=10, key="inbox_fetch_n")
-        if st.button("ðŸ“¬ Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
+        if st.button("Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
             with st.spinner("Connecting to Gmail..."):
                 try:
                     from tools.gmail_read import read_emails
@@ -2406,7 +2153,7 @@ if active_tab == "Email":
                         if "not configured" in str(err).lower() or "not enough arguments" in str(err).lower():
                             st.error(err)
                         else:
-                            st.info(f"ðŸ“­ {err}")
+                            st.info(f"{err}")
                     else:
                         st.success(f"Loaded **{len(st.session_state.inbox_emails)}** email(s). Select one below to read the full message.")
                         st.rerun()
@@ -2420,7 +2167,7 @@ if active_tab == "Email":
                 labels = []
                 for em in st.session_state.inbox_emails:
                     att_n = em.get("attachment_count") or 0
-                    att_tag = f" ðŸ“Ž{att_n}" if att_n else ""
+                    att_tag = f" attachment {att_n}" if att_n else ""
                     labels.append(
                         f"{em.get('date', '')} | {em.get('from_name', '?')[:28]}{att_tag}\n{em.get('subject', '')[:55]}"
                     )
@@ -3137,7 +2884,7 @@ if active_tab == "Documents":
                 if not is_google_drive_configured():
                     st.error("Google Drive is not configured.")
                 else:
-                    with st.spinner("ðŸ“‚ Loading and reading Drive files..."):
+                    with st.spinner("Loading and reading Drive files..."):
                         try:
                             from tools.mcp_drive_client import DriveClient
 
@@ -3147,10 +2894,10 @@ if active_tab == "Documents":
                                 st.session_state.drive_documents = docs
                                 from database.vector_db import embed_documents
 
-                                with st.spinner("ðŸ§  Embedding into ChromaDB..."):
+                                with st.spinner("Embedding into ChromaDB..."):
                                     res = embed_documents(docs, "documents")
                                 st.success(
-                                    f"âœ… Loaded {len(docs)} docs Â· Embedded {res.get('embedded', 0)} into ChromaDB"
+                                    f"Loaded {len(docs)} docs · Embedded {res.get('embedded', 0)} into ChromaDB"
                                 )
                                 try:
                                     from database.sqlite_db import get_session, DocumentMeta
@@ -3176,7 +2923,7 @@ if active_tab == "Documents":
                                         {"file": f.get("name", ""), "id": f.get("id", ""), "content": ""}
                                         for f in files
                                     ]
-                                    st.warning(f"âš ï¸ Listed {len(files)} files but could not read content.")
+                                    st.warning(f"Listed {len(files)} files but could not read content.")
                                 else:
                                     st.warning("No files found in Google Drive.")
                         except DriveNotConfiguredError as e:
@@ -3185,7 +2932,7 @@ if active_tab == "Documents":
                             st.error(f"Drive error: {e}")
 
         with lc2:
-            up_docs = st.file_uploader("ðŸ“ Upload Files", accept_multiple_files=True, type=["pdf","txt","docx"], key="doc_up")
+            up_docs = st.file_uploader("Upload Files", accept_multiple_files=True, type=["pdf","txt","docx"], key="doc_up")
             if up_docs:
                 for f in up_docs:
                     if not any(d["file"]==f.name for d in st.session_state.drive_documents):
@@ -3203,26 +2950,26 @@ if active_tab == "Documents":
                 if st.session_state.drive_documents:
                     from database.vector_db import embed_documents
                     embed_documents([d for d in st.session_state.drive_documents if d.get("content")], "documents")
-                st.success(f"âœ… {len(st.session_state.drive_documents)} documents ready & embedded")
+                st.success(f"{len(st.session_state.drive_documents)} documents ready and embedded")
 
         if st.session_state.drive_documents:
             names = " | ".join(d["file"] for d in st.session_state.drive_documents[:5])
             extra = f" | +{len(st.session_state.drive_documents)-5} more" if len(st.session_state.drive_documents)>5 else ""
             st.markdown(f"**{len(st.session_state.drive_documents)} documents** | {names}{extra}")
-            if st.button("ðŸ—‘ï¸ Clear", key="clr_docs"): st.session_state.drive_documents=[]; st.rerun()
+            if st.button("Clear", key="clr_docs"): st.session_state.drive_documents=[]; st.rerun()
 
         st.divider()
         docs_action = st.selectbox("Document Action", [
-            "ðŸ’¬ Q&A (RAG via ChromaDB)","ðŸ” Search","ðŸ“ Summarize",
-            "ðŸ”Ž Extract Data","âš–ï¸ Compare Two Docs","ðŸ“Š Batch Analyze","ðŸ“‹ List All"
+            "Q&A (RAG via ChromaDB)","Search","Summarize",
+            "Extract Data","Compare Two Docs","Batch Analyze","List All"
         ], key="docs_action")
 
-        if docs_action.startswith("ðŸ’¬"):
+        if docs_action.startswith("Q&A"):
             st.caption("Type your question in the chat bar pinned at the bottom of the page. Your conversation appears at the top of this tab.")
 
-        elif docs_action.startswith("ðŸ”"):
+        elif docs_action.startswith("Search"):
             sq = st.text_input("Search query", key="doc_sq")
-            if st.button("ðŸ” Search", key="doc_srch", use_container_width=True) and sq.strip():
+            if st.button("Search", key="doc_srch", use_container_width=True) and sq.strip():
                 with st.spinner("Searching..."):
                     try:
                         from agents.documents_agent import search_documents
@@ -3231,10 +2978,10 @@ if active_tab == "Documents":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif docs_action.startswith("ðŸ“"):
+        elif docs_action.startswith("Summarize"):
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="sum_sel")
-                if st.button("ðŸ“ Summarize", key="sum_btn", use_container_width=True):
+                if st.button("Summarize", key="sum_btn", use_container_width=True):
                     doc = next((d for d in st.session_state.drive_documents if d["file"]==sel), None)
                     if doc:
                         with st.spinner("Summarizing..."):
@@ -3247,11 +2994,11 @@ if active_tab == "Documents":
             else:
                 st.info("Load documents first.")
 
-        elif docs_action.startswith("ðŸ”Ž"):
+        elif docs_action.startswith("Extract"):
             ext_type = st.selectbox("Extract Type", ["all","dates","amounts","parties","clauses","contacts"], key="ext_t")
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="ext_sel")
-                if st.button("ðŸ”Ž Extract", key="ext_btn", use_container_width=True):
+                if st.button("Extract", key="ext_btn", use_container_width=True):
                     doc = next((d for d in st.session_state.drive_documents if d["file"]==sel), None)
                     if doc:
                         with st.spinner("Extracting..."):

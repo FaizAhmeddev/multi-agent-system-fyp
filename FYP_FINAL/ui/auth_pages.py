@@ -21,10 +21,152 @@ _AUTH_DEFAULTS = {
 }
 
 _AUTH_HEADINGS = {
-    "login": ("🔐", "Welcome back", "Sign in to access your automation workspace."),
-    "signup": ("✨", "Create account", "Register with email verification to get started."),
-    "forgot": ("🔑", "Reset password", "Verify your identity, then choose a new password."),
+    "login": ("Welcome back", "Sign in to access your automation workspace."),
+    "signup": ("Create account", "Register with email verification to get started."),
+    "forgot": ("Reset password", "Verify your identity, then choose a new password."),
 }
+
+_AUTH_CSS = """
+<style>
+/* Login screen only — injected before st.stop() on the auth gate */
+section[data-testid="stSidebar"] { display: none !important; }
+section[data-testid="stSidebar"] ~ div { margin-left: 0 !important; }
+[data-testid="stHeader"] { display: none !important; }
+footer { visibility: hidden !important; height: 0 !important; }
+.stApp {
+    background-color: #050816 !important;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 184, 166, 0.22), transparent 55%),
+        radial-gradient(ellipse 70% 55% at 85% 75%, rgba(124, 58, 237, 0.20), transparent 50%) !important;
+}
+.main .block-container {
+    max-width: 1100px !important;
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+}
+.auth-hero-panel {
+    border-radius: 20px;
+    padding: 2.25rem 2rem;
+    margin-top: 0.5rem;
+    background: linear-gradient(155deg, #0f766e 0%, #1e3a8a 42%, #5b21b6 100%);
+    color: #f8fafc;
+    min-height: 460px;
+    box-shadow: 0 24px 48px -16px rgba(15, 118, 110, 0.45);
+}
+.auth-hero-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #ccfbf1;
+    margin-bottom: 1.25rem;
+}
+.auth-hero-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    margin-bottom: 1.25rem;
+}
+.auth-hero-panel h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.5rem;
+    line-height: 1.15;
+    color: #ffffff !important;
+}
+.auth-hero-panel p {
+    font-size: 15px;
+    color: #e2e8f0 !important;
+    margin: 0 0 1.5rem;
+    line-height: 1.6;
+}
+.auth-feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.auth-feature-list li {
+    font-size: 14px;
+    font-weight: 500;
+    color: #f1f5f9 !important;
+    margin-bottom: 10px;
+    padding-left: 4px;
+}
+.auth-card-header h2 {
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #f1f5f9 !important;
+    margin: 0 0 0.35rem;
+}
+.auth-card-header p {
+    font-size: 13.5px;
+    color: #94a3b8 !important;
+    margin: 0 0 1rem;
+    line-height: 1.5;
+}
+.auth-demo-pill {
+    margin-top: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #99f6e4 !important;
+    background: rgba(20, 184, 166, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.25);
+}
+.auth-footer-note {
+    text-align: center;
+    font-size: 11.5px;
+    color: #64748b !important;
+    margin-top: 0.75rem;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(15, 23, 42, 0.88) !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    border-radius: 20px !important;
+    padding: 1.5rem 1.25rem !important;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.45) !important;
+}
+.stTextInput label, [data-testid="stWidgetLabel"] p {
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+}
+.stTextInput input {
+    background: rgba(2, 6, 23, 0.65) !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    border-radius: 12px !important;
+    color: #f8fafc !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #14b8a6, #6366f1) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+}
+.stButton > button:not([kind="primary"]) {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    color: #e2e8f0 !important;
+    border-radius: 12px !important;
+}
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #94a3b8 !important;
+}
+</style>
+"""
 
 
 def _init_auth_session() -> None:
@@ -33,21 +175,23 @@ def _init_auth_session() -> None:
             st.session_state[k] = v if not isinstance(v, dict) else {}
 
 
+def _inject_auth_styles() -> None:
+    st.markdown(_AUTH_CSS, unsafe_allow_html=True)
+
+
 def _auth_hero_panel() -> None:
     st.markdown(
         """
         <div class="auth-hero-panel">
-            <div class="auth-hero-inner">
-                <div class="auth-hero-badge">Secure enterprise portal</div>
-                <div class="auth-hero-logo">🤖</div>
-                <h1>Office Automation Pro</h1>
-                <p>Multi-agent AI workspace for HR, Finance, IT, and email — powered by orchestrated automation.</p>
-                <ul class="auth-feature-list">
-                    <li><span class="auth-feature-icon">⚡</span> Intelligent agent routing</li>
-                    <li><span class="auth-feature-icon">🛡️</span> Role-based secure access</li>
-                    <li><span class="auth-feature-icon">📊</span> Real-time dashboards & history</li>
-                </ul>
-            </div>
+            <div class="auth-hero-badge">Secure enterprise portal</div>
+            <div class="auth-hero-logo">🤖</div>
+            <h1>Office Automation Pro</h1>
+            <p>Multi-agent AI workspace for HR, Finance, IT, and email — powered by orchestrated automation.</p>
+            <ul class="auth-feature-list">
+                <li>⚡ Intelligent agent routing</li>
+                <li>🛡️ Role-based secure access</li>
+                <li>📊 Real-time dashboards &amp; history</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -56,13 +200,12 @@ def _auth_hero_panel() -> None:
 
 def _auth_card_header() -> None:
     screen = st.session_state.auth_screen
-    icon, title, subtitle = _AUTH_HEADINGS.get(
-        screen, ("🔐", "Sign in", "Access your workspace.")
+    title, subtitle = _AUTH_HEADINGS.get(
+        screen, ("Sign in", "Access your workspace.")
     )
     st.markdown(
         f"""
         <div class="auth-card-header">
-            <div class="auth-card-icon">{icon}</div>
             <h2>{title}</h2>
             <p>{subtitle}</p>
         </div>
@@ -73,7 +216,7 @@ def _auth_card_header() -> None:
 
 def _auth_secondary_links() -> None:
     screen = st.session_state.auth_screen
-    st.markdown('<div class="auth-divider"></div>', unsafe_allow_html=True)
+    st.divider()
     if screen == "login":
         c1, c2 = st.columns(2)
         with c1:
@@ -373,34 +516,28 @@ def render_auth_gate(*, new_session_id_fn, record_login_fn) -> None:
         return
 
     _init_auth_session()
+    _inject_auth_styles()
 
-    st.markdown('<div class="auth-page-wrap">', unsafe_allow_html=True)
-
-    hero_col, form_col = st.columns([1.05, 1], gap="medium")
+    hero_col, form_col = st.columns([1, 1], gap="large")
 
     with hero_col:
         _auth_hero_panel()
 
     with form_col:
-        st.markdown('<div class="auth-form-shell">', unsafe_allow_html=True)
-        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-        _auth_card_header()
-        screen = st.session_state.auth_screen
-        if screen == "login":
-            _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
-        elif screen == "signup":
-            _render_signup()
-        elif screen == "forgot":
-            _render_forgot()
-        _auth_secondary_links()
-        st.markdown(
-            '<p class="auth-footer-note">Protected by role-based access · KIET Automation Suite</p>',
-            unsafe_allow_html=True,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            _auth_card_header()
+            screen = st.session_state.auth_screen
+            if screen == "login":
+                _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
+            elif screen == "signup":
+                _render_signup()
+            elif screen == "forgot":
+                _render_forgot()
+            _auth_secondary_links()
+            st.markdown(
+                '<p class="auth-footer-note">Protected by role-based access · KIET Automation Suite</p>',
+                unsafe_allow_html=True,
+            )
 
     if is_hosted_deploy() and not (OPENAI_API_KEY or "").strip():
         st.warning(
