@@ -55,7 +55,7 @@ import streamlit as st
 st.set_page_config(
     page_title="Office Automation Agents Pro",
     layout="wide", page_icon=None,
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -113,21 +113,22 @@ refresh_config_from_env()
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 :root {
-    --bg: #f8fafc;
+    --bg: #f4f7fb;
     --surface: #ffffff;
-    --border: #e2e8f0;
+    --surface-2: #f8fafc;
+    --border: #dbe3ee;
     --text: #0f172a;
-    --muted: #64748b;
-    --primary: #4f46e5;
-    --primary-dark: #3730a3;
-    --primary-light: #818cf8;
-    --accent: #0ea5e9;
-    --accent-light: #e0f2fe;
-    --success: #10b981;
+    --muted: #5f6b7a;
+    --primary: #1d4ed8;
+    --primary-dark: #1e3a8a;
+    --primary-light: #60a5fa;
+    --accent: #0f766e;
+    --accent-light: #ccfbf1;
+    --success: #059669;
     --success-bg: #ecfdf5;
-    --warning: #f59e0b;
+    --warning: #d97706;
     --warning-bg: #fffbeb;
-    --danger: #ef4444;
+    --danger: #dc2626;
     --danger-bg: #fef2f2;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
@@ -152,8 +153,85 @@ st.markdown("""<style>
 .main { padding-top: 0.4rem; background: transparent; }
 .stApp {
     background-color: var(--bg);
-    background-image: radial-gradient(rgba(148, 163, 184, 0.12) 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
+    background-image:
+        radial-gradient(circle at top left, rgba(29, 78, 216, 0.12), transparent 25%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.10), transparent 22%),
+        linear-gradient(180deg, #f8fbff 0%, #f4f7fb 46%, #eef3f8 100%);
+    background-attachment: fixed;
+}
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+section[data-testid="stSidebar"] * {
+    color: #e2e8f0 !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
+.sidebar-hero {
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
+    padding: 18px 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    box-shadow: 0 20px 40px rgba(2, 6, 23, 0.22);
+}
+.sidebar-title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin: 0 0 4px 0;
+}
+.sidebar-subtitle {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 0;
+}
+.sidebar-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-card {
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.04);
+}
+.sidebar-card b { color: #f8fafc; }
+.sidebar-card small { color: #94a3b8; }
+.nav-card {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.nav-card strong { display: block; color: #f8fafc; margin-bottom: 2px; }
+.nav-card span { color: #cbd5e1; font-size: 12px; }
+.nav-chip {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(96, 165, 250, 0.15);
+    color: #bfdbfe;
+}
+.section-link {
+    color: #93c5fd !important;
+    text-decoration: none !important;
 }
 
 /* Custom buttons */
@@ -481,6 +559,17 @@ div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>""", unsafe_allow_html=True)
+
+_SIDEBAR_NAV = [
+    ("Assistant", "Unified orchestrator and chat entry point", "Orchestrator"),
+    ("Dashboard", "Live system health and usage", "Overview"),
+    ("IT Support", "Tickets and troubleshooting", "IT"),
+    ("Email", "Inbox, drafts, and send flows", "A2A"),
+    ("HR", "Hiring workflows and policy Q&A", "HR"),
+    ("Finance", "Budgets, invoices, and reports", "Finance"),
+    ("Documents", "Drive, RAG, and batch document tools", "MCP"),
+    ("History", "Threads, tasks, and login audit", "Archive"),
+]
 
 # ── Session defaults ──────────────────────────────────────────────────────────
 _defs = {
@@ -1142,6 +1231,68 @@ with c3:
             st.session_state[k] = None
         st.session_state.orch_chat = []
         st.rerun()
+
+with st.sidebar:
+    st.markdown(
+        f"""
+        <div class="sidebar-hero">
+            <div class="sidebar-title">Office Automation Pro</div>
+            <div class="sidebar-subtitle">A polished multi-agent workspace</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <div class="sidebar-section sidebar-card">
+            <b>{st.session_state.user_name}</b><br>
+            <small>{st.session_state.user_role} · @{st.session_state.username}</small>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Workspace navigation")
+    for tab_name, description, chip in _SIDEBAR_NAV:
+        if tab_name in get_visible_tabs_for_role(st.session_state.user_role):
+            st.markdown(
+                f"""
+                <a class="nav-card section-link" href="#{tab_name.lower().replace(' ', '-')}" target="_self">
+                    <strong>{tab_name}</strong>
+                    <span>{description}</span><br>
+                    <span class="nav-chip">{chip}</span>
+                </a>
+                """,
+                unsafe_allow_html=True,
+            )
+    st.markdown('<div class="sidebar-section"></div>', unsafe_allow_html=True)
+    st.caption("Quick status")
+    st.markdown(
+        f"""
+        <div class="sidebar-card">
+            <b>OpenAI</b><br>
+            <small>{"Connected" if OPENAI_API_KEY else "Not configured"}</small>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <div class="sidebar-card">
+            <b>Google Drive</b><br>
+            <small>{"Connected" if is_google_drive_configured() else "Not configured"}</small>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <div class="sidebar-card">
+            <b>Gmail</b><br>
+            <small>{"Connected" if is_gmail_configured() else "Not configured"}</small>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ── Tabs (RBAC: visible labels depend on role) ──────────────────────────────────
 tab_labels = get_visible_tabs_for_role(st.session_state.user_role)

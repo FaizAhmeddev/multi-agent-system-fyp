@@ -10,6 +10,7 @@ sys.path.insert(0, ROOT)
 
 from config import get_role_orchestrator_allowlist, load_local_env
 from Orchestrator.orchestrator_brain import Orchestrator
+from tools.hr_email_intelligence import parse_email_search_prompt
 from utils.logging_config import configure_logging
 
 load_local_env()
@@ -90,6 +91,23 @@ def main() -> int:
     Orchestrator._invoke_agent = _mock_invoke  # type: ignore[method-assign]
     orch = Orchestrator()
     failures = 0
+    parser_cases = [
+        ("fetch last 2 emails from our mailbox", {"max_results": 2, "sender": ""}),
+        ("fetch last 2 emails from my inbox", {"max_results": 2, "sender": ""}),
+        ("fetch last 2 emails from ali@example.com", {"max_results": 2, "sender": "ali@example.com"}),
+        ("show last 2 emails", {"max_results": 2, "sender": ""}),
+        ("read the last 2 messages in gmail", {"max_results": 2, "sender": ""}),
+    ]
+
+    print("\n=== Parser regressions ===")
+    for prompt, expected in parser_cases:
+        spec = parse_email_search_prompt(prompt) or {}
+        ok = all(spec.get(k) == v for k, v in expected.items())
+        status = "OK" if ok else "FAIL"
+        if status == "FAIL":
+            failures += 1
+        print(f"  [{status}] {prompt!r} -> max={spec.get('max_results')} sender={spec.get('sender')!r}")
+
     followup_prompt = (
         "Complete below jobs\n"
         "1. send a email for Huzaifa to welcome to join KIET\n"
@@ -120,6 +138,21 @@ def main() -> int:
             if status == "FAIL":
                 preview = (result.get("final_answer") or "")[:120].replace("\n", " ")
                 print(f"         answer: {preview}...")
+
+        inbox_prompt = "fetch last 2 emails"
+        result = orch.route(
+            inbox_prompt,
+            user_name="TestUser",
+            use_llm_intent=True,
+            allowed_agents=allow,
+            user_role=role,
+        )
+        used = set(result.get("agents_used") or [])
+        ok = used == {"hr_gmail"} or (role == "Assistant" and not used)
+        status = "OK" if ok else "FAIL"
+        if status == "FAIL":
+            failures += 1
+        print(f"  [{status}] inbox prompt expected=['hr_gmail'] got={sorted(used)}")
 
         result = orch.route(
             "huzaifa@example.com",

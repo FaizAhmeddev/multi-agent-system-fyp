@@ -297,6 +297,20 @@ def parse_email_search_prompt(message: str) -> dict[str, Any] | None:
     sem = re.search(r"(?:from|sender)\s+([a-z0-9._@\s-]{3,80})", low, re.I)
     if sem:
         candidate_sender = sem.group(1).strip()
+        candidate_sender = re.split(
+            r"\b(?:with|where|that|which|containing|about|mentioning|subject|on|since|after|before)\b",
+            candidate_sender,
+            maxsplit=1,
+        )[0].strip(" .,-")
+        if re.fullmatch(
+            r"(?:"
+            r"(?:my|our|the)?\s*(?:inbox|mailbox|mail\s*box|gmail|email|e-mail|mail)"
+            r"|last\s+\d+\s+(?:e-?mails?|emails?|messages?)"
+            r")",
+            candidate_sender,
+            re.I,
+        ):
+            candidate_sender = ""
         # "fetch … from last 10 emails" is an inbox window, not a sender filter
         if not re.search(
             r"\blast\s+\d+\s+(?:e-?mails?|emails?|messages?)\b", candidate_sender, re.I

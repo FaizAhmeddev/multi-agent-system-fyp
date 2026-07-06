@@ -332,31 +332,20 @@ def _parallel_multi_task_preflight(
 
     limitations: list[str] = []
     clarify_prefix = ""
-    if "email" in agents and not facts.get("email"):
-        recipient_name = facts.get("name") or ""
-        if not recipient_name:
-            for line in assigned.get("email") or []:
-                recipient_name = _parse_compose_recipient_name(line)
-                if recipient_name:
-                    break
-        if recipient_name:
-            clarify_prefix = (
-                f"Before I can send emails to **{recipient_name}**, please share their **email address**.\n\n"
-                "I'll still run your other tasks in parallel and prepare email drafts meanwhile."
+    if onboarding:
+        clarify_prefix = _build_onboarding_clarification(facts, msg)
+        if clarify_prefix:
+            limitations.append(
+                "Onboarding details are incomplete; collect all missing facts before running agents."
             )
-        else:
-            clarify_prefix = (
-                "Before I can send the requested emails, please share the recipient's **full name** "
-                "or **email address**.\n\n"
-                "I'll still run your other tasks in parallel and prepare email drafts meanwhile."
-            )
-        limitations.append(
-            "Recipient email not in the thread; email agent will draft until an address is provided."
-        )
-    if onboarding and not facts.get("salary") and "finance" in agents:
-        limitations.append(
-            "Salary not specified; finance will use placeholders in payroll breakdown."
-        )
+            return {
+                "proceed": False,
+                "message": clarify_prefix,
+                "agents": [],
+                "agent_tasks": {},
+                "limitations": limitations,
+                "clarify_prefix": clarify_prefix,
+            }
 
     return {
         "proceed": True,
@@ -373,6 +362,47 @@ def _facts_context_block(facts: dict[str, str]) -> str:
         return ""
     lines = [f"- {k.replace('_', ' ').title()}: {v}" for k, v in facts.items()]
     return "Known employee facts from this thread (use these — do not ask again):\n" + "\n".join(lines) + "\n\n"
+
+
+def _onboarding_missing_facts(facts: dict[str, str], msg: str) -> list[str]:
+    """Return onboarding facts that are still missing from the thread."""
+    low = (msg or "").lower()
+
+    def _has_date_like(text: str) -> bool:
+        return bool(
+            re.search(r"\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b", text)
+            or re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
+            or re.search(r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow)\b", text)
+        )
+
+    missing: list[str] = []
+    if not facts.get("name"):
+        missing.append("full name")
+    if not facts.get("designation"):
+        missing.append("job title / designation")
+    if not facts.get("department"):
+        missing.append("department")
+    if not facts.get("salary"):
+        missing.append("salary")
+    if not facts.get("joining_date") and not facts.get("joining_day") and not _has_date_like(low):
+        missing.append("start date / joining date")
+    if not facts.get("email"):
+        missing.append("email address")
+    return missing
+
+
+def _build_onboarding_clarification(facts: dict[str, str], msg: str) -> str:
+    missing = _onboarding_missing_facts(facts, msg)
+    if not missing:
+        return ""
+    if len(missing) == 1:
+        return f"Please provide the employee's **{missing[0]}**."
+    items = ", ".join(f"**{item}**" for item in missing[:-1]) + f", and **{missing[-1]}**"
+    return (
+        "I need a few missing onboarding details before I can continue: "
+        f"{items}.\n\n"
+        "Please send them together, and then I’ll run the workflow."
+    )
 
 
 def _parse_compose_recipient_name(message: str) -> str:
@@ -991,7 +1021,17 @@ def _assistant_preflight_result(
                 }
 
     if _is_parallel_multi_task_request(msg, conversation_history):
-        return _parallel_multi_task_preflight(msg, conversation_history)
+        plan = _parallel_multi_task_preflight(msg, conversation_history)
+        if plan.get("clarify_prefix"):
+            return {
+                "proceed": False,
+                "message": plan["clarify_prefix"],
+                "agents": [],
+                "agent_tasks": {},
+                "limitations": plan.get("limitations") or [],
+                "clarify_prefix": plan["clarify_prefix"],
+            }
+        return plan
 
     if _is_compose_to_person_request(msg, conversation_history):
         compose_check = validate_compose_email_request(msg, conversation_history)
@@ -1007,6 +1047,8 @@ def _assistant_preflight_result(
             "limitations": [],
         }
         if not compose_check.get("ok") and compose_check.get("clarify_message"):
+            out["proceed"] = False
+            out["message"] = compose_check["clarify_message"]
             out["clarify_prefix"] = compose_check["clarify_message"]
         return out
 
@@ -1192,6 +1234,18 @@ def _pre_route_intent(
 
     if _is_parallel_multi_task_request(user_message, conversation_history):
         return None
+
+    from tools.hr_email_intelligence import message_looks_like_gmail_ops
+
+    if re.search(
+        r"\b(?:expense|expenses|budget|invoice|revenue|sales|profit|loss|cost|costs|payroll|salary|finance|financial)\b",
+        user_message,
+        re.I,
+    ):
+        return None
+
+    if message_looks_like_gmail_ops(user_message):
+        return ["hr_gmail"]
 
     hr_mail_intent = classify_hr_email_intent(user_message)
     if hr_mail_intent in ("inbox_browse", "cv_inventory", "cv_shortlist"):
@@ -2097,6 +2151,38 @@ class Orchestrator:
 
         from tools.hr_email_intelligence import message_looks_like_gmail_ops
 
+        if re.search(
+            r"\b(?:expense|expenses|budget|invoice|revenue|sales|profit|loss|cost|costs|payroll|salary|finance|financial)\b",
+            user_message,
+            re.I,
+        ):
+            message_looks_like_gmail_ops = lambda _msg: False  # type: ignore[assignment]
+
+        if message_looks_like_gmail_ops(user_message) and not _should_skip_gmail_shortcircuit(
+            user_message, routing_history
+        ):
+            routing_path = "hr_gmail_shortcut:message_looks_like_gmail_ops"
+            hr_gmail = self._route_hr_gmail(
+                user_message=user_message,
+                user_name=user_name,
+                user_role=user_role,
+                conversation_history=routing_history,
+                allowed_agents=allowed_agents,
+                start_time=start_time,
+            )
+            if hr_gmail is not None:
+                _log_route_trace(
+                    user_message=user_message,
+                    user_role=user_role,
+                    allowed_agents=allowed_agents,
+                    routing_path=routing_path,
+                    agents_before_filter=["hr_gmail"],
+                    agents_used=hr_gmail.get("agents_used") or ["hr_gmail"],
+                    final_answer=hr_gmail.get("final_answer") or "",
+                    pre_route_hint=pre_route_hint,
+                )
+                return hr_gmail
+
         if not use_llm_intent and not _should_skip_gmail_shortcircuit(user_message, routing_history):
             if message_looks_like_gmail_ops(user_message):
                 routing_path = "hr_gmail_shortcut:message_looks_like_gmail_ops"
@@ -2177,6 +2263,26 @@ class Orchestrator:
         agents = _finalize_agent_routing(
             user_message, agents, routing_history, attachments
         )
+        if clarify_prefix:
+            elapsed = round((time.time() - start_time) * 1000)
+            _log_route_trace(
+                user_message=user_message,
+                user_role=user_role,
+                allowed_agents=allowed_agents,
+                routing_path=f"{routing_path}:clarification_required",
+                agents_before_filter=agents_before_filter,
+                agents_after_filter=agents,
+                blocked=[],
+                agents_used=[],
+                final_answer=clarify_prefix,
+                pre_route_hint=pre_route_hint,
+            )
+            return self._scoped_route_result(
+                start_time=start_time,
+                agents_used=[],
+                final_answer=clarify_prefix,
+                responses={},
+            )
         if not self._agent_tasks.get("email") and agents == ["email"]:
             self._agent_tasks.setdefault("email", user_message.strip())
 
