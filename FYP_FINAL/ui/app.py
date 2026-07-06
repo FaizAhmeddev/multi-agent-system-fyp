@@ -1,4 +1,4 @@
-"""
+﻿"""
 UI/APP.PY 
 ==========================================================
 Tabs: Login | Assistant (orchestrator) | Dashboard | specialist tools | History
@@ -9,12 +9,6 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-
-try:
-    from utils.logging_config import configure_logging
-    configure_logging()
-except Exception:
-    pass
 
 # Local dev: load FYP_FINAL/.env before Streamlit / config read credentials
 try:
@@ -54,7 +48,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Office Automation Agents Pro",
-    layout="wide", page_icon=None,
+    layout="wide", page_icon="ðŸ¤–",
     initial_sidebar_state="expanded",
 )
 
@@ -69,7 +63,7 @@ def _hydrate_streamlit_secrets_into_environ() -> None:
         sec = st.secrets
         items = sec.items()
     except FileNotFoundError:
-        # No secrets.toml — normal for local dev when using .env instead
+        # No secrets.toml â€” normal for local dev when using .env instead
         return
     except Exception:
         return
@@ -109,31 +103,31 @@ from config import (
 
 refresh_config_from_env()
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+# â”€â”€ CSS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 :root {
-    --bg: #f4f7fb;
-    --surface: #ffffff;
-    --surface-2: #f8fafc;
-    --border: #dbe3ee;
-    --text: #0f172a;
-    --muted: #5f6b7a;
-    --primary: #1d4ed8;
-    --primary-dark: #1e3a8a;
-    --primary-light: #60a5fa;
-    --accent: #0f766e;
-    --accent-light: #ccfbf1;
-    --success: #059669;
-    --success-bg: #ecfdf5;
-    --warning: #d97706;
-    --warning-bg: #fffbeb;
-    --danger: #dc2626;
-    --danger-bg: #fef2f2;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+    --bg: #0b1220;
+    --surface: #141d30;
+    --surface-2: #1b2740;
+    --border: #28344d;
+    --text: #e8edf6;
+    --muted: #94a3b8;
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --primary-light: #818cf8;
+    --accent: #38bdf8;
+    --accent-light: #0c4a6e;
+    --success: #34d399;
+    --success-bg: #06281f;
+    --warning: #fbbf24;
+    --warning-bg: #2a2008;
+    --danger: #f87171;
+    --danger-bg: #2a1115;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.40);
+    --shadow-lg: 0 12px 24px -6px rgba(0, 0, 0, 0.50);
+    --shadow-xl: 0 24px 40px -10px rgba(0, 0, 0, 0.55);
     --radius-sm: 6px;
     --radius-md: 12px;
     --radius-lg: 18px;
@@ -154,84 +148,11 @@ st.markdown("""<style>
 .stApp {
     background-color: var(--bg);
     background-image:
-        radial-gradient(circle at top left, rgba(29, 78, 216, 0.12), transparent 25%),
-        radial-gradient(circle at top right, rgba(15, 118, 110, 0.10), transparent 22%),
-        linear-gradient(180deg, #f8fbff 0%, #f4f7fb 46%, #eef3f8 100%);
+        radial-gradient(900px 500px at 12% -8%, rgba(99,102,241,0.16), transparent 60%),
+        radial-gradient(800px 500px at 100% 0%, rgba(56,189,248,0.10), transparent 55%),
+        radial-gradient(rgba(148, 163, 184, 0.07) 1.4px, transparent 1.4px);
+    background-size: auto, auto, 24px 24px;
     background-attachment: fixed;
-}
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-}
-section[data-testid="stSidebar"] * {
-    color: #e2e8f0 !important;
-}
-section[data-testid="stSidebar"] .stButton > button {
-    background: rgba(255, 255, 255, 0.05) !important;
-    color: #e2e8f0 !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
-    box-shadow: none !important;
-}
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255, 255, 255, 0.10) !important;
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-}
-.sidebar-hero {
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 18px;
-    padding: 18px 16px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-    box-shadow: 0 20px 40px rgba(2, 6, 23, 0.22);
-}
-.sidebar-title {
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 4px 0;
-}
-.sidebar-subtitle {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-bottom: 0;
-}
-.sidebar-section {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(255,255,255,0.08);
-}
-.sidebar-card {
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 14px;
-    padding: 12px 14px;
-    margin-bottom: 8px;
-    background: rgba(255,255,255,0.04);
-}
-.sidebar-card b { color: #f8fafc; }
-.sidebar-card small { color: #94a3b8; }
-.nav-card {
-    display: block;
-    padding: 10px 12px;
-    border-radius: 12px;
-    margin-bottom: 8px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-}
-.nav-card strong { display: block; color: #f8fafc; margin-bottom: 2px; }
-.nav-card span { color: #cbd5e1; font-size: 12px; }
-.nav-chip {
-    display: inline-block;
-    margin-top: 8px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    background: rgba(96, 165, 250, 0.15);
-    color: #bfdbfe;
-}
-.section-link {
-    color: #93c5fd !important;
-    text-decoration: none !important;
 }
 
 /* Custom buttons */
@@ -294,19 +215,259 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     border-bottom: none !important;
 }
 
-/* Auth login (lightweight) */
-.auth-brand { text-align: center; margin: 2rem 0 1rem; }
-.auth-brand h1 {
-    font-size: 1.65rem; font-weight: 800; color: #1e293b;
-    margin: 0; letter-spacing: -0.03em;
+/* ===== Auth / login screen (enterprise portal) ===== */
+body:has(.auth-page-wrap) [data-testid="stSidebar"],
+body:has(.auth-page-wrap) [data-testid="stHeader"],
+body:has(.auth-page-wrap) footer,
+body:has(.auth-page-wrap) [data-testid="stToolbar"] {
+    display: none !important;
 }
-.auth-brand p { font-size: 13px; color: #64748b; margin: 6px 0 0; }
+body:has(.auth-page-wrap) .main .block-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+}
+body:has(.auth-page-wrap) .stApp {
+    background: #050816 !important;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 184, 166, 0.22), transparent 55%),
+        radial-gradient(ellipse 70% 55% at 85% 75%, rgba(124, 58, 237, 0.20), transparent 50%),
+        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(244, 63, 94, 0.08), transparent 45%) !important;
+}
+.auth-page-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+}
+.auth-hero-panel {
+    position: relative;
+    border-radius: 0 28px 28px 0;
+    padding: 3rem 2.5rem;
+    background: linear-gradient(155deg, #0f766e 0%, #1e3a8a 42%, #5b21b6 100%);
+    color: #f8fafc;
+    overflow: hidden;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 30px 60px -20px rgba(15, 118, 110, 0.45);
+}
+.auth-hero-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.14), transparent 42%),
+        radial-gradient(circle at 80% 70%, rgba(45, 212, 191, 0.18), transparent 40%);
+    pointer-events: none;
+}
+.auth-hero-panel::after {
+    content: "";
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    right: -80px;
+    bottom: -80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+}
+.auth-hero-inner { position: relative; z-index: 1; }
+.auth-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #ccfbf1;
+    margin-bottom: 1.25rem;
+}
+.auth-hero-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    backdrop-filter: blur(8px);
+    margin-bottom: 1.25rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.auth-hero-panel h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.5rem;
+    line-height: 1.15;
+    color: #ffffff;
+}
+.auth-hero-panel p {
+    font-size: 15px;
+    color: rgba(226, 232, 240, 0.88);
+    margin: 0 0 1.75rem;
+    line-height: 1.6;
+    max-width: 340px;
+}
+.auth-feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.auth-feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: rgba(241, 245, 249, 0.92);
+}
+.auth-feature-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    flex-shrink: 0;
+}
+.auth-form-shell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    min-height: 520px;
+}
 .auth-card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    padding: 8px 4px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
+    width: 100%;
+    max-width: 420px;
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 22px;
+    padding: 2rem 1.75rem 1.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow:
+        0 24px 48px -12px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.auth-card-header { margin-bottom: 1.25rem; }
+.auth-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 0.85rem;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.25), rgba(99, 102, 241, 0.25));
+    border: 1px solid rgba(45, 212, 191, 0.35);
+}
+.auth-card-header h2 {
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #f1f5f9;
+    margin: 0 0 0.35rem;
+}
+.auth-card-header p {
+    font-size: 13.5px;
+    color: #94a3b8;
+    margin: 0;
+    line-height: 1.5;
+}
+.auth-demo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #99f6e4;
+    background: rgba(20, 184, 166, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.25);
+}
+.auth-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(148,163,184,0.25), transparent);
+    margin: 1.25rem 0 0.75rem;
+}
+.auth-footer-note {
+    text-align: center;
+    font-size: 11.5px;
+    color: #64748b;
+    margin-top: 1rem;
+}
+body:has(.auth-page-wrap) .stTextInput label,
+body:has(.auth-page-wrap) [data-testid="stWidgetLabel"] p {
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+}
+body:has(.auth-page-wrap) .stTextInput input {
+    background: rgba(2, 6, 23, 0.65) !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    border-radius: 12px !important;
+    color: #f8fafc !important;
+    padding: 0.65rem 0.85rem !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+body:has(.auth-page-wrap) .stTextInput input:focus {
+    border-color: #2dd4bf !important;
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18) !important;
+}
+body:has(.auth-page-wrap) .stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #14b8a6, #6366f1) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 0.7rem 1.25rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
+    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.35) !important;
+}
+body:has(.auth-page-wrap) .stButton > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #0d9488, #4f46e5) !important;
+    box-shadow: 0 12px 28px rgba(99, 102, 241, 0.4) !important;
+}
+body:has(.auth-page-wrap) .stButton > button:not([kind="primary"]) {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    color: #e2e8f0 !important;
+    border-radius: 12px !important;
+}
+body:has(.auth-page-wrap) .stButton > button:not([kind="primary"]):hover {
+    background: rgba(51, 65, 85, 0.75) !important;
+    border-color: rgba(45, 212, 191, 0.35) !important;
+    color: #ffffff !important;
+}
+body:has(.auth-page-wrap) [data-testid="stVerticalBlockBorderWrapper"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+body:has(.auth-page-wrap) .stCaption,
+body:has(.auth-page-wrap) [data-testid="stCaptionContainer"] {
+    color: #94a3b8 !important;
+}
+@media (max-width: 900px) {
+    .auth-hero-panel { border-radius: 0; min-height: auto; padding: 2rem 1.5rem; }
+    .auth-form-shell { min-height: auto; padding: 1.5rem 1rem 2.5rem; }
 }
 
 /* Floating Glassmorphic Header */
@@ -560,21 +721,283 @@ div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>""", unsafe_allow_html=True)
 
-_SIDEBAR_NAV = [
-    ("Assistant", "Unified orchestrator and chat entry point", "Orchestrator"),
-    ("Dashboard", "Live system health and usage", "Overview"),
-    ("IT Support", "Tickets and troubleshooting", "IT"),
-    ("Email", "Inbox, drafts, and send flows", "A2A"),
-    ("HR", "Hiring workflows and policy Q&A", "HR"),
-    ("Finance", "Budgets, invoices, and reports", "Finance"),
-    ("Documents", "Drive, RAG, and batch document tools", "MCP"),
-    ("History", "Threads, tasks, and login audit", "Archive"),
-]
+# â”€â”€ Sidebar navigation + layout polish â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+st.markdown("""<style>
+/* ===== Sidebar shell ===== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #111c33 55%, #0b1426 100%) !important;
+    border-right: 1px solid rgba(148,163,184,0.12) !important;
+    width: 290px !important;
+}
+section[data-testid="stSidebar"] > div { padding-top: 0.6rem !important; }
+section[data-testid="stSidebar"] * { color: #e2e8f0; }
 
-# ── Session defaults ──────────────────────────────────────────────────────────
+/* Brand */
+.side-brand {
+    display:flex; align-items:center; gap:12px;
+    padding: 6px 6px 16px; margin-bottom: 4px;
+    border-bottom: 1px solid rgba(148,163,184,0.14);
+}
+.side-logo {
+    width:42px; height:42px; border-radius:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:22px;
+    background: linear-gradient(135deg,#6366f1,#8b5cf6);
+    box-shadow: 0 6px 16px rgba(99,102,241,0.4);
+}
+.side-title { font-size:15px; font-weight:800; letter-spacing:-0.02em; color:#f8fafc; }
+.side-sub   { font-size:11px; color:#94a3b8; margin-top:2px; }
+
+.side-nav-label {
+    font-size:10.5px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+    color:#64748b; margin: 14px 6px 8px;
+}
+
+/* Nav buttons (override global button look inside sidebar) */
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: #cbd5e1 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 11px 14px !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    margin-bottom: 2px !important;
+    transition: all 0.15s ease !important;
+}
+section[data-testid="stSidebar"] .stButton > button > div { justify-content:flex-start !important; }
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(148,163,184,0.12) !important;
+    border-color: rgba(148,163,184,0.18) !important;
+    color: #ffffff !important;
+    transform: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, rgba(99,102,241,0.95), rgba(139,92,246,0.95)) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 6px 16px rgba(99,102,241,0.35) !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+    transform: none !important;
+    box-shadow: 0 8px 20px rgba(99,102,241,0.45) !important;
+}
+
+.side-divider { height:1px; background:rgba(148,163,184,0.14); margin:16px 4px; }
+
+.side-pills { display:flex; gap:6px; flex-wrap:wrap; margin: 0 4px 12px; }
+
+/* User card */
+.side-user {
+    display:flex; align-items:center; gap:11px;
+    background: rgba(148,163,184,0.10);
+    border:1px solid rgba(148,163,184,0.16);
+    border-radius:12px; padding:10px 12px; margin: 0 4px;
+}
+.side-avatar {
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:15px; color:#fff;
+    background: linear-gradient(135deg,#0ea5e9,#6366f1);
+}
+.side-user-name { font-size:13.5px; font-weight:700; color:#f1f5f9; line-height:1.2; }
+.side-user-role { font-size:11px; color:#94a3b8; margin-top:2px; }
+.side-stack { font-size:10.5px; color:#64748b; margin:8px 6px 12px; }
+
+/* ===== Main page heading ===== */
+.page-head {
+    display:flex; align-items:center; gap:12px;
+    margin: 2px 0 16px; padding-bottom:14px;
+    border-bottom:1px solid var(--border);
+}
+.page-head-icon {
+    width:40px; height:40px; border-radius:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    box-shadow: 0 6px 16px rgba(79,70,229,0.28);
+}
+.page-head-title { font-size:1.55rem; font-weight:800; letter-spacing:-0.03em; color:var(--text); }
+
+/* Block container width breathing room */
+.block-container { padding-top: 1.4rem !important; max-width: 1400px; }
+
+/* Metric cards (native st.metric) polish */
+[data-testid="stMetric"] {
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+[data-testid="stMetric"]:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+    border-color: var(--primary-light);
+}
+[data-testid="stMetricValue"] { font-weight:800 !important; color:var(--primary-dark) !important; }
+
+/* Inputs */
+[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
+[data-baseweb="select"] > div {
+    border-radius: 10px !important;
+}
+
+/* Expanders */
+[data-testid="stExpander"] {
+    border:1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+    overflow:hidden;
+}
+
+/* ===== Pinned chat input bar (Assistant) â€” ChatGPT / Claude style ===== */
+[data-testid="stChatInput"] {
+    background: transparent !important;
+    /* background: rgba(248, 250, 252, 0.85) !important; */
+    backdrop-filter: none !important;
+    border-top: none !important;
+    padding-bottom: 10px !important;
+}
+[data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] { background: transparent !important; }
+[data-testid="stChatInput"] > div {
+    max-width: 820px !important;
+    margin: 0 auto !important;
+}
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] > div > div {
+    border-radius: 16px !important;
+}
+[data-testid="stChatInput"] textarea {
+    font-size: 15px !important;
+}
+/* leave room so messages don't hide behind the fixed bar */
+[data-testid="stAppViewBlockContainer"], .block-container { padding-bottom: 120px !important; }
+
+/* ===== Chat panel: roomier + subtle scroll ===== */
+.chat-panel { max-width: 880px; margin-left:auto; margin-right:auto; }
+
+/* ===== Alerts (info / success / warning / error) ===== */
+[data-testid="stAlert"] {
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* ===== Plotly / native charts as cards ===== */
+[data-testid="stPlotlyChart"], [data-testid="stVegaLiteChart"], .stPlotlyChart {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 8px;
+}
+
+/* ===== Dataframes ===== */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* ===== Download buttons ===== */
+[data-testid="stDownloadButton"] > button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+
+/* ===== Inner tabs (e.g. finance preview) ===== */
+.stTabs [data-baseweb="tab-list"] { border-radius: var(--radius-md) !important; }
+
+/* ===== Dividers / captions ===== */
+hr { border-color: var(--border) !important; opacity: 0.7; }
+[data-testid="stCaptionContainer"], .stCaption { color: var(--muted) !important; }
+
+/* ===== File uploader dropzone ===== */
+[data-testid="stFileUploaderDropzone"] {
+    border-radius: var(--radius-md) !important;
+    border: 1.5px dashed var(--border) !important;
+    background: rgba(255,255,255,0.03) !important;
+}
+
+/* ===================================================================== */
+/* DARK THEME OVERRIDES â€” custom components that used hardcoded light hues */
+/* ===================================================================== */
+.chat-panel {
+    background: rgba(20, 29, 48, 0.6) !important;
+    border-color: var(--border) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+.chat-agent {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+.thread-bar {
+    background: linear-gradient(90deg, rgba(52,211,153,0.10), rgba(20,29,48,0.6)) !important;
+    border-color: rgba(52,211,153,0.30) !important;
+    color: #86efac !important;
+}
+.metric-card, .agent-status-card, .cand-card, .hist-row, .qmsg, .notif {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+.metric-card:hover, .agent-status-card:hover, .cand-card:hover {
+    border-color: var(--primary) !important;
+}
+.resp-box {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+.sec-hdr {
+    color: var(--text) !important;
+    background: linear-gradient(90deg, rgba(99,102,241,0.10), transparent) !important;
+}
+.a2a-flow {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+}
+.a2a-agent { color: var(--primary-light) !important; }
+.score-bar { background: var(--surface-2) !important; }
+.main-header { background: rgba(2, 6, 18, 0.6) !important; }
+
+/* Native widgets / containers on dark */
+[data-testid="stMetric"] { background: var(--surface) !important; border-color: var(--border) !important; }
+[data-testid="stMetricValue"] { color: var(--primary-light) !important; }
+[data-testid="stExpander"] { background: var(--surface) !important; }
+[data-testid="stExpander"] summary { color: var(--text) !important; }
+[data-testid="stDataFrame"] { background: var(--surface) !important; }
+.stTextInput input, .stTextArea textarea, [data-baseweb="select"] > div, [data-baseweb="input"] {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+[data-testid="stChatInput"] { background: transparent !important; }
+[data-testid="stChatInput"] textarea, [data-testid="stChatInput"] > div > div {
+    background: var(--surface-2) !important; color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 10px 28px -6px rgba(0,0,0,0.55) !important;
+}
+/* secondary buttons readable on dark */
+.stButton > button { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
+.stButton > button:hover { background: var(--surface-2) !important; color: #fff !important; }
+
+</style>""", unsafe_allow_html=True)
+
+# â”€â”€ Session defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _defs = {
     "logged_in": False, "username": "", "user_role": "", "user_name": "",
     "orch_chat": [], "coord_chat": [], "docs_chat": [],
+    "it_chat": [], "hr_chat": [], "fin_chat": [],
     "pending_email": None, "monitor_log": [], "monitor_import_error": "",
     "hr_results": None,
     "uploaded_cvs": [], "drive_documents": [], "mcp_running": False,
@@ -596,10 +1019,105 @@ _defs = {
     "docs_conversation_id": None,
     "inbox_emails": [],
     "selected_inbox_idx": None,
+    "active_tab": None,
 }
 for k, v in _defs.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+
+# â”€â”€ Per-agent quick-chat (the pinned bottom bar feeds these) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+_AGENT_CHAT = {
+    "Email":      ("coord_chat", "ðŸ“§", "Ask the Email agent â€” e.g. 'email Ahmed about the 3pm meeting'â€¦"),
+    "Documents":  ("docs_chat",  "ðŸ“‚", "Ask anything about your loaded documentsâ€¦"),
+    "IT Support": ("it_chat",    "ðŸ› ï¸", "Describe your IT problemâ€¦"),
+    "HR":         ("hr_chat",    "ðŸ‘¥", "Ask the HR agent â€” policies, process, leavesâ€¦"),
+    "Finance":    ("fin_chat",   "ðŸ’°", "Ask the Finance agent â€” tax, budgets, expensesâ€¦"),
+}
+
+
+def _agent_answer(tab: str, prompt: str, user_name: str) -> str:
+    """Route a single free-text prompt to the right specialist agent."""
+    if tab == "IT Support":
+        from graph.it_graph import it_graph
+        r = it_graph.invoke({"user_name": user_name, "it_problem": prompt})
+        tid = r.get("ticket_id", "")
+        sol = r.get("it_solution", "") or "No solution produced."
+        return (f"**Ticket {tid}**\n\n" if tid else "") + sol
+    if tab == "Finance":
+        from database.vector_db import collection_stats
+        if collection_stats().get("finance_docs", 0) > 0:
+            from database.vector_db import rag_answer
+            return rag_answer(prompt, "finance_docs", top_k=4, user_name=user_name)
+        from graph.finance_graph import finance_graph
+        return finance_graph.invoke(
+            {"action": "query", "question": prompt, "context": "", "user_name": user_name}
+        ).get("output", "")
+    if tab == "HR":
+        from database.vector_db import collection_stats
+        if collection_stats().get("hr_policies", 0) > 0:
+            from database.vector_db import rag_answer
+            return rag_answer(prompt, "hr_policies", top_k=4, user_name=user_name)
+        from graph.hr_graph import hr_graph
+        return hr_graph.invoke(
+            {"action": "hr_query", "query": prompt, "user_name": user_name}
+        ).get("output", "")
+    if tab == "Documents":
+        from agents.documents_agent import answer_question_from_documents
+        return answer_question_from_documents(prompt, st.session_state.get("drive_documents", []), user_name)
+    if tab == "Email":
+        import re
+        from agents.auto_reply_agent import generate_reply
+        from tools.email_search import find_email_by_name
+        m = re.search(r"(?:email|send|message|contact|write to|notify)\s+([A-Za-z]+)", prompt, re.IGNORECASE)
+        if m:
+            contacts = find_email_by_name(m.group(1))
+            if contacts:
+                c = contacts[0]
+                reply = generate_reply({"email_content": prompt, "sender_name": user_name})
+                st.session_state.pending_email = {
+                    "name": c["name"], "email": c["email"],
+                    "subject": f"Message from {user_name}", "body": reply.get("body", prompt),
+                }
+                return f"ðŸ“§ Found **{c['name']}** ({c['email']}). Drafted a message â€” review & confirm below."
+            return f"ðŸ” Could not find **{m.group(1)}**'s email. Provide the address directly."
+        reply = generate_reply({"email_content": prompt, "sender_name": user_name})
+        return reply.get("body", "")
+    return "Unsupported agent."
+
+
+def _render_agent_quick_chat(tab: str) -> None:
+    """Render a per-agent chat history + process a pending pinned-bar prompt."""
+    chat_key, icon, _ph = _AGENT_CHAT[tab]
+    history = st.session_state.get(chat_key, [])
+    if history:
+        st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
+        for e in history:
+            if e.get("role") == "user":
+                st.markdown(
+                    f'<div class="chat-wrap"><div class="chat-user">{_hesc_html(e.get("content",""))}</div></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="chat-wrap"><div class="chat-agent">{icon} {_hesc_html(e.get("content",""))}</div></div>',
+                    unsafe_allow_html=True,
+                )
+        st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("Clear chat", key=f"clear_{chat_key}"):
+            st.session_state[chat_key] = []
+            st.rerun()
+    pend = (st.session_state.pop(f"_pending_{tab}", "") or "").strip()
+    if pend:
+        st.session_state.setdefault(chat_key, [])
+        st.session_state[chat_key].append({"role": "user", "content": pend})
+        with st.spinner(f"{tab} agent workingâ€¦"):
+            try:
+                ans = _agent_answer(tab, pend, st.session_state.user_name or "User")
+            except Exception as e:
+                ans = f"Error: {e}"
+        st.session_state[chat_key].append({"role": "agent", "content": ans})
+        st.rerun()
 
 
 def _new_auth_session_id() -> str:
@@ -621,9 +1139,9 @@ def _record_login_event(username: str, display_name: str, role: str, event: str)
         pass
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# AUTH (login · sign-up · forgot) — early exit before heavy UI setup
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# AUTH (login Â· sign-up Â· forgot) â€” early exit before heavy UI setup
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 if not st.session_state.logged_in:
     from ui.auth_pages import render_auth_gate
 
@@ -702,14 +1220,6 @@ def _sync_orch_chat_from_db(force: bool = False) -> None:
             pass
 
 
-def _clear_hr_ats_state() -> None:
-    st.session_state.pending_hr_gmail_batch_id = None
-    st.session_state.hr_ats_batch_id = None
-    st.session_state.hr_ats_candidates = []
-    st.session_state.hr_ats_filters = {}
-    st.session_state.hr_ats_selected = []
-
-
 def _sync_hr_ats_from_result(result: dict) -> None:
     """Keep last fetched candidates in session for ATS panel + follow-up commands."""
     if not result or not result.get("ok"):
@@ -739,7 +1249,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
         unsafe_allow_html=True,
     )
     if filters.get("required_skills"):
-        st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** · Min score: **{filters.get('min_score', 55)}%**")
+        st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** Â· Min score: **{filters.get('min_score', 55)}%**")
     st.caption("Select candidates, then **Send email** per person, or use bulk actions. Emails are never sent without your action.")
 
     selected: list[str] = []
@@ -747,9 +1257,9 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
         cid = c.get("candidate_id") or f"c{i}"
         name = c.get("candidate_name") or "Candidate"
         score = int(c.get("match_score") or 0)
-        status = c.get("status") or "—"
-        skills = ", ".join(c.get("key_skills") or []) or "—"
-        exp = c.get("experience_level") or "—"
+        status = c.get("status") or "â€”"
+        skills = ", ".join(c.get("key_skills") or []) or "â€”"
+        exp = c.get("experience_level") or "â€”"
         hr_st = c.get("hr_state") or "pending"
         status_cls = "badge-green" if status == "Recommended" else "badge-orange"
         if hr_st == "rejected":
@@ -758,7 +1268,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
             f'<div class="cand-card">'
             f'<b>{_hesc_html(name)}</b> <span class="badge {status_cls}">{_hesc_html(status)}</span> '
             f'<span class="badge badge-blue">{score}% Match</span><br>'
-            f'<span style="font-size:12px;color:#64748b">Skills: {_hesc_html(skills)} · {_hesc_html(exp)}</span>'
+            f'<span style="font-size:12px;color:#64748b">Skills: {_hesc_html(skills)} Â· {_hesc_html(exp)}</span>'
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -768,7 +1278,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
             if sel:
                 selected.append(cid)
         with cols[1]:
-            st.caption(f"To: {c.get('recipient') or '—'}")
+            st.caption(f"To: {c.get('recipient') or 'â€”'}")
         with cols[2]:
             if st.button("Send email", key=f"{key_prefix}_send_{bid}_{cid}", disabled=hr_st == "rejected" or not c.get("sendable")):
                 if bid:
@@ -782,8 +1292,6 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                             )
                             if sr.get("ok"):
                                 st.success(f"Sent to **{name}**.")
-                                _clear_hr_ats_state()
-                                st.rerun()
                             else:
                                 st.error(sr.get("error", "Send failed."))
                         except Exception as ex:
@@ -807,7 +1315,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="send to selected", ui_selected_ids=selected)
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** email(s).")
-                    _clear_hr_ats_state()
+                    st.session_state.pending_hr_gmail_batch_id = None
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -820,7 +1328,6 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all recommended candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** to recommended.")
-                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -831,7 +1338,6 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="invite top 2 candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
-                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -843,36 +1349,20 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all candidates send to everyone")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
-                    _clear_hr_ats_state()
+                    st.session_state.pending_hr_gmail_batch_id = None
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
 
 
 def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> None:
-    """Structured results (candidates, inbox rows) — not raw markdown dumps."""
+    """Structured results (candidates, inbox rows) â€” not raw markdown dumps."""
     if not ui or not isinstance(ui, dict):
         return
     t = ui.get("type") or ""
     if t == "hr_shortlist":
         bid = ui.get("batch_id")
-        send_result = ui.get("send_result") or {}
-        already_sent = bool(send_result.get("ok"))
-        if bid and not already_sent:
-            try:
-                from database.sqlite_db import hr_shortlist_get_batch
-
-                row = hr_shortlist_get_batch(bid)
-                already_sent = bool(row and row.get("status") == "sent")
-            except Exception:
-                pass
-        if already_sent:
-            _clear_hr_ats_state()
-            sent_n = send_result.get("emails_sent")
-            msg = f"Sent {sent_n} invitation(s) via Gmail." if sent_n is not None else "Interview invitation emails already sent."
-            st.success(msg)
-            return
-        if bid and not already_sent:
+        if bid:
             st.session_state.pending_hr_gmail_batch_id = bid
             st.session_state.hr_ats_batch_id = bid
         st.session_state.hr_ats_candidates = ui.get("candidates") or []
@@ -880,10 +1370,15 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
         stats = ui.get("stats") or {}
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Shortlisted", len(ui.get("candidates") or []))
-        c2.metric("Emails scanned", stats.get("emails_scanned", "—"))
-        c3.metric("CVs parsed", stats.get("attachments_parsed", "—"))
+        c2.metric("Emails scanned", stats.get("emails_scanned", "â€”"))
+        c3.metric("CVs parsed", stats.get("attachments_parsed", "â€”"))
         skills = stats.get("required_skills") or []
-        c4.metric("Skill filter", ", ".join(skills) if skills else "—")
+        c4.metric("Skill filter", ", ".join(skills) if skills else "â€”")
+        send_result = ui.get("send_result") or {}
+        if send_result.get("ok"):
+            st.success(
+                f"Sent {send_result.get('emails_sent', 0)} invitation(s) via Gmail."
+            )
         _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
     elif t == "hr_inventory":
         st.markdown(
@@ -912,7 +1407,7 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
                 f"<span style='font-size:12px;color:#64748b'>&lt;{_hesc_html(em.get('from_email', ''))}&gt;</span><br>"
                 f"<span style='font-size:13px'>{_hesc_html(em.get('subject', ''))}</span> "
                 f"{badge}"
-                f"<span style='font-size:11px;color:#94a3b8'> · {_hesc_html(em.get('date', ''))}</span>"
+                f"<span style='font-size:11px;color:#94a3b8'> Â· {_hesc_html(em.get('date', ''))}</span>"
                 f"<br><span style='font-size:12px;color:#475569'>{_hesc_html(em.get('snippet', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -921,7 +1416,6 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
                 st.caption(f"Attachments: {em.get('attachment_count', 0)}")
     elif t == "email_send":
         if ui.get("ok"):
-            _clear_hr_ats_state()
             st.success(ui.get("message") or "Emails sent.")
         else:
             st.warning(ui.get("message") or "Send could not be completed.")
@@ -941,7 +1435,7 @@ def _start_new_orch_conversation() -> None:
         st.session_state.orch_chat = []
         st.session_state.orch_last_proc = None
         st.session_state["_orch_active_cid"] = cid
-        _clear_hr_ats_state()
+        st.session_state.pending_hr_gmail_batch_id = None
 
 
 def _render_inbox_email_detail(em: dict) -> None:
@@ -989,14 +1483,14 @@ def _render_inbox_email_detail(em: dict) -> None:
     else:
         st.caption("No attachments in this message.")
 
-# ── DB init ───────────────────────────────────────────────────────────────────
+# â”€â”€ DB init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 try:
     from database.sqlite_db import init_db
     init_db()
 except Exception:
     pass
 
-# ── MCP auto-start (local only; skip on Streamlit Cloud — set FYP_HOSTED=true in Secrets) ─
+# â”€â”€ MCP auto-start (local only; skip on Streamlit Cloud â€” set FYP_HOSTED=true in Secrets) â”€
 if is_hosted_deploy():
     st.session_state.mcp_running = False
 else:
@@ -1010,7 +1504,7 @@ else:
     except Exception:
         st.session_state.mcp_running = False
 
-# ── Monitor logs (skip heavy IMAP stack on hosted — not usable headless anyway) ─
+# â”€â”€ Monitor logs (skip heavy IMAP stack on hosted â€” not usable headless anyway) â”€
 if is_hosted_deploy():
 
     def get_pending_logs():
@@ -1074,8 +1568,9 @@ def _monitor_header_state() -> str:
     return "on" if is_running() else "off"
 
 
-@st.cache_data(ttl=20, show_spinner=False)
 def _cached_dashboard_stats():
+    # Counts are cheap and must reflect the latest tasks immediately (no cache),
+    # otherwise the "X calls" agent cards lag behind the live A2A queue.
     from database.sqlite_db import get_dashboard_stats
     return get_dashboard_stats()
 
@@ -1096,10 +1591,10 @@ def _drain_monitor_logs() -> None:
 
 
 def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
-    """Gmail IMAP auto-reply — Email and IT tabs (local + Gmail configured)."""
+    """Gmail IMAP auto-reply â€” Email and IT tabs (local + Gmail configured)."""
     if not can_use_email_monitor(st.session_state.user_role or ""):
         return
-    st.markdown('<div class="sec-hdr sec-orange">📬 Email auto-reply monitor</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-hdr sec-orange">ðŸ“¬ Email auto-reply monitor</div>', unsafe_allow_html=True)
     _hosted = not local_background_services_enabled()
     _gmail_ok = is_gmail_configured()
     if st.session_state.get("monitor_import_error"):
@@ -1117,7 +1612,7 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
         "Auto-reply monitor",
         key=toggle_key,
         disabled=_hosted or not _gmail_ok,
-        help="ON — automatically reply to new inbox emails every 30s. OFF — no auto-replies.",
+        help="ON â€” automatically reply to new inbox emails every 30s. OFF â€” no auto-replies.",
     )
 
     running = is_running()
@@ -1140,26 +1635,26 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
     if is_running():
         st.markdown(
             '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">🟢 <b>Auto-reply ON</b> — checking inbox every 30s</div>',
+            'border-radius:8px;margin:8px 0">ðŸŸ¢ <b>Auto-reply ON</b> â€” checking inbox every 30s</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div style="background:#f1f5f9;border:1px solid #cbd5e1;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">⚪ <b>Auto-reply OFF</b></div>',
+            '<div style="background:var(--surface-2);border:1px solid var(--border);padding:8px 14px;'
+            'border-radius:8px;margin:8px 0">âšª <b>Auto-reply OFF</b></div>',
             unsafe_allow_html=True,
         )
 
     _drain_monitor_logs()
     if st.session_state.monitor_log:
-        with st.expander("📋 Activity log", expanded=False):
+        with st.expander("ðŸ“‹ Activity log", expanded=False):
             for log in reversed(st.session_state.monitor_log[-25:]):
                 st.caption(log)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # MAIN APP (after login)
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 if st.session_state.logged_in:
     try:
@@ -1181,34 +1676,78 @@ if st.session_state.logged_in:
     except Exception:
         pass
 
-# ── Top header ────────────────────────────────────────────────────────────────
-c1, c2, c3 = st.columns([3, 1.5, 1])
-with c1:
-    from html import escape as _hesc
-    unm = _hesc(st.session_state.user_name or "")
+# â”€â”€ Sidebar navigation (RBAC: visible items depend on role) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+from html import escape as _hesc
+
+tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
+
+# Keep the active tab valid for the current role; default to the first item.
+if st.session_state.get("active_tab") not in tab_labels:
+    st.session_state.active_tab = tab_labels[0] if tab_labels else None
+
+_NAV_ICONS = {
+    "Assistant": "💬",
+    "Dashboard": "📊",
+    "IT Support": "🛠️",
+    "Email": "✉️",
+    "HR": "👥",
+    "Finance": "💰",
+    "Documents": "📄",
+    "History": "🕑",
+}
+
+with st.sidebar:
+    _db_label = "PostgreSQL" if use_postgresql_database() else "SQLite"
+    st.markdown(
+        '<div class="side-brand">'
+        '<div class="side-logo">🤖</div>'
+        '<div class="side-brand-text">'
+        '<div class="side-title">Office Automation</div>'
+        '<div class="side-sub">Multi-Agent · A2A · MCP</div>'
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="side-nav-label">KIET Workspace</div>', unsafe_allow_html=True)
+    for _lbl in tab_labels:
+        _icon = _NAV_ICONS.get(_lbl, "•")
+        _is_active = st.session_state.active_tab == _lbl
+        if st.button(
+            f"{_icon}  {_lbl}",
+            key=f"nav_{_lbl}",
+            use_container_width=True,
+            type="primary" if _is_active else "secondary",
+        ):
+            st.session_state.active_tab = _lbl
+            st.rerun()
+
+    st.markdown('<div class="side-divider"></div>', unsafe_allow_html=True)
+
+    # Service status (only for roles that manage background services)
     _role = st.session_state.user_role or ""
-    _svc_line = ""
     if can_manage_background_services(_role):
         mcp_pill = _service_status_pill("MCP", _mcp_header_state())
         mon_pill = _service_status_pill("Monitor", _monitor_header_state())
-        _svc_line = f"{mcp_pill} &nbsp; {mon_pill}<br>"
-    rol = _hesc(st.session_state.user_role or "")
+        st.markdown(
+            f'<div class="side-pills">{mcp_pill} {mon_pill}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # User card
+    _unm = _hesc(st.session_state.user_name or "")
+    _rol = _hesc(st.session_state.user_role or "")
+    _initial = (_unm[:1] or "U").upper()
     st.markdown(
-        f'<div class="main-header">'
-        f"<div>"
-        f'<div class="header-title">Office Automation Agents Pro</div>'
-        f'<div class="header-sub">LangGraph · OpenAI · MCP · ChromaDB · '
-        f'{"PostgreSQL" if use_postgresql_database() else "SQLite"}</div>'
+        f'<div class="side-user">'
+        f'<div class="side-avatar">{_initial}</div>'
+        f'<div class="side-user-text"><div class="side-user-name">{_unm}</div>'
+        f'<div class="side-user-role">{_rol}</div></div>'
         f"</div>"
-        f'<div style="text-align:right;font-size:12px;line-height:1.6">'
-        f"{_svc_line}"
-        f'<span style="color:#94a3b8">{unm} ({rol})</span>'
-        f"</div>"
-        f"</div>",
+        f'<div class="side-stack">Stack · SQLite · LangGraph Â· OpenAI</div>',
         unsafe_allow_html=True,
     )
-with c3:
-    if st.button("Logout", use_container_width=True):
+
+    if st.button("Sign out", key="side_logout", use_container_width=True):
         _record_login_event(
             username=st.session_state.username,
             display_name=st.session_state.user_name,
@@ -1230,84 +1769,31 @@ with c3:
         for k in ("orch_conversation_id", "coord_conversation_id", "docs_conversation_id"):
             st.session_state[k] = None
         st.session_state.orch_chat = []
+        st.session_state.active_tab = None
         st.rerun()
 
-with st.sidebar:
-    st.markdown(
-        f"""
-        <div class="sidebar-hero">
-            <div class="sidebar-title">Office Automation Pro</div>
-            <div class="sidebar-subtitle">A polished multi-agent workspace</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"""
-        <div class="sidebar-section sidebar-card">
-            <b>{st.session_state.user_name}</b><br>
-            <small>{st.session_state.user_role} · @{st.session_state.username}</small>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption("Workspace navigation")
-    for tab_name, description, chip in _SIDEBAR_NAV:
-        if tab_name in get_visible_tabs_for_role(st.session_state.user_role):
-            st.markdown(
-                f"""
-                <a class="nav-card section-link" href="#{tab_name.lower().replace(' ', '-')}" target="_self">
-                    <strong>{tab_name}</strong>
-                    <span>{description}</span><br>
-                    <span class="nav-chip">{chip}</span>
-                </a>
-                """,
-                unsafe_allow_html=True,
-            )
-    st.markdown('<div class="sidebar-section"></div>', unsafe_allow_html=True)
-    st.caption("Quick status")
-    st.markdown(
-        f"""
-        <div class="sidebar-card">
-            <b>OpenAI</b><br>
-            <small>{"Connected" if OPENAI_API_KEY else "Not configured"}</small>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"""
-        <div class="sidebar-card">
-            <b>Google Drive</b><br>
-            <small>{"Connected" if is_google_drive_configured() else "Not configured"}</small>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"""
-        <div class="sidebar-card">
-            <b>Gmail</b><br>
-            <small>{"Connected" if is_gmail_configured() else "Not configured"}</small>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# â”€â”€ Main content area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+active_tab = st.session_state.active_tab
+_MAIN = st.container()
 
-# ── Tabs (RBAC: visible labels depend on role) ──────────────────────────────────
-tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
-tabs = st.tabs(tab_labels)
-_tab_idx = {name: i for i, name in enumerate(tab_labels)}
-_pb = ROLE_PORTAL_BANNERS.get(st.session_state.user_role)
-if _pb:
-    st.markdown(_pb, unsafe_allow_html=True)
+with _MAIN:
+    # Page heading + role banner
+    _icon = _NAV_ICONS.get(active_tab, "•")
+    st.markdown(
+        f'<div class="page-head"><span class="page-head-icon">{_icon}</span>'
+        f'<span class="page-head-title">{_hesc(active_tab or "")}</span></div>',
+        unsafe_allow_html=True,
+    )
+    _pb = ROLE_PORTAL_BANNERS.get(st.session_state.user_role)
+    if _pb:
+        st.markdown(_pb, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Dashboard")
-if _ti is not None:
-    with tabs[_ti]:
+
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 2 â€” DASHBOARD
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "Dashboard":
+    with _MAIN:
         try:
             from database.sqlite_db import get_notifications
             stats = _cached_dashboard_stats()
@@ -1396,7 +1882,7 @@ if _ti is not None:
                         f'<div style="margin-bottom:6px">'
                         f'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'
                         f"<b>{cname}</b><span>{cnt} vectors</span></div>"
-                        f'<div style="background:#e2e8f0;border-radius:4px;height:6px">'
+                        f'<div style="background:rgba(148,163,184,0.18);border-radius:4px;height:6px">'
                         f'<div style="background:#7c3aed;width:{pct}%;height:6px;border-radius:4px"></div></div>'
                         f"</div>",
                         unsafe_allow_html=True,
@@ -1438,12 +1924,12 @@ if _ti is not None:
                 mcp_st = f"Running :{_port_disp}" if st.session_state.mcp_running else "Stopped"
                 mon_st = "Active" if is_running() else "Stopped"
             else:
-                mcp_st = mon_st = "—"
+                mcp_st = mon_st = "â€”"
             vdb_st = "ChromaDB (has rows)" if total_vecs > 0 else "ChromaDB (empty)"
             from html import escape as _escu
             un = _escu(st.session_state.user_name or "")
             st.markdown(
-                f'<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;font-size:13px">'
+                f'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--text)">'
                 f"<b>Uptime:</b> {uptime}s<br>"
                 f"<b>DB:</b> {'PostgreSQL' if use_postgresql_database() else 'SQLite'} connected<br>"
                 f"<b>VectorDB:</b> {vdb_st}<br>"
@@ -1509,16 +1995,18 @@ if _ti is not None:
             pass
 
         if st.button("Refresh dashboard", key="dash_refresh"):
-            _cached_dashboard_stats.clear()
+            try:
+                _cached_dashboard_stats.clear()
+            except Exception:
+                pass
             _cached_vector_stats.clear()
             st.rerun()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — ASSISTANT (single entry → orchestrator → sub-agents)
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Assistant")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 1 â€” ASSISTANT (single entry â†’ orchestrator â†’ sub-agents)
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "Assistant":
+    with _MAIN:
         st.markdown(
             '<div class="sec-hdr sec-blue">Unified Assistant <span class="badge badge-a2a">Orchestrator</span> '
             '<span class="badge badge-mcp">MCP</span></div>',
@@ -1534,7 +2022,7 @@ if _ti is not None:
         _allow = get_role_orchestrator_allowlist(st.session_state.user_role)
         if _allow is None:
             st.info(
-                "**One assistant for everything** — IT, finance, documents, and **HR hiring** in plain language. "
+                "**One assistant for everything** â€” IT, finance, documents, and **HR hiring** in plain language. "
                 "Examples: *Fetch the latest 10 candidate emails*, *fetch 20 and select two for python*, "
                 "*Show emails received on 15 May 2026*, *Send interview invitations for Monday at 3 PM*. "
                 "Ask *What can you do?* in chat for the full task list from the orchestrator. "
@@ -1554,11 +2042,11 @@ if _ti is not None:
                 from database.sqlite_db import list_user_conversations, get_conversation_for_user
 
                 threads = list_user_conversations(st.session_state.username, "orchestrator", limit=20)
-                thread_opts = {0: "— Open a saved thread —"}
+                thread_opts = {0: "â€” Open a saved thread â€”"}
                 for t in threads:
-                    label = f"#{t['id']} · {t['updated_at']} · {t['message_count']} msgs"
+                    label = f"#{t['id']} Â· {t['updated_at']} Â· {t['message_count']} msgs"
                     if t.get("preview"):
-                        label += f" — {t['preview'][:50]}"
+                        label += f" â€” {t['preview'][:50]}"
                     thread_opts[t["id"]] = label
                 pick = st.selectbox(
                     "Saved conversations",
@@ -1594,12 +2082,19 @@ if _ti is not None:
             unsafe_allow_html=True,
         )
 
-        orch_up = st.file_uploader(
-            "Attach files (optional, PDF / TXT / DOCX)",
-            accept_multiple_files=True,
-            type=["pdf", "txt", "docx"],
-            key="orch_files",
-        )
+        with st.expander("➕ Attachments & options", expanded=False):
+            orch_up = st.file_uploader(
+                "Attach files (optional, PDF / TXT / DOCX)",
+                accept_multiple_files=True,
+                type=["pdf", "txt", "docx"],
+                key="orch_files",
+            )
+            st.checkbox(
+                "Use LLM for intent routing",
+                value=st.session_state.get("orch_use_llm", True),
+                key="orch_use_llm",
+                help="When on, the orchestrator uses the LLM to understand and route your request.",
+            )
         orch_attachments = []
         if orch_up:
             for f in orch_up:
@@ -1609,7 +2104,7 @@ if _ti is not None:
 
         st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
         if not st.session_state.orch_chat:
-            st.caption("Start a conversation — messages are saved automatically and reload when you return or open a saved thread.")
+            st.caption("Start a conversation â€” messages are saved automatically and reload when you return or open a saved thread.")
         for idx, entry in enumerate(st.session_state.orch_chat):
             if entry["role"] == "user":
                 body = _hesc_html(entry.get("content", ""))
@@ -1617,13 +2112,10 @@ if _ti is not None:
             else:
                 from tools.assistant_display import build_display_text
 
-                display = entry.get("display_content") or ""
-                full_content = entry.get("content", "")
-                if (
-                    not display
-                    or (display.rstrip().endswith(("…", "â€¦")) and len(full_content or "") > len(display))
-                ):
-                    display = build_display_text(full_content, entry.get("ui_payload"))
+                display = entry.get("display_content") or build_display_text(
+                    entry.get("content", ""),
+                    entry.get("ui_payload"),
+                )
                 body = _hesc_html(display)
                 badges = " ".join(
                     f'<span class="badge badge-indigo">{_hesc_html(a)}</span>'
@@ -1650,7 +2142,7 @@ if _ti is not None:
                 for i, fe in enumerate(_orch_fe):
                     with cols[i % ncols]:
                         st.download_button(
-                            label=f"⬇ {(fe.get('format') or 'file').upper()}",
+                            label=f"â¬‡ {(fe.get('format') or 'file').upper()}",
                             data=fe.get("data") or b"",
                             file_name=fe.get("filename") or "export.bin",
                             mime=fe.get("mime_type") or "application/octet-stream",
@@ -1658,19 +2150,13 @@ if _ti is not None:
                         )
                         st.caption(fe.get("filename", ""))
 
-        with st.form("orch_form", clear_on_submit=True):
-            inp = st.text_area(
-                "Your message",
-                placeholder="e.g. Fetch latest 10 candidate emails · select 2 python developers · send invites Monday 3 PM",
-                height=90,
-            )
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                sub = st.form_submit_button("Send (route to specialists)", use_container_width=True)
-            with c2:
-                use_llm = st.checkbox("LLM intent", value=True)
+        # The input is the chat bar pinned to the bottom of the page (rendered
+        # outside the main container, at the end of the script). It stores the
+        # submitted text in session_state, which we pick up here.
+        use_llm = st.session_state.get("orch_use_llm", True)
+        inp = (st.session_state.pop("_pending_orch_prompt", "") or "")
 
-        if sub and inp.strip():
+        if inp.strip():
             dedupe = (inp.strip(), tuple((a["name"], len(a.get("content", ""))) for a in orch_attachments))
             if st.session_state.orch_last_proc == dedupe:
                 st.caption("Same request was just processed; change the message or attachments to send again.")
@@ -1717,11 +2203,11 @@ if _ti is not None:
                         )
                         st.session_state.orch_last_proc = dedupe
                         if result.get("hr_gmail_pending_cleared"):
-                            _clear_hr_ats_state()
+                            st.session_state.pending_hr_gmail_batch_id = None
                         elif result.get("hr_gmail_batch_id"):
                             st.session_state.pending_hr_gmail_batch_id = result["hr_gmail_batch_id"]
                         st.session_state.orch_finance_export_files = result.get("finance_export_files")
-                        if "hr_gmail" in (result.get("agents_used") or []) and not result.get("hr_gmail_pending_cleared"):
+                        if "hr_gmail" in (result.get("agents_used") or []):
                             try:
                                 from database.sqlite_db import hr_shortlist_get_batch
                                 bid = result.get("hr_gmail_batch_id")
@@ -1801,41 +2287,42 @@ if _ti is not None:
             and not any((e.get("ui_payload") or {}).get("type") == "hr_shortlist" for e in st.session_state.orch_chat if e.get("role") == "agent")
         ):
             st.divider()
-            st.caption("Active shortlist — use chat to send invites or the actions below.")
+            st.caption("Active shortlist â€” use chat to send invites or the actions below.")
             _render_hr_ats_candidate_panel(_pbid, key_prefix="asst_sticky")
             if st.button("Dismiss shortlist panel", key="asst_hitl_clear"):
-                _clear_hr_ats_state()
+                st.session_state.pending_hr_gmail_batch_id = None
+                st.session_state.hr_ats_candidates = []
                 st.rerun()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB — IT SUPPORT
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("IT Support")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB â€” IT SUPPORT
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "IT Support":
+    with _MAIN:
+        _render_agent_quick_chat("IT Support")
         st.caption(
-            "Tip: for most tasks, use **Assistant** — the orchestrator routes to IT (and other agents) automatically."
+            "Tip: for most tasks, use **Assistant** â€” the orchestrator routes to IT (and other agents) automatically."
         )
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<div class="sec-hdr sec-blue">💻 IT Support Agent</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-hdr sec-blue">ðŸ’» IT Support Agent</div>', unsafe_allow_html=True)
             it_name = st.text_input("Your Name", value=st.session_state.user_name, key="it_name")
             it_prob = st.text_area("Describe Your IT Problem", placeholder="e.g. WiFi not connecting, laptop freezes, can't login...", height=160)
             pri_col, btn_col = st.columns([1,2])
             with pri_col:
                 priority = st.selectbox("Priority", ["Normal","High","Urgent"], key="it_pri")
             with btn_col:
-                it_btn = st.button("🔍 Get Solution", use_container_width=True, key="it_btn")
+                it_btn = st.button("ðŸ” Get Solution", use_container_width=True, key="it_btn")
 
             if it_btn and it_prob.strip():
-                with st.spinner("🔄 IT Agent analyzing..."):
+                with st.spinner("ðŸ”„ IT Agent analyzing..."):
                     try:
                         from graph.it_graph import it_graph
                         result = it_graph.invoke({"user_name":it_name,"it_problem":it_prob})
                         sol = result.get("it_solution","")
                         tid = result.get("ticket_id","")
                         if tid:
-                            st.success(f"✅ Ticket created: **{tid}**")
+                            st.success(f"âœ… Ticket created: **{tid}**")
                         if result.get("it_handled"):
                             st.markdown(f'<div class="resp-box">{sol}</div>', unsafe_allow_html=True)
                         else:
@@ -1845,7 +2332,7 @@ if _ti is not None:
 
         with c2:
             _render_email_auto_monitor_panel(key_prefix="it_mon")
-            st.markdown('<div class="sec-hdr" style="margin-top:14px">🎫 Recent IT Tickets</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-hdr" style="margin-top:14px">ðŸŽ« Recent IT Tickets</div>', unsafe_allow_html=True)
             try:
                 from database.sqlite_db import get_session
                 from database.sqlite_db import ITTicket
@@ -1870,78 +2357,44 @@ if _ti is not None:
             except Exception:
                 st.caption("No tickets yet.")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 5 — EMAIL
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Email")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 5 â€” EMAIL
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "Email":
+    with _MAIN:
         st.caption(
             "Tip: use **Assistant** for email-related tasks routed with other domains; this tab is for drafts, inbox, and confirm-send flows."
         )
-        st.markdown('<div class="sec-hdr sec-teal">📧 Email Coordinator <span class="badge badge-a2a">A2A</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal">ðŸ“§ Email Coordinator <span class="badge badge-a2a">A2A</span></div>', unsafe_allow_html=True)
         _render_email_auto_monitor_panel(key_prefix="email_mon")
         st.divider()
 
-        for entry in st.session_state.coord_chat:
-            if entry["role"] == "user":
-                st.markdown(f'<div class="chat-wrap"><div class="chat-user">👤 {entry["content"]}</div></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="chat-wrap"><div class="chat-agent">📧 {entry["content"]}</div></div>', unsafe_allow_html=True)
+        _render_agent_quick_chat("Email")
 
         if st.session_state.pending_email:
             p = st.session_state.pending_email
-            st.warning(f"**📧 Ready to Send**\n\n**To:** {p.get('name','')} `{p.get('email','')}`\n**Subject:** {p.get('subject','')}\n\n{p.get('body','')[:300]}...")
+            st.warning(f"**ðŸ“§ Ready to Send**\n\n**To:** {p.get('name','')} `{p.get('email','')}`\n**Subject:** {p.get('subject','')}\n\n{p.get('body','')[:300]}...")
             cy, cn = st.columns(2)
             with cy:
-                if st.button("✅ Confirm & Send", use_container_width=True, key="send_yes"):
+                if st.button("âœ… Confirm & Send", use_container_width=True, key="send_yes"):
                     try:
                         from tools.gmail_send import send_email
                         from database.sqlite_db import log_email
                         send_email({"recipient":p["email"],"subject":p["subject"],"body":p["body"]})
                         log_email("sent", __import__("config").GMAIL_EMAIL, p["email"], p["subject"], p["body"])
-                        st.session_state.coord_chat.append({"role":"agent","content":f"✅ Email sent to {p.get('name',p['email'])}!"})
+                        st.session_state.coord_chat.append({"role":"agent","content":f"âœ… Email sent to {p.get('name',p['email'])}!"})
                         st.session_state.pending_email = None; st.rerun()
                     except Exception as e:
                         st.error(f"Send failed: {e}")
             with cn:
-                if st.button("❌ Cancel", use_container_width=True, key="send_no"):
+                if st.button("âŒ Cancel", use_container_width=True, key="send_no"):
                     st.session_state.pending_email = None; st.rerun()
 
-        with st.form("coord_form", clear_on_submit=True):
-            coord_inp = st.text_area("Message", placeholder="'Email Ahmed about 3pm meeting' or 'Draft reply to Hassan about project delay'", height=80)
-            coord_sub = st.form_submit_button("📤 Send", use_container_width=True)
-
-        if coord_sub and coord_inp.strip():
-            st.session_state.coord_chat.append({"role":"user","content":coord_inp.strip()})
-            with st.spinner("🔄 Processing..."):
-                try:
-                    import re
-                    from agents.auto_reply_agent import generate_reply
-                    from tools.email_search import find_email_by_name
-                    m = re.search(r'(?:email|send|message|contact|write to|notify)\s+([A-Za-z]+)', coord_inp, re.IGNORECASE)
-                    if m:
-                        tname    = m.group(1)
-                        contacts = find_email_by_name(tname)
-                        if contacts:
-                            c        = contacts[0]
-                            reply    = generate_reply({"email_content":coord_inp,"sender_name":st.session_state.user_name})
-                            st.session_state.pending_email = {"name":c["name"],"email":c["email"],"subject":f"Message from {st.session_state.user_name}","body":reply.get("body",coord_inp)}
-                            st.session_state.coord_chat.append({"role":"agent","content":f"📧 Found **{c['name']}** ({c['email']}). Drafted — please review and confirm."})
-                        else:
-                            st.session_state.coord_chat.append({"role":"agent","content":f"🔍 Could not find **{tname}**'s email. Please provide their email directly."})
-                    else:
-                        reply = generate_reply({"email_content":coord_inp,"sender_name":st.session_state.user_name})
-                        st.session_state.coord_chat.append({"role":"agent","content":reply.get("body","")})
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-        st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">📥 Read Inbox</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal" style="font-size:13px">ðŸ“¥ Read Inbox</div>', unsafe_allow_html=True)
         if not is_gmail_configured():
             st.warning("Gmail is not configured.")
         inbox_count = st.number_input("How many emails to fetch", min_value=1, max_value=30, value=10, key="inbox_fetch_n")
-        if st.button("📬 Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
+        if st.button("ðŸ“¬ Fetch Latest Emails", key="fetch_emails", type="primary", disabled=not is_gmail_configured()):
             with st.spinner("Connecting to Gmail..."):
                 try:
                     from tools.gmail_read import read_emails
@@ -1953,7 +2406,7 @@ if _ti is not None:
                         if "not configured" in str(err).lower() or "not enough arguments" in str(err).lower():
                             st.error(err)
                         else:
-                            st.info(f"📭 {err}")
+                            st.info(f"ðŸ“­ {err}")
                     else:
                         st.success(f"Loaded **{len(st.session_state.inbox_emails)}** email(s). Select one below to read the full message.")
                         st.rerun()
@@ -1967,7 +2420,7 @@ if _ti is not None:
                 labels = []
                 for em in st.session_state.inbox_emails:
                     att_n = em.get("attachment_count") or 0
-                    att_tag = f" 📎{att_n}" if att_n else ""
+                    att_tag = f" ðŸ“Ž{att_n}" if att_n else ""
                     labels.append(
                         f"{em.get('date', '')} | {em.get('from_name', '?')[:28]}{att_tag}\n{em.get('subject', '')[:55]}"
                     )
@@ -1984,12 +2437,12 @@ if _ti is not None:
                 sel_em = st.session_state.inbox_emails[st.session_state.selected_inbox_idx or 0]
                 _render_inbox_email_detail(sel_em)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 6 — HR
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("HR")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 6 â€” HR
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "HR":
+    with _MAIN:
+        _render_agent_quick_chat("HR")
         st.info(
             "**Inbox fetch, CV shortlist, interview invites, and follow-ups** are handled in the **Assistant** tab "
             "using natural language (e.g. *fetch 20 and select two for python*, *send interview invitations Monday 3 PM*)."
@@ -2222,12 +2675,12 @@ if _ti is not None:
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 7 — FINANCE
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Finance")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 7 â€” FINANCE
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "Finance":
+    with _MAIN:
+        _render_agent_quick_chat("Finance")
         st.caption("Tip: use **Assistant** for mixed requests; this tab is for focused finance workflows.")
         st.markdown('<div class="sec-hdr sec-green">Finance</div>', unsafe_allow_html=True)
         fin_user = st.text_input("Your Name", value=st.session_state.user_name, key="fin_user")
@@ -2240,7 +2693,7 @@ if _ti is not None:
                 "Summarize Invoice",
                 "Generate Report",
                 "Budget vs Actual",
-                "Generate documents (PDF / Excel / …)",
+                "Generate documents (PDF / Excel / â€¦)",
             ],
             key="fin_act",
         )
@@ -2293,13 +2746,22 @@ if _ti is not None:
                             try:
                                 import pandas as pd
                                 import io as _io
+                                from utils.finance_upload_charts import coerce_numeric_columns
 
                                 df = pd.read_csv(_io.StringIO(data_src))
+                                df = coerce_numeric_columns(df)
                                 if df.shape[1] >= 3:
                                     amt_col = df.columns[2]
                                     cat_col = df.columns[3] if df.shape[1] > 3 else df.columns[1]
-                                    chart_df = df.groupby(cat_col)[amt_col].sum().reset_index()
-                                    st.bar_chart(chart_df.set_index(cat_col))
+                                    chart_df = (
+                                        df[[cat_col, amt_col]]
+                                        .dropna(subset=[amt_col])
+                                        .groupby(cat_col)[amt_col]
+                                        .sum()
+                                        .reset_index()
+                                    )
+                                    if not chart_df.empty:
+                                        st.bar_chart(chart_df.set_index(cat_col))
                             except Exception:
                                 pass
                             from database.sqlite_db import log_finance
@@ -2365,7 +2827,7 @@ if _ti is not None:
                 for idx, dfile in enumerate(dash_files):
                     key_s = f"{idx}_{abs(hash(dfile.name)) % 10_000_000}"
                     df, err = file_to_dataframe(dfile)
-                    with st.expander(f"📄 {dfile.name}", expanded=(idx == 0)):
+                    with st.expander(f"ðŸ“„ {dfile.name}", expanded=(idx == 0)):
                         if err or df is None:
                             st.error(f"Could not read file: {err or 'unknown error'}")
                             continue
@@ -2485,11 +2947,11 @@ if _ti is not None:
                                 agg=agg_use,
                             )
                             if fig is None:
-                                st.caption(f"**{ct}** — could not build (check columns and numeric values).")
+                                st.caption(f"**{ct}** â€” could not build (check columns and numeric values).")
                             else:
                                 st.plotly_chart(fig, use_container_width=True)
                         if want_ai:
-                            with st.spinner(f"AI summary for {dfile.name}…"):
+                            with st.spinner(f"AI summary for {dfile.name}â€¦"):
                                 try:
                                     from graph.finance_graph import finance_graph
 
@@ -2558,14 +3020,20 @@ if _ti is not None:
                             import pandas as pd, io
                             bdf = pd.read_csv(io.StringIO(bdata), header=None, names=["Category","Budget"])
                             adf = pd.read_csv(io.StringIO(adata), header=None, names=["Category","Actual"])
-                            merged = bdf.merge(adf, on="Category").set_index("Category")
-                            st.bar_chart(merged)
+                            for _d, _c in ((bdf, "Budget"), (adf, "Actual")):
+                                _d[_c] = pd.to_numeric(
+                                    _d[_c].astype("string").str.replace(",", "", regex=False).str.strip(),
+                                    errors="coerce",
+                                )
+                            merged = bdf.merge(adf, on="Category").dropna().set_index("Category")
+                            if not merged.empty:
+                                st.bar_chart(merged)
                         except Exception:
                             pass
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif fin_action == "Generate documents (PDF / Excel / …)":
+        elif fin_action == "Generate documents (PDF / Excel / â€¦)":
             st.markdown(
                 "Describe the **report, summary, or analysis** you want and paste **source numbers or text**. "
                 "Pick one or more formats; binaries are built **in parallel** (ThreadPoolExecutor)."
@@ -2585,7 +3053,7 @@ if _ti is not None:
             )
             fin_exp_data = st.text_area(
                 "Source data (optional)",
-                placeholder="Paste CSV rows, budget lines, invoice text, or notes…",
+                placeholder="Paste CSV rows, budget lines, invoice text, or notesâ€¦",
                 height=160,
                 key="fin_exp_data",
             )
@@ -2608,7 +3076,7 @@ if _ti is not None:
                 if not instr and not data_src and not fin_exp_up:
                     st.warning("Add instructions and/or source data, or upload a file.")
                 else:
-                    with st.spinner("LLM structuring + parallel export (PDF / Excel / …)…"):
+                    with st.spinner("LLM structuring + parallel export (PDF / Excel / â€¦)â€¦"):
                         try:
                             from graph.finance_graph import finance_graph
 
@@ -2622,7 +3090,7 @@ if _ti is not None:
                                 upload_blob = "\n\n".join(parts_u)
                             merged_data = "\n\n".join(x for x in (data_src, upload_blob) if (x or "").strip())
 
-                            q = instr or (merged_data[:800] + " — finance document export")
+                            q = instr or (merged_data[:800] + " â€” finance document export")
                             r = finance_graph.invoke(
                                 {
                                     "action": "export_documents",
@@ -2653,23 +3121,23 @@ if _ti is not None:
                         except Exception as e:
                             st.error(str(e))
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 8 — DOCUMENTS
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("Documents")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB 8 â€” DOCUMENTS
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "Documents":
+    with _MAIN:
+        _render_agent_quick_chat("Documents")
         st.caption("Tip: **Assistant** can route document Q&A; use this tab for Drive load, embeddings, and batch tools.")
-        st.markdown('<div class="sec-hdr sec-teal">📂 Documents Agent <span class="badge badge-mcp">MCP</span> <span class="badge badge-purple">ChromaDB</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal">ðŸ“‚ Documents Agent <span class="badge badge-mcp">MCP</span> <span class="badge badge-purple">ChromaDB</span></div>', unsafe_allow_html=True)
         docs_user = st.text_input("Your Name", value=st.session_state.user_name, key="docs_user")
 
         lc1, lc2 = st.columns(2)
         with lc1:
-            if st.button("☁️ Load from Google Drive", key="load_drive", use_container_width=True):
+            if st.button("â˜ï¸ Load from Google Drive", key="load_drive", use_container_width=True):
                 if not is_google_drive_configured():
                     st.error("Google Drive is not configured.")
                 else:
-                    with st.spinner("📂 Loading and reading Drive files..."):
+                    with st.spinner("ðŸ“‚ Loading and reading Drive files..."):
                         try:
                             from tools.mcp_drive_client import DriveClient
 
@@ -2679,10 +3147,10 @@ if _ti is not None:
                                 st.session_state.drive_documents = docs
                                 from database.vector_db import embed_documents
 
-                                with st.spinner("🧠 Embedding into ChromaDB..."):
+                                with st.spinner("ðŸ§  Embedding into ChromaDB..."):
                                     res = embed_documents(docs, "documents")
                                 st.success(
-                                    f"✅ Loaded {len(docs)} docs · Embedded {res.get('embedded', 0)} into ChromaDB"
+                                    f"âœ… Loaded {len(docs)} docs Â· Embedded {res.get('embedded', 0)} into ChromaDB"
                                 )
                                 try:
                                     from database.sqlite_db import get_session, DocumentMeta
@@ -2708,7 +3176,7 @@ if _ti is not None:
                                         {"file": f.get("name", ""), "id": f.get("id", ""), "content": ""}
                                         for f in files
                                     ]
-                                    st.warning(f"⚠️ Listed {len(files)} files but could not read content.")
+                                    st.warning(f"âš ï¸ Listed {len(files)} files but could not read content.")
                                 else:
                                     st.warning("No files found in Google Drive.")
                         except DriveNotConfiguredError as e:
@@ -2717,7 +3185,7 @@ if _ti is not None:
                             st.error(f"Drive error: {e}")
 
         with lc2:
-            up_docs = st.file_uploader("📁 Upload Files", accept_multiple_files=True, type=["pdf","txt","docx"], key="doc_up")
+            up_docs = st.file_uploader("ðŸ“ Upload Files", accept_multiple_files=True, type=["pdf","txt","docx"], key="doc_up")
             if up_docs:
                 for f in up_docs:
                     if not any(d["file"]==f.name for d in st.session_state.drive_documents):
@@ -2735,43 +3203,26 @@ if _ti is not None:
                 if st.session_state.drive_documents:
                     from database.vector_db import embed_documents
                     embed_documents([d for d in st.session_state.drive_documents if d.get("content")], "documents")
-                st.success(f"✅ {len(st.session_state.drive_documents)} documents ready & embedded")
+                st.success(f"âœ… {len(st.session_state.drive_documents)} documents ready & embedded")
 
         if st.session_state.drive_documents:
             names = " | ".join(d["file"] for d in st.session_state.drive_documents[:5])
             extra = f" | +{len(st.session_state.drive_documents)-5} more" if len(st.session_state.drive_documents)>5 else ""
             st.markdown(f"**{len(st.session_state.drive_documents)} documents** | {names}{extra}")
-            if st.button("🗑️ Clear", key="clr_docs"): st.session_state.drive_documents=[]; st.rerun()
+            if st.button("ðŸ—‘ï¸ Clear", key="clr_docs"): st.session_state.drive_documents=[]; st.rerun()
 
         st.divider()
         docs_action = st.selectbox("Document Action", [
-            "💬 Q&A (RAG via ChromaDB)","🔍 Search","📝 Summarize",
-            "🔎 Extract Data","⚖️ Compare Two Docs","📊 Batch Analyze","📋 List All"
+            "ðŸ’¬ Q&A (RAG via ChromaDB)","ðŸ” Search","ðŸ“ Summarize",
+            "ðŸ”Ž Extract Data","âš–ï¸ Compare Two Docs","ðŸ“Š Batch Analyze","ðŸ“‹ List All"
         ], key="docs_action")
 
-        if docs_action.startswith("💬"):
-            for entry in st.session_state.docs_chat:
-                if entry["role"]=="user":
-                    st.markdown(f'<div class="chat-wrap"><div class="chat-user">👤 {entry["content"]}</div></div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="chat-wrap"><div class="chat-agent">📂 {entry["content"]}</div></div>', unsafe_allow_html=True)
-            with st.form("docs_qa", clear_on_submit=True):
-                dq  = st.text_area("Question", placeholder="Ask anything about your documents...", height=80)
-                dsb = st.form_submit_button("💬 Ask (RAG)", use_container_width=True)
-            if dsb and dq.strip():
-                st.session_state.docs_chat.append({"role":"user","content":dq.strip()})
-                with st.spinner("🧠 Searching ChromaDB..."):
-                    try:
-                        from agents.documents_agent import answer_question_from_documents
-                        ans = answer_question_from_documents(dq.strip(), st.session_state.drive_documents, docs_user)
-                        st.session_state.docs_chat.append({"role":"agent","content":ans})
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+        if docs_action.startswith("ðŸ’¬"):
+            st.caption("Type your question in the chat bar pinned at the bottom of the page. Your conversation appears at the top of this tab.")
 
-        elif docs_action.startswith("🔍"):
+        elif docs_action.startswith("ðŸ”"):
             sq = st.text_input("Search query", key="doc_sq")
-            if st.button("🔍 Search", key="doc_srch", use_container_width=True) and sq.strip():
+            if st.button("ðŸ” Search", key="doc_srch", use_container_width=True) and sq.strip():
                 with st.spinner("Searching..."):
                     try:
                         from agents.documents_agent import search_documents
@@ -2780,10 +3231,10 @@ if _ti is not None:
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif docs_action.startswith("📝"):
+        elif docs_action.startswith("ðŸ“"):
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="sum_sel")
-                if st.button("📝 Summarize", key="sum_btn", use_container_width=True):
+                if st.button("ðŸ“ Summarize", key="sum_btn", use_container_width=True):
                     doc = next((d for d in st.session_state.drive_documents if d["file"]==sel), None)
                     if doc:
                         with st.spinner("Summarizing..."):
@@ -2796,11 +3247,11 @@ if _ti is not None:
             else:
                 st.info("Load documents first.")
 
-        elif docs_action.startswith("🔎"):
+        elif docs_action.startswith("ðŸ”Ž"):
             ext_type = st.selectbox("Extract Type", ["all","dates","amounts","parties","clauses","contacts"], key="ext_t")
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="ext_sel")
-                if st.button("🔎 Extract", key="ext_btn", use_container_width=True):
+                if st.button("ðŸ”Ž Extract", key="ext_btn", use_container_width=True):
                     doc = next((d for d in st.session_state.drive_documents if d["file"]==sel), None)
                     if doc:
                         with st.spinner("Extracting..."):
@@ -2811,13 +3262,13 @@ if _ti is not None:
                             except Exception as e:
                                 st.error(f"Error: {e}")
 
-        elif docs_action.startswith("⚖️"):
+        elif docs_action.startswith("âš–ï¸"):
             if len(st.session_state.drive_documents) >= 2:
                 names = [d["file"] for d in st.session_state.drive_documents]
                 cc1, cc2 = st.columns(2)
                 with cc1: d1n = st.selectbox("Document 1", names, key="cmp1")
                 with cc2: d2n = st.selectbox("Document 2", names, index=1, key="cmp2")
-                if st.button("⚖️ Compare", key="cmp_btn", use_container_width=True):
+                if st.button("âš–ï¸ Compare", key="cmp_btn", use_container_width=True):
                     d1 = next((d for d in st.session_state.drive_documents if d["file"]==d1n), {})
                     d2 = next((d for d in st.session_state.drive_documents if d["file"]==d2n), {})
                     with st.spinner("Comparing..."):
@@ -2830,9 +3281,9 @@ if _ti is not None:
             else:
                 st.info("Load at least 2 documents.")
 
-        elif docs_action.startswith("📊"):
+        elif docs_action.startswith("ðŸ“Š"):
             bat = st.selectbox("Analysis Type", ["overview","financial","contracts","policies","compliance"], key="bat_t")
-            if st.button("📊 Batch Analyze", key="bat_btn", use_container_width=True):
+            if st.button("ðŸ“Š Batch Analyze", key="bat_btn", use_container_width=True):
                 with st.spinner(f"Analyzing {len(st.session_state.drive_documents)} documents..."):
                     try:
                         from agents.documents_agent import batch_analyze_documents
@@ -2841,17 +3292,16 @@ if _ti is not None:
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif docs_action.startswith("📋"):
-            if st.button("📋 List All", key="lst_btn", use_container_width=True):
+        elif docs_action.startswith("ðŸ“‹"):
+            if st.button("ðŸ“‹ List All", key="lst_btn", use_container_width=True):
                 from agents.documents_agent import list_documents_summary
                 st.markdown(f'<div class="resp-box resp-teal">{list_documents_summary(st.session_state.drive_documents)}</div>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB — HISTORY
-# ══════════════════════════════════════════════════════════════════════════════
-_ti = _tab_idx.get("History")
-if _ti is not None:
-    with tabs[_ti]:
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# TAB â€” HISTORY
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if active_tab == "History":
+    with _MAIN:
         st.markdown('<div class="sec-hdr sec-blue">Chat &amp; activity history</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="sec-hdr" style="margin-top:8px">Saved chat threads</div>', unsafe_allow_html=True)
@@ -2866,7 +3316,7 @@ if _ti is not None:
             if threads:
                 for t in threads:
                     with st.expander(
-                        f"Thread #{t['id']} · {t['updated_at']} · {t['message_count']} messages",
+                        f"Thread #{t['id']} Â· {t['updated_at']} Â· {t['message_count']} messages",
                         expanded=False,
                     ):
                         if t.get("preview"):
@@ -2886,10 +3336,10 @@ if _ti is not None:
                                 st.session_state.orch_conversation_id = t["id"]
                                 st.session_state.orch_chat = []
                                 _sync_orch_chat_from_db(force=True)
-                                st.info(f"Thread #{t['id']} loaded — open the **Assistant** tab to continue.")
+                                st.info(f"Thread #{t['id']} loaded â€” open the **Assistant** tab to continue.")
                                 st.rerun()
             else:
-                st.info("No saved chat threads yet. Use **Assistant** — each thread is stored automatically.")
+                st.info("No saved chat threads yet. Use **Assistant** â€” each thread is stored automatically.")
         except Exception as ex:
             st.error(f"Chat threads: {ex}")
 
@@ -2927,12 +3377,12 @@ if _ti is not None:
             st.error(f"History error: {e}")
 
         st.divider()
-        st.markdown('<div class="sec-hdr">🔐 Login History (database)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr">ðŸ” Login History (database)</div>', unsafe_allow_html=True)
         try:
             from database.sqlite_db import get_login_history
             if st.session_state.user_role == "Admin":
                 login_rows = get_login_history(limit=200)
-                st.caption("All users — stored in the database login history table.")
+                st.caption("All users â€” stored in the database login history table.")
             else:
                 login_rows = get_login_history(limit=100, username=st.session_state.username)
                 st.caption("Your sign-in / sign-out events only.")
@@ -2944,7 +3394,7 @@ if _ti is not None:
                         f'<div class="hist-row">'
                         f'<span class="badge {badge}">{(row.get("event") or "").upper()}</span> '
                         f'<b>{row.get("display_name", "")}</b> '
-                        f'<span style="color:#64748b">({row.get("username", "")} · {row.get("role", "")})</span><br>'
+                        f'<span style="color:#64748b">({row.get("username", "")} Â· {row.get("role", "")})</span><br>'
                         f'<small style="color:#94a3b8">{row.get("time", "")}</small>'
                         f"</div>",
                         unsafe_allow_html=True,
@@ -2953,4 +3403,28 @@ if _ti is not None:
                 st.info("No login history yet. Sign in and out to record events.")
         except Exception as e:
             st.error(f"Login history error: {e}")
+
+
+
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# PINNED CHAT BAR â€” rendered at top level so Streamlit anchors it to the bottom
+# of the viewport, like ChatGPT / Claude / Gemini. Shown for every agent tab.
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+if st.session_state.get("logged_in"):
+    _act = st.session_state.get("active_tab")
+    if _act == "Assistant":
+        _prompt = st.chat_input(
+            "Message the assistantâ€¦  (e.g. fetch latest 10 candidate emails, then shortlist 2 for Python)"
+        )
+        if _prompt and _prompt.strip():
+            st.session_state["_pending_orch_prompt"] = _prompt.strip()
+            st.rerun()
+    elif _act in _AGENT_CHAT:
+        _ph = _AGENT_CHAT[_act][2]
+        _prompt = st.chat_input(_ph)
+        if _prompt and _prompt.strip():
+            st.session_state[f"_pending_{_act}"] = _prompt.strip()
+            st.rerun()
+
+
 

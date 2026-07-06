@@ -20,6 +20,12 @@ _AUTH_DEFAULTS = {
     "auth_dev_otp_email": "",
 }
 
+_AUTH_HEADINGS = {
+    "login": ("🔐", "Welcome back", "Sign in to access your automation workspace."),
+    "signup": ("✨", "Create account", "Register with email verification to get started."),
+    "forgot": ("🔑", "Reset password", "Verify your identity, then choose a new password."),
+}
+
 
 def _init_auth_session() -> None:
     for k, v in _AUTH_DEFAULTS.items():
@@ -27,29 +33,47 @@ def _init_auth_session() -> None:
             st.session_state[k] = v if not isinstance(v, dict) else {}
 
 
-def _auth_brand() -> None:
+def _auth_hero_panel() -> None:
     st.markdown(
         """
-        <div class="auth-brand">
-            <h1>Office Automation Pro</h1>
+        <div class="auth-hero-panel">
+            <div class="auth-hero-inner">
+                <div class="auth-hero-badge">Secure enterprise portal</div>
+                <div class="auth-hero-logo">🤖</div>
+                <h1>Office Automation Pro</h1>
+                <p>Multi-agent AI workspace for HR, Finance, IT, and email — powered by orchestrated automation.</p>
+                <ul class="auth-feature-list">
+                    <li><span class="auth-feature-icon">⚡</span> Intelligent agent routing</li>
+                    <li><span class="auth-feature-icon">🛡️</span> Role-based secure access</li>
+                    <li><span class="auth-feature-icon">📊</span> Real-time dashboards & history</li>
+                </ul>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def _auth_screen_heading() -> None:
+def _auth_card_header() -> None:
     screen = st.session_state.auth_screen
-    if screen == "signup":
-        st.markdown("### Create account")
-        st.caption("Register with email verification.")
-    elif screen == "forgot":
-        st.markdown("### Reset password")
-        st.caption("Verify your identity, then choose a new password.")
+    icon, title, subtitle = _AUTH_HEADINGS.get(
+        screen, ("🔐", "Sign in", "Access your workspace.")
+    )
+    st.markdown(
+        f"""
+        <div class="auth-card-header">
+            <div class="auth-card-icon">{icon}</div>
+            <h2>{title}</h2>
+            <p>{subtitle}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _auth_secondary_links() -> None:
     screen = st.session_state.auth_screen
+    st.markdown('<div class="auth-divider"></div>', unsafe_allow_html=True)
     if screen == "login":
         c1, c2 = st.columns(2)
         with c1:
@@ -150,17 +174,16 @@ def _validate_password(password: str) -> str | None:
 
 
 def _render_login(*, new_session_id_fn, record_login_fn) -> None:
-    st.caption("Enter your username and password.")
     username = st.text_input(
         "Username",
-        placeholder="e.g. admin, hr, finance",
+        placeholder="Enter your username",
         autocomplete="username",
         key="login_username",
     )
     password = st.text_input(
         "Password",
         type="password",
-        placeholder="Your password",
+        placeholder="Enter your password",
         autocomplete="current-password",
         key="login_password",
     )
@@ -172,7 +195,14 @@ def _render_login(*, new_session_id_fn, record_login_fn) -> None:
             _complete_login(user, new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
         else:
             st.error("Invalid username or password.")
-    st.caption("Demo: **admin**, **hr**, **finance**, **it** — or use your assigned account.")
+    st.markdown(
+        """
+        <div class="auth-demo-pill">
+            Demo accounts: <strong>admin</strong> · <strong>hr</strong> · <strong>finance</strong> · <strong>it</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_signup() -> None:
@@ -182,7 +212,7 @@ def _render_signup() -> None:
     draft = st.session_state.signup_draft
 
     if step == 1:
-        st.caption("Step 1 of 2 - Account details")
+        st.caption("Step 1 of 2 — Account details")
         draft["display_name"] = st.text_input("Full name", value=draft.get("display_name", ""))
         draft["username"] = st.text_input("Username", value=draft.get("username", ""))
         draft["email"] = st.text_input("Work email", value=draft.get("email", ""))
@@ -209,7 +239,7 @@ def _render_signup() -> None:
                 st.rerun()
 
     elif step == 2:
-        st.caption("Step 2 of 2 - Verify email")
+        st.caption("Step 2 of 2 — Verify email")
         email = (draft.get("email") or "").strip()
         st.markdown(f"Code will be sent to **{email}**")
         if st.button("Send email code", use_container_width=True):
@@ -313,7 +343,7 @@ def _render_forgot() -> None:
 
     elif step == 3:
         u = st.session_state.forgot_username
-        st.caption("Step 2 of 2 - Set new password")
+        st.caption("Step 2 of 2 — Set new password")
         new_pw = st.text_input("New password", type="password")
         new_pw2 = st.text_input("Confirm new password", type="password")
         if st.button("Update password", use_container_width=True, type="primary"):
@@ -343,20 +373,34 @@ def render_auth_gate(*, new_session_id_fn, record_login_fn) -> None:
         return
 
     _init_auth_session()
-    _auth_brand()
 
-    _, col, _ = st.columns([1, 1.2, 1])
-    with col:
-        with st.container(border=True):
-            _auth_screen_heading()
-            screen = st.session_state.auth_screen
-            if screen == "login":
-                _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
-            elif screen == "signup":
-                _render_signup()
-            elif screen == "forgot":
-                _render_forgot()
-            _auth_secondary_links()
+    st.markdown('<div class="auth-page-wrap">', unsafe_allow_html=True)
+
+    hero_col, form_col = st.columns([1.05, 1], gap="medium")
+
+    with hero_col:
+        _auth_hero_panel()
+
+    with form_col:
+        st.markdown('<div class="auth-form-shell">', unsafe_allow_html=True)
+        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+        _auth_card_header()
+        screen = st.session_state.auth_screen
+        if screen == "login":
+            _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
+        elif screen == "signup":
+            _render_signup()
+        elif screen == "forgot":
+            _render_forgot()
+        _auth_secondary_links()
+        st.markdown(
+            '<p class="auth-footer-note">Protected by role-based access · KIET Automation Suite</p>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if is_hosted_deploy() and not (OPENAI_API_KEY or "").strip():
         st.warning(
