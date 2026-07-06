@@ -613,6 +613,14 @@ def _sync_orch_chat_from_db(force: bool = False) -> None:
             pass
 
 
+def _clear_hr_ats_state() -> None:
+    st.session_state.pending_hr_gmail_batch_id = None
+    st.session_state.hr_ats_batch_id = None
+    st.session_state.hr_ats_candidates = []
+    st.session_state.hr_ats_filters = {}
+    st.session_state.hr_ats_selected = []
+
+
 def _sync_hr_ats_from_result(result: dict) -> None:
     """Keep last fetched candidates in session for ATS panel + follow-up commands."""
     if not result or not result.get("ok"):
@@ -685,6 +693,8 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                             )
                             if sr.get("ok"):
                                 st.success(f"Sent to **{name}**.")
+                                _clear_hr_ats_state()
+                                st.rerun()
                             else:
                                 st.error(sr.get("error", "Send failed."))
                         except Exception as ex:
@@ -708,7 +718,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="send to selected", ui_selected_ids=selected)
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** email(s).")
-                    st.session_state.pending_hr_gmail_batch_id = None
+                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -721,6 +731,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all recommended candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** to recommended.")
+                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -731,6 +742,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="invite top 2 candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
+                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -742,7 +754,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all candidates send to everyone")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
-                    st.session_state.pending_hr_gmail_batch_id = None
+                    _clear_hr_ats_state()
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -755,7 +767,23 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
     t = ui.get("type") or ""
     if t == "hr_shortlist":
         bid = ui.get("batch_id")
-        if bid:
+        send_result = ui.get("send_result") or {}
+        already_sent = bool(send_result.get("ok"))
+        if bid and not already_sent:
+            try:
+                from database.sqlite_db import hr_shortlist_get_batch
+
+                row = hr_shortlist_get_batch(bid)
+                already_sent = bool(row and row.get("status") == "sent")
+            except Exception:
+                pass
+        if already_sent:
+            _clear_hr_ats_state()
+            sent_n = send_result.get("emails_sent")
+            msg = f"Sent {sent_n} invitation(s) via Gmail." if sent_n is not None else "Interview invitation emails already sent."
+            st.success(msg)
+            return
+        if bid and not already_sent:
             st.session_state.pending_hr_gmail_batch_id = bid
             st.session_state.hr_ats_batch_id = bid
         st.session_state.hr_ats_candidates = ui.get("candidates") or []
@@ -767,11 +795,6 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
         c3.metric("CVs parsed", stats.get("attachments_parsed", "—"))
         skills = stats.get("required_skills") or []
         c4.metric("Skill filter", ", ".join(skills) if skills else "—")
-        send_result = ui.get("send_result") or {}
-        if send_result.get("ok"):
-            st.success(
-                f"Sent {send_result.get('emails_sent', 0)} invitation(s) via Gmail."
-            )
         _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
     elif t == "hr_inventory":
         st.markdown(
@@ -809,6 +832,7 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
                 st.caption(f"Attachments: {em.get('attachment_count', 0)}")
     elif t == "email_send":
         if ui.get("ok"):
+            _clear_hr_ats_state()
             st.success(ui.get("message") or "Emails sent.")
         else:
             st.warning(ui.get("message") or "Send could not be completed.")
@@ -828,7 +852,7 @@ def _start_new_orch_conversation() -> None:
         st.session_state.orch_chat = []
         st.session_state.orch_last_proc = None
         st.session_state["_orch_active_cid"] = cid
-        st.session_state.pending_hr_gmail_batch_id = None
+        _clear_hr_ats_state()
 
 
 def _render_inbox_email_detail(em: dict) -> None:
@@ -1442,10 +1466,13 @@ if _ti is not None:
             else:
                 from tools.assistant_display import build_display_text
 
-                display = entry.get("display_content") or build_display_text(
-                    entry.get("content", ""),
-                    entry.get("ui_payload"),
-                )
+                display = entry.get("display_content") or ""
+                full_content = entry.get("content", "")
+                if (
+                    not display
+                    or (display.rstrip().endswith(("…", "â€¦")) and len(full_content or "") > len(display))
+                ):
+                    display = build_display_text(full_content, entry.get("ui_payload"))
                 body = _hesc_html(display)
                 badges = " ".join(
                     f'<span class="badge badge-indigo">{_hesc_html(a)}</span>'
@@ -1539,11 +1566,11 @@ if _ti is not None:
                         )
                         st.session_state.orch_last_proc = dedupe
                         if result.get("hr_gmail_pending_cleared"):
-                            st.session_state.pending_hr_gmail_batch_id = None
+                            _clear_hr_ats_state()
                         elif result.get("hr_gmail_batch_id"):
                             st.session_state.pending_hr_gmail_batch_id = result["hr_gmail_batch_id"]
                         st.session_state.orch_finance_export_files = result.get("finance_export_files")
-                        if "hr_gmail" in (result.get("agents_used") or []):
+                        if "hr_gmail" in (result.get("agents_used") or []) and not result.get("hr_gmail_pending_cleared"):
                             try:
                                 from database.sqlite_db import hr_shortlist_get_batch
                                 bid = result.get("hr_gmail_batch_id")
@@ -1626,8 +1653,7 @@ if _ti is not None:
             st.caption("Active shortlist — use chat to send invites or the actions below.")
             _render_hr_ats_candidate_panel(_pbid, key_prefix="asst_sticky")
             if st.button("Dismiss shortlist panel", key="asst_hitl_clear"):
-                st.session_state.pending_hr_gmail_batch_id = None
-                st.session_state.hr_ats_candidates = []
+                _clear_hr_ats_state()
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════

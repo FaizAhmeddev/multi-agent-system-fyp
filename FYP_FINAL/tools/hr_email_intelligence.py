@@ -23,6 +23,7 @@ from tools.hr_gmail_shortlist import (
     approve_and_send_shortlist_batch,
     format_hr_gmail_approve_send_reply,
     handle_hr_recruitment_follow_up,
+    hr_shortlist_get_batch,
     parse_gmail_shortlist_prompt,
     prompt_has_hiring_focus,
     run_gmail_shortlist_from_user_prompt,
@@ -295,7 +296,12 @@ def parse_email_search_prompt(message: str) -> dict[str, Any] | None:
     sender = ""
     sem = re.search(r"(?:from|sender)\s+([a-z0-9._@\s-]{3,80})", low, re.I)
     if sem:
-        sender = sem.group(1).strip()
+        candidate_sender = sem.group(1).strip()
+        # "fetch … from last 10 emails" is an inbox window, not a sender filter
+        if not re.search(
+            r"\blast\s+\d+\s+(?:e-?mails?|emails?|messages?)\b", candidate_sender, re.I
+        ):
+            sender = candidate_sender
 
     subject = ""
     subm = re.search(r"subject\s+(?:contains?|like|is)\s+['\"]?([^'\".;,\n]{2,80})", m, re.I)
@@ -772,12 +778,32 @@ def try_hr_email_assistant_command(
             ui = None
             bid = fu.get("hr_gmail_batch_id")
             if "sent" in (fu.get("final_answer") or "").lower() and fu.get("ok"):
-                ui = {
-                    "type": "email_send",
-                    "ok": True,
-                    "emails_sent": 1,
-                    "message": build_display_text(fu.get("final_answer", ""), None),
-                }
+                send_result = fu.get("send_result") or {}
+                row = hr_shortlist_get_batch(bid) if bid else None
+                if row:
+                    payload = row.get("payload") or {}
+                    ui = build_hr_shortlist_ui_payload(
+                        {
+                            "batch_id": bid,
+                            "drafts": payload.get("top") or [],
+                            "role_title": (row.get("criteria") or "")[:120],
+                            "emails_scanned": payload.get("emails_scanned", 0),
+                            "attachments_parsed": payload.get("attachments_parsed", 0),
+                            "filters_applied": (payload.get("session_memory") or {}).get("filters_applied") or {},
+                        },
+                        send_result={
+                            "ok": True,
+                            "emails_sent": send_result.get("emails_sent", 0),
+                            "error": send_result.get("error"),
+                        },
+                    )
+                else:
+                    ui = {
+                        "type": "email_send",
+                        "ok": True,
+                        "emails_sent": send_result.get("emails_sent", 0),
+                        "message": build_display_text(fu.get("final_answer", ""), None),
+                    }
             elif not fu.get("ok") and "No shortlist batch" in (fu.get("final_answer") or ""):
                 ui = {
                     "type": "hr_error",

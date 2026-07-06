@@ -98,8 +98,7 @@ def _send_otp(username: str, channel: str, destination: str, purpose: str) -> bo
 
 def _complete_login(user: dict, *, new_session_id_fn, record_login_fn) -> None:
     from database.sqlite_db import (
-        get_or_create_conversation,
-        load_conversation_ui_messages,
+        create_new_conversation,
         touch_user_session,
     )
 
@@ -114,14 +113,18 @@ def _complete_login(user: dict, *, new_session_id_fn, record_login_fn) -> None:
         user["name"],
         user["role"],
     )
-    st.session_state.orch_conversation_id = get_or_create_conversation(
+    st.session_state.orch_conversation_id = create_new_conversation(
         st.session_state.auth_session_id,
         user["username"],
         "orchestrator",
     )
-    st.session_state.orch_chat = load_conversation_ui_messages(
-        st.session_state.orch_conversation_id
-    )
+    st.session_state.orch_chat = []
+    st.session_state["_orch_active_cid"] = st.session_state.orch_conversation_id
+    st.session_state.pending_hr_gmail_batch_id = None
+    st.session_state.hr_ats_batch_id = None
+    st.session_state.hr_ats_candidates = []
+    st.session_state.hr_ats_filters = {}
+    st.session_state.hr_ats_selected = []
     record_login_fn(
         username=user["username"],
         display_name=user["name"],

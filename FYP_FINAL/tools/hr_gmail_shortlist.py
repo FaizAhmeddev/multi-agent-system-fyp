@@ -187,6 +187,8 @@ def _extract_top_n_from_prompt(low: str) -> int | None:
         r"\btop\s*(?P<n>\d+|one|two|three|four|five)\s+(?:candidates?|developers?|engineers?)\b",
         r"\bshortlist\s+(?P<n>\d+|one|two|three|four|five)\b",
         r"\b(\d+)\s+best\s+candidates?\b",
+        r"\b(?P<n>\d+|one|two|three|four|five)\s+best\s+"
+        rf"(?:{_TECH_ROLE_RE})\s+(?:developer|engineer|candidate)s?\b",
     )
     for pat in patterns:
         mm = re.search(pat, low, re.I)
@@ -257,6 +259,10 @@ def is_inbox_list_only_request(message: str) -> bool:
     low = (message or "").lower().strip()
     if len(low) < 8:
         return False
+    if _prompt_has_hiring_focus(low):
+        return False
+    if re.search(r"\b(?:\d+|one|two|three|four|five)\s+best\b", low):
+        return False
     if re.search(r"\b(?:select|shortlist|pick|choose|rank|screen|hire)\b", low):
         if re.search(
             r"\b(?:select|shortlist|pick|choose)\s+(?:\d+|one|two|three|four|five|top)\b",
@@ -297,6 +303,13 @@ def prompt_has_hiring_focus(message: str) -> bool:
 
 def _is_employee_onboarding_context(low: str) -> bool:
     """Multi-step new-hire workflows belong to the orchestrator, not Gmail CV shortlist."""
+    strong = (
+        "complete the full onboarding",
+        "full onboarding process",
+        "onboarding process automatically",
+    )
+    if any(x in low for x in strong):
+        return True
     markers = (
         "onboarding process",
         "full onboarding",
@@ -1153,7 +1166,8 @@ def handle_hr_recruitment_follow_up(
             "ok": bool(sr.get("ok")),
             "final_answer": body,
             "agents_used": ["hr_gmail"],
-            "hr_gmail_batch_id": None if sr.get("ok") else bid,
+            "hr_gmail_batch_id": bid,
+            "send_result": sr,
         }
         if sr.get("ok"):
             out["hr_gmail_pending_cleared"] = True

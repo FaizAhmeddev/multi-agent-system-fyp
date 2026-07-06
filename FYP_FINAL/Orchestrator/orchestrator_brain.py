@@ -67,6 +67,49 @@ def _thread_blob(
     return "\n".join(parts)
 
 
+def _is_contextual_followup_request(message: str) -> bool:
+    """True when the current message needs prior chat to resolve pronouns/actions."""
+    low = (message or "").strip().lower()
+    if not low:
+        return False
+    if len(low) <= 80 and re.search(
+        r"\b(?:yes|continue|go ahead|send it|send them|approve|approved|do it|"
+        r"complete it|complete other|other task|given task|remaining task|next step|"
+        r"that|those|them|same|again)\b",
+        low,
+    ):
+        return True
+    if len(low) <= 120 and re.fullmatch(r"[\w.+-]+@[\w.-]+\.\w+", low):
+        return True
+    return bool(
+        len(low) <= 120
+        and re.search(r"\b(?:it|that|those|them|same)\b", low)
+        and re.search(r"\b(?:send|email|create|make|complete|attach|invite|approve)\b", low)
+    )
+
+# Matches "1. ", "2. " etc. anywhere in text — not just at line starts.
+# Negative lookbehind avoids false-splitting on decimals like "3.5".
+_NUMBERED_ITEM_RE = re.compile(r'(?<!\d)(\d{1,2})\.\s+(?=\S)')
+
+
+def _split_numbered_tasks(message: str) -> list[str]:
+    """Split a prompt into task strings, whether items are on separate lines or inline."""
+    msg = (message or "").strip()
+    if not msg:
+        return []
+    matches = list(_NUMBERED_ITEM_RE.finditer(msg))
+    if len(matches) < 2:
+        return []
+    tasks = []
+    for i, m in enumerate(matches):
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(msg)
+        task = msg[start:end].strip()
+        if task:
+            tasks.append(task)
+    return tasks
+
+
 def _is_onboarding_workflow(
     user_message: str,
     conversation_history: Optional[List[Dict[str, str]]] = None,
@@ -80,7 +123,9 @@ def _should_skip_gmail_shortcircuit(
     user_message: str,
     conversation_history: Optional[List[Dict[str, str]]] = None,
 ) -> bool:
-    """Onboarding threads and direct SMTP sends must not hijack the Gmail inbox pipeline."""
+    """Onboarding threads, multi-task prompts, and direct SMTP sends must not hijack parallel routing."""
+    if _is_parallel_multi_task_request(user_message, conversation_history):
+        return True
     if _is_onboarding_workflow(user_message, conversation_history):
         return True
     if _is_compose_to_person_request(user_message, conversation_history):
@@ -96,7 +141,9 @@ def _is_compose_to_person_request(
     from tools.hr_gmail_shortlist import is_compose_email_to_person
 
     msg = (user_message or "").strip()
-    if not msg or _is_onboarding_workflow(msg, conversation_history):
+    if not msg or _is_parallel_multi_task_request(msg, conversation_history):
+        return False
+    if _is_onboarding_workflow(msg, conversation_history):
         return False
     if is_compose_email_to_person(msg) or _looks_like_one_off_email_request(msg):
         return True
@@ -134,8 +181,14 @@ def _extract_onboarding_facts(
 
     for pat in (
         r"(?:new employee|employee named?|joining(?: the company)?(?: as)?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+        r"\bnew employee named?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
         r"\b([A-Z][a-z]+\s+[A-Z][a-z]+)\s+is joining",
-        r"named?\s+([A-Z][a-z]+\s+[A-Z][a-z]+)",
+        r"named?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
+        r"(?:welcome email|send (?:a )?welcome email|email)\s+to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
+        r"(?:send (?:a )?e-?mail (?:for|to)|email (?:for|to))\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
+        r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'s joining",
+        r"(?:send (?:a )?e-?mail (?:for|to)|email (?:for|to))\s+([A-Z][a-z]+)\b",
+        r"(?:payroll entry|salary breakdown)(?:\s+(?:for|of))?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
     ):
         m = re.search(pat, blob)
         if m:
@@ -164,6 +217,157 @@ def _onboarding_agent_set() -> list[str]:
     return ["hr", "email", "it_support", "finance", "documents"]
 
 
+_ONBOARDING_AGENT_TASKS: dict[str, str] = {
+    "hr": "Create employee profile, offer letter text, orientation schedule, onboarding summary.",
+    "email": "Compose and send welcome email with joining instructions to the employee.",
+    "it_support": "Create IT ticket for laptop, official email, and software setup.",
+    "finance": "Generate monthly salary breakdown and initial payroll entry; export PDF.",
+    "documents": "Prepare offer letter and onboarding summary documents.",
+}
+
+# Keyword hints to route numbered list items to LangGraph specialist agents (parallel fan-out).
+# Order matters: hr_gmail before hr so inbox fetch lines are not misrouted.
+_TASK_LINE_AGENT_HINTS: dict[str, tuple[str, ...]] = {
+    "hr_gmail": (
+        "fetch", "last 10", "last 20", "last 30", "last 40", "inbox", "shortlist",
+        "python developer", "developer from", "from last", "candidate email", "best python",
+        "best developer", "top developer", "last emails", "last email",
+    ),
+    "email": (
+        "welcome email", "send email", "send a email", "send a welcome", "email to",
+        "email that", "email for", "mail to", "send mail", "notify", "welcome to join",
+    ),
+    "documents": (
+        "offer letter", "joining letter", "joining pdf", "letter in pdf", " in pdf", "generate pdf",
+        "documents folder", "store all", "generated documents",
+        "google drive", "file system", "save it", "company file", "attach letter",
+    ),
+    "it_support": (
+        "it support", "it ticket", "laptop", "software installation", "official email setup",
+        "provisioning", "vpn", "wifi",
+    ),
+    "finance": (
+        "payroll", "salary breakdown", "salary", "payroll entry", "monthly salary",
+    ),
+    "hr": (
+        "employee profile", "orientation", "schedule orientation", "onboarding summary",
+        "employment offer", "joining date", "department", "designation", "admin dashboard",
+        "log all agent", "inter-agent",
+    ),
+}
+
+
+def _is_parallel_multi_task_request(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> bool:
+    """True when the user lists several tasks that should run specialist agents in parallel."""
+    if _is_onboarding_workflow(user_message, conversation_history):
+        return True
+    msg = (user_message or "").strip()
+    low = msg.lower()
+    numbered = len(_split_numbered_tasks(msg))
+    if re.search(r"\bcomplete\s+(?:the\s+)?(?:below|following)\b", low):
+        return numbered >= 2
+    if "tasks to perform" in low or "complete the following" in low:
+        return numbered >= 2
+    return numbered >= 3
+
+
+def _parallel_multi_task_preflight(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+) -> dict:
+    """Deterministic parallel routing for onboarding / numbered multi-step prompts."""
+    msg = (user_message or "").strip()
+    onboarding = _is_onboarding_workflow(msg, conversation_history)
+    numbered_lines = _split_numbered_tasks(msg)
+
+    facts = _extract_onboarding_facts(msg, conversation_history)
+    facts_block = _facts_context_block(facts)
+    assigned: dict[str, list[str]] = {}
+
+    if numbered_lines:
+        for line in numbered_lines:
+            low_line = line.lower()
+            routed_slugs: list[str] = []
+            for slug, keys in _TASK_LINE_AGENT_HINTS.items():
+                if any(k in low_line for k in keys):
+                    routed_slugs.append(slug)
+            # A single job can require more than one agent, e.g. "create and email
+            # the joining letter" belongs to Documents and Email in the same fan-out.
+            if routed_slugs:
+                for slug in normalize_agent_list(routed_slugs):
+                    assigned.setdefault(slug, []).append(line)
+            else:
+                assigned.setdefault("hr", []).append(line)
+        agents = normalize_agent_list(list(assigned.keys()))
+    elif onboarding:
+        agents = normalize_agent_list(_onboarding_agent_set())
+        assigned = {slug: [] for slug in agents}
+    else:
+        agents = expand_agents_for_multi_task(msg, [], conversation_history)
+        if len(agents) < 2:
+            agents = normalize_agent_list(_onboarding_agent_set())
+        assigned = {slug: [] for slug in agents}
+
+    agent_tasks: dict[str, str] = {}
+    for slug in agents:
+        lines = assigned.get(slug) or []
+        if lines:
+            if slug == "hr_gmail":
+                task_body = "\n".join(lines)
+            else:
+                task_body = "Your assigned tasks from the user request:\n" + "\n".join(
+                    f"- {ln}" for ln in lines
+                )
+        else:
+            task_body = _ONBOARDING_AGENT_TASKS.get(slug, msg)
+        # hr_gmail must see only its inbox/shortlist lines — full onboarding context
+        # makes classify_hr_email_intent return "none" and misparses inbox search.
+        if slug == "hr_gmail" and lines:
+            agent_tasks[slug] = task_body
+        else:
+            agent_tasks[slug] = facts_block + task_body + "\n\nFull request context:\n" + msg[:6000]
+
+    limitations: list[str] = []
+    clarify_prefix = ""
+    if "email" in agents and not facts.get("email"):
+        recipient_name = facts.get("name") or ""
+        if not recipient_name:
+            for line in assigned.get("email") or []:
+                recipient_name = _parse_compose_recipient_name(line)
+                if recipient_name:
+                    break
+        if recipient_name:
+            clarify_prefix = (
+                f"Before I can send emails to **{recipient_name}**, please share their **email address**.\n\n"
+                "I'll still run your other tasks in parallel and prepare email drafts meanwhile."
+            )
+        else:
+            clarify_prefix = (
+                "Before I can send the requested emails, please share the recipient's **full name** "
+                "or **email address**.\n\n"
+                "I'll still run your other tasks in parallel and prepare email drafts meanwhile."
+            )
+        limitations.append(
+            "Recipient email not in the thread; email agent will draft until an address is provided."
+        )
+    if onboarding and not facts.get("salary") and "finance" in agents:
+        limitations.append(
+            "Salary not specified; finance will use placeholders in payroll breakdown."
+        )
+
+    return {
+        "proceed": True,
+        "message": "",
+        "agents": agents,
+        "agent_tasks": {k: agent_tasks[k] for k in agents if k in agent_tasks},
+        "limitations": limitations,
+        "clarify_prefix": clarify_prefix,
+    }
+
+
 def _facts_context_block(facts: dict[str, str]) -> str:
     if not facts:
         return ""
@@ -179,8 +383,11 @@ def _parse_compose_recipient_name(message: str) -> str:
     patterns = (
         r"\b(?:email|mail|send|write|invite)\s+(?:an?\s+)?(?:e-?mail\s+)?to\s+"
         r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})",
+        r"\b(?:send|email|mail)\s+(?:an?\s+)?(?:e-?mail\s+)?for\s+"
+        r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})",
         r"\b(?:interview|invite|notify)\b.*\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})",
         r"\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b.*\b(?:interview|invite)\b",
+        r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'s joining",
     )
     for pat in patterns:
         hit = re.search(pat, m, re.I)
@@ -744,6 +951,48 @@ def _assistant_preflight_result(
             "limitations": [],
         }
 
+    if re.fullmatch(r"[\w.+-]+@[\w.-]+\.\w+", msg):
+        prior_email_task = ""
+        for entry in reversed(conversation_history or []):
+            if (entry.get("role") or "").strip().lower() != "user":
+                continue
+            prev = (entry.get("content") or "").strip()
+            if re.search(r"\b(?:send|email|mail|welcome|joining letter|offer letter|invite)\b", prev, re.I):
+                prior_email_task = prev
+                break
+        if prior_email_task:
+            return {
+                "proceed": True,
+                "message": "",
+                "agents": ["email"],
+                "agent_tasks": {"email": msg},
+                "limitations": [],
+            }
+
+    if re.search(r"\b(?:other|remaining|given)\s+tasks?\b|\bcomplete\s+other\b", low):
+        for entry in reversed(conversation_history or []):
+            if (entry.get("role") or "").strip().lower() != "user":
+                continue
+            prev = (entry.get("content") or "").strip()
+            if not _split_numbered_tasks(prev):
+                continue
+            prior = _parallel_multi_task_preflight(prev, None)
+            agents = [a for a in normalize_agent_list(prior.get("agents") or []) if a != "hr_gmail"]
+            if agents:
+                tasks = {
+                    k: v for k, v in (prior.get("agent_tasks") or {}).items()
+                    if k in agents
+                }
+                return {
+                    **prior,
+                    "agents": agents,
+                    "agent_tasks": tasks,
+                    "clarify_prefix": prior.get("clarify_prefix", ""),
+                }
+
+    if _is_parallel_multi_task_request(msg, conversation_history):
+        return _parallel_multi_task_preflight(msg, conversation_history)
+
     if _is_compose_to_person_request(msg, conversation_history):
         compose_check = validate_compose_email_request(msg, conversation_history)
         task = msg
@@ -762,6 +1011,11 @@ def _assistant_preflight_result(
         return out
 
     if _looks_like_export_request(msg):
+        if (
+            _is_onboarding_workflow(msg, conversation_history)
+            or _is_parallel_multi_task_request(msg, conversation_history)
+        ):
+            return _parallel_multi_task_preflight(msg, conversation_history)
         if not _has_substantive_export_data(msg, attachments):
             return {
                 "proceed": False,
@@ -935,6 +1189,9 @@ def _pre_route_intent(
 
     if _is_compose_to_person_request(user_message, conversation_history):
         return ["email"]
+
+    if _is_parallel_multi_task_request(user_message, conversation_history):
+        return None
 
     hr_mail_intent = classify_hr_email_intent(user_message)
     if hr_mail_intent in ("inbox_browse", "cv_inventory", "cv_shortlist"):
@@ -1223,6 +1480,9 @@ def apply_routing_corrections(
     if not msg:
         return agents
 
+    if _is_parallel_multi_task_request(msg, conversation_history):
+        return normalize_agent_list(agents)
+
     if _is_compose_to_person_request(msg, conversation_history):
         return ["email"]
 
@@ -1252,6 +1512,8 @@ def _finalize_agent_routing(
     attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> List[str]:
     """Last routing pass before parallel execution — prevents hr_gmail + email double-runs."""
+    if _is_parallel_multi_task_request(user_message, conversation_history):
+        return normalize_agent_list(agents)
     agents = apply_routing_corrections(user_message, agents, conversation_history, attachments)
     agents = coerce_agents_for_cv_hiring(user_message, attachments, agents)
     if _is_compose_to_person_request(user_message, conversation_history):
@@ -1274,8 +1536,13 @@ def expand_agents_for_multi_task(
         return ["email"]
 
     low = (message or "").lower()
-    numbered = len(re.findall(r"(?m)^\s*\d+\.\s", message or ""))
-    multi = numbered >= 3 or "tasks to perform" in low or "complete the following" in low
+    numbered = len(_split_numbered_tasks(message or ""))
+    multi = (
+        numbered >= 3
+        or "tasks to perform" in low
+        or "complete the following" in low
+        or (re.search(r"\bcomplete\s+(?:the\s+)?(?:below|following)\b", low) and numbered >= 2)
+    )
     if not multi and len(agents) > 1:
         return agents
     if not multi:
@@ -1284,7 +1551,7 @@ def expand_agents_for_multi_task(
     extra = set(agents)
     if any(k in low for k in ("fetch", "inbox", "last 10", "last 20", "shortlist", "python developer", "gmail")):
         extra.add("hr_gmail")
-    if any(k in low for k in ("welcome email", "send email", "send a welcome", "email to", "notify", "compose")):
+    if any(k in low for k in ("welcome email", "send email", "send a email", "send a welcome", "email to", "email for", "notify", "compose")):
         extra.add("email")
     if any(
         k in low
@@ -1371,10 +1638,12 @@ def plan_orchestrator_request(
             out["clarify_prefix"] = compose_check["clarify_message"]
         return out
 
-    hist = _history_context_block(conversation_history, max_turns=10)
-    facts = _extract_onboarding_facts(user_message, conversation_history)
+    use_thread_context = _is_contextual_followup_request(user_message)
+    hist = _history_context_block(conversation_history, max_turns=10) if use_thread_context else ""
+    planning_history = conversation_history if use_thread_context else None
+    facts = _extract_onboarding_facts(user_message, planning_history)
     facts_block = _facts_context_block(facts)
-    onboarding = _is_onboarding_workflow(user_message, conversation_history)
+    onboarding = _is_onboarding_workflow(user_message, planning_history)
     caps = []
     if not is_gmail_configured():
         caps.append("Gmail fetch/send is not configured (set GMAIL_EMAIL and GMAIL_APP_PASSWORD in .env).")
@@ -1465,14 +1734,7 @@ JSON only:"""
                     limitations = [
                         "Some employee details were not in the thread; agents will use placeholders where needed."
                     ]
-            default_tasks = {
-                "hr": "Create employee profile, offer letter text, orientation schedule, onboarding summary.",
-                "email": "Compose and send welcome email with joining instructions to the employee.",
-                "it_support": "Create IT ticket for laptop, official email, and software setup.",
-                "finance": "Generate monthly salary breakdown and initial payroll entry; export PDF.",
-                "documents": "Prepare offer letter and onboarding summary documents.",
-            }
-            for slug, task in default_tasks.items():
+            for slug, task in _ONBOARDING_AGENT_TASKS.items():
                 agent_tasks.setdefault(slug, task)
         agents = apply_routing_corrections(
             user_message, agents, conversation_history, attachments=None
@@ -1528,9 +1790,10 @@ def detect_intent_llm(
 
     try:
         llm = _get_llm()
-        hist = _history_context_block(conversation_history, max_turns=8)
+        use_thread_context = _is_contextual_followup_request(user_message)
+        hist = _history_context_block(conversation_history, max_turns=8) if use_thread_context else ""
         context_block = (
-            f"\nRecent conversation:\n{hist}\n" if hist else "\n(No prior turns in this thread.)\n"
+            f"\nRecent conversation:\n{hist}\n" if hist else "\n(No prior turns used for this independent request.)\n"
         )
         prompt = f"""You are an intent detector for an office automation system.
 Use the conversation thread to resolve follow-ups ("that", "them", "approve", "send it", "the shortlist").
@@ -1775,7 +2038,9 @@ class Orchestrator:
         forced_agents: Optional[List[str]] = None
         clarify_prefix = ""
         routing_path = "plan_orchestrator_request"
-        pre_route_hint = _pre_route_intent(user_message, conversation_history)
+        use_thread_context = _is_contextual_followup_request(user_message)
+        routing_history = conversation_history if use_thread_context else None
+        pre_route_hint = _pre_route_intent(user_message, routing_history)
 
         if _is_capabilities_or_meta_question(user_message):
             routing_path = "_is_capabilities_or_meta_question"
@@ -1797,7 +2062,7 @@ class Orchestrator:
                 responses={"general": cap_answer},
             )
 
-        preflight = _assistant_preflight_result(user_message, conversation_history, attachments)
+        preflight = _assistant_preflight_result(user_message, routing_history, attachments)
         if preflight is not None:
             routing_path = "_assistant_preflight_result"
             if not preflight.get("proceed"):
@@ -1826,20 +2091,20 @@ class Orchestrator:
                 use_llm_intent = False
 
         full_message = build_context_with_attachments(
-            _enrich_onboarding_context(user_message, conversation_history),
+            _enrich_onboarding_context(user_message, routing_history),
             attachments,
         )
 
         from tools.hr_email_intelligence import message_looks_like_gmail_ops
 
-        if not use_llm_intent and not _should_skip_gmail_shortcircuit(user_message, conversation_history):
+        if not use_llm_intent and not _should_skip_gmail_shortcircuit(user_message, routing_history):
             if message_looks_like_gmail_ops(user_message):
                 routing_path = "hr_gmail_shortcut:message_looks_like_gmail_ops"
                 hr_gmail = self._route_hr_gmail(
                     user_message=user_message,
                     user_name=user_name,
                     user_role=user_role,
-                    conversation_history=conversation_history,
+                    conversation_history=routing_history,
                     allowed_agents=allowed_agents,
                     start_time=start_time,
                 )
@@ -1862,27 +2127,34 @@ class Orchestrator:
             agents = forced_agents
         elif use_llm_intent:
             routing_path = "plan_orchestrator_request"
-            plan = plan_orchestrator_request(user_message, conversation_history)
+            plan = plan_orchestrator_request(user_message, routing_history)
             plan_limitations = plan.get("limitations") or []
             if not plan.get("proceed"):
-                msg_out = plan.get("message") or "I need more information to proceed."
-                _log_route_trace(
-                    user_message=user_message,
-                    user_role=user_role,
-                    allowed_agents=allowed_agents,
-                    routing_path=f"{routing_path}:blocked",
-                    agents_before_filter=[],
-                    agents_used=[],
-                    final_answer=msg_out,
-                    pre_route_hint=pre_route_hint,
-                )
-                return self._scoped_route_result(
-                    start_time=start_time,
-                    agents_used=[],
-                    final_answer=msg_out,
-                )
+                if _is_parallel_multi_task_request(user_message, routing_history):
+                    parallel = _parallel_multi_task_preflight(user_message, routing_history)
+                    plan = {**plan, **parallel}
+                    plan_limitations = list(dict.fromkeys(
+                        (plan.get("limitations") or []) + (parallel.get("limitations") or [])
+                    ))
+                else:
+                    msg_out = plan.get("message") or "I need more information to proceed."
+                    _log_route_trace(
+                        user_message=user_message,
+                        user_role=user_role,
+                        allowed_agents=allowed_agents,
+                        routing_path=f"{routing_path}:blocked",
+                        agents_before_filter=[],
+                        agents_used=[],
+                        final_answer=msg_out,
+                        pre_route_hint=pre_route_hint,
+                    )
+                    return self._scoped_route_result(
+                        start_time=start_time,
+                        agents_used=[],
+                        final_answer=msg_out,
+                    )
             agents = expand_agents_for_multi_task(
-                user_message, plan.get("agents") or [], conversation_history
+                user_message, plan.get("agents") or [], routing_history
             )
             self._agent_tasks = plan.get("agent_tasks") or {}
             if not clarify_prefix:
@@ -1896,14 +2168,14 @@ class Orchestrator:
             agents = self._resolve_agents(
                 user_message=user_message,
                 attachments=attachments,
-                conversation_history=conversation_history,
+                conversation_history=routing_history,
                 use_llm_intent=False,
             )
-            agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
+            agents = expand_agents_for_multi_task(user_message, agents, routing_history)
 
         agents_before_filter = list(agents)
         agents = _finalize_agent_routing(
-            user_message, agents, conversation_history, attachments
+            user_message, agents, routing_history, attachments
         )
         if not self._agent_tasks.get("email") and agents == ["email"]:
             self._agent_tasks.setdefault("email", user_message.strip())
@@ -1997,7 +2269,7 @@ class Orchestrator:
                     user_name,
                     user_message_raw=task_msg or user_message,
                     attachments=attachments,
-                    conversation_history=conversation_history,
+                    conversation_history=routing_history,
                     user_role=user_role,
                 )
                 return agent_type, resp, None
@@ -2061,6 +2333,14 @@ class Orchestrator:
         for k in list(responses_flat.keys()):
             responses_flat[k] = strip_hr_gmail_batch_marker(responses_flat[k] or "")
 
+        email_resp = responses_flat.get("email", "")
+        if agents == ["email"] and re.search(
+            r"Email delivery \(Gmail SMTP\)[\s\S]{0,300}Email sent to",
+            email_resp or "",
+            re.I,
+        ):
+            result["hr_gmail_pending_cleared"] = True
+
         from tools.assistant_display import build_display_text, build_hr_shortlist_ui_payload
         from database.sqlite_db import hr_shortlist_get_batch
 
@@ -2117,7 +2397,8 @@ class Orchestrator:
             result["final_answer"] = (
                 result["final_answer"] + "\n\nUnable to complete:\n" + lim
             ).strip()
-        result["display_answer"] = build_display_text(result.get("final_answer", ""), result.get("ui_payload"))
+        display_payload = None if len(agents) > 1 else result.get("ui_payload")
+        result["display_answer"] = build_display_text(result.get("final_answer", ""), display_payload)
 
         if len(agents) > 1:
             try:
@@ -2170,7 +2451,8 @@ class Orchestrator:
         This is the A2A execution layer.
         """
         raw = (user_message_raw or user_message or "").strip()
-        hist_prefix = _history_context_block(conversation_history)
+        use_thread_context = agent_type == "general" or _is_contextual_followup_request(raw)
+        hist_prefix = _history_context_block(conversation_history) if use_thread_context else ""
         contextual = (hist_prefix + user_message) if hist_prefix else user_message
 
         if agent_type == "general":

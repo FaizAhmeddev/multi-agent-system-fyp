@@ -30,7 +30,7 @@ def strip_internal_markers(text: str) -> str:
 
 
 def build_display_text(final_answer: str, ui_payload: dict[str, Any] | None) -> str:
-    """Short plain-language line for the chat bubble."""
+    """Plain-language text for the chat bubble."""
     if ui_payload:
         t = ui_payload.get("type") or ""
         if t == "hr_shortlist":
@@ -75,8 +75,6 @@ def build_display_text(final_answer: str, ui_payload: dict[str, Any] | None) -> 
         lines.append(line)
     short = "\n".join(lines).strip()
     short = strip_markdown(short)
-    if len(short) > 600:
-        return short[:600].rsplit(" ", 1)[0] + "…"
     return short or "Done."
 
 
@@ -136,10 +134,11 @@ def build_email_list_ui_payload(emails: list[dict], *, filter_hint: str = "") ->
 def prepare_assistant_chat_entry(orchestrator_result: dict[str, Any]) -> dict[str, Any]:
     ui = orchestrator_result.get("ui_payload")
     final = orchestrator_result.get("final_answer") or ""
+    display = orchestrator_result.get("display_answer") or build_display_text(final, ui)
     return {
         "role": "agent",
         "content": final,
-        "display_content": build_display_text(final, ui),
+        "display_content": display,
         "ui_payload": ui,
         "agents": orchestrator_result.get("agents_used") or [],
         "elapsed_ms": orchestrator_result.get("elapsed_ms", 0),

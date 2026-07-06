@@ -48,8 +48,30 @@ PROMPTS = [
         {"hr", "email", "it_support", "finance", "documents"},
     ),
     (
+        "Please complete the full onboarding process automatically.\n\nTasks to perform:\n\n"
+        "1. Send a welcome email to Ahmed with joining instructions.\n"
+        "2. Create an employee profile with department, designation, salary, and joining date.\n"
+        "3. Generate an employment offer letter.\n"
+        "4. Schedule orientation meetings for next Monday.\n"
+        "5. Create an IT support ticket for laptop allocation.\n"
+        "6. Generate a monthly salary breakdown and payroll entry.\n"
+        "7. Store all generated documents.\n"
+        "8. Prepare an onboarding summary report.\n"
+        "9. Notify the admin dashboard.\n"
+        "10. Log all agent activities.",
+        {"hr", "email", "it_support", "finance", "documents"},
+    ),
+    (
         "Send a welcome email to ali@example.com — start Monday as Software Engineer",
         {"email"},
+    ),
+    (
+        "Complete below jobs\n"
+        "1. send a email for Huzaifa to welcome to join KIET\n"
+        "2. create Huzaifa's joining letter in PDF\n"
+        "3. create then again email that joining letter to Huzaifa\n"
+        "4. also fetch 2 best python developer from last 10 emails",
+        {"email", "documents", "hr_gmail"},
     ),
     (
         "What can you do?",
@@ -68,6 +90,13 @@ def main() -> int:
     Orchestrator._invoke_agent = _mock_invoke  # type: ignore[method-assign]
     orch = Orchestrator()
     failures = 0
+    followup_prompt = (
+        "Complete below jobs\n"
+        "1. send a email for Huzaifa to welcome to join KIET\n"
+        "2. create Huzaifa's joining letter in PDF\n"
+        "3. create then again email that joining letter to Huzaifa\n"
+        "4. also fetch 2 best python developer from last 10 emails"
+    )
 
     for role in ROLES:
         allow = get_role_orchestrator_allowlist(role)
@@ -91,6 +120,24 @@ def main() -> int:
             if status == "FAIL":
                 preview = (result.get("final_answer") or "")[:120].replace("\n", " ")
                 print(f"         answer: {preview}...")
+
+        result = orch.route(
+            "huzaifa@example.com",
+            user_name="TestUser",
+            use_llm_intent=True,
+            allowed_agents=allow,
+            user_role=role,
+            conversation_history=[
+                {"role": "user", "content": followup_prompt},
+                {"role": "assistant", "content": "Before I can send emails to Huzaifa, please share their email address."},
+            ],
+        )
+        used = set(result.get("agents_used") or [])
+        ok = used == {"email"}
+        status = "OK" if ok else "FAIL"
+        if status == "FAIL":
+            failures += 1
+        print(f"  [{status}] email-address follow-up expected=['email'] got={sorted(used)}")
 
     print(f"\nDone. Failures: {failures}")
     return failures
