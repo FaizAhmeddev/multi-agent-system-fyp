@@ -24,7 +24,10 @@ Every message has:
 
 import uuid
 import time
+import calendar
 import threading
+import json
+from datetime import datetime
 from collections import defaultdict, deque
 from typing import Callable, Optional
 from dataclasses import dataclass, field
@@ -70,6 +73,69 @@ class MessageQueue:
         self._history       = deque(maxlen=max_history)  # all messages ever
         self._agent_stats   = defaultdict(lambda: {"sent": 0, "received": 0, "processed": 0})
 
+    def _persist_message(self, msg: A2AMessage) -> None:
+        """Store queue events in the shared app database when available."""
+        try:
+            from database.sqlite_db import MessageLog, get_session
+
+            session = get_session()
+            try:
+                session.add(
+                    MessageLog(
+                        msg_id=msg.msg_id,
+                        timestamp=datetime.utcfromtimestamp(msg.timestamp),
+                        sender=msg.sender,
+                        receiver=msg.receiver,
+                        topic=msg.topic,
+                        payload=json.dumps(msg.payload, ensure_ascii=False),
+                        status=msg.status,
+                    )
+                )
+                session.commit()
+            finally:
+                session.close()
+        except Exception:
+            # The in-memory queue still works even if the database is unavailable.
+            pass
+
+    def _load_persisted_messages(self, limit: int = 50) -> list[A2AMessage]:
+        """Load recent queue events from the shared database."""
+        try:
+            from database.sqlite_db import MessageLog, get_session
+
+            session = get_session()
+            try:
+                rows = (
+                    session.query(MessageLog)
+                    .order_by(MessageLog.timestamp.desc(), MessageLog.id.desc())
+                    .limit(max(1, int(limit)))
+                    .all()
+                )
+            finally:
+                session.close()
+        except Exception:
+            return []
+
+        out: list[A2AMessage] = []
+        for row in reversed(rows):
+            payload = {}
+            try:
+                payload = json.loads(row.payload or "{}")
+            except Exception:
+                payload = {"raw": row.payload or ""}
+            out.append(
+                A2AMessage(
+                    sender=row.sender or "",
+                    receiver=row.receiver or "",
+                    topic=row.topic or "",
+                    payload=payload if isinstance(payload, dict) else {"raw": payload},
+                    msg_id=row.msg_id or str(uuid.uuid4())[:8],
+                    timestamp=calendar.timegm(row.timestamp.utctimetuple()) if row.timestamp else time.time(),
+                    status=row.status or "pending",
+                )
+            )
+        return out
+
     # ── Publish ──────────────────────────────────────────────────────────────
 
     def publish(self, msg: A2AMessage) -> str:
@@ -87,6 +153,8 @@ class MessageQueue:
 
             self._history.append(msg)
             self._agent_stats[msg.sender]["sent"] += 1
+
+        self._persist_message(msg)
 
         # Fire topic subscribers (outside lock to avoid deadlock)
         for cb in self._subscribers.get(msg.topic, []):
@@ -143,8 +211,10 @@ class MessageQueue:
     # ── History & Stats ──────────────────────────────────────────────────────
 
     def get_history(self, limit: int = 100) -> list:
-        with self._lock:
-            items = list(self._history)[-limit:]
+        items = self._load_persisted_messages(limit)
+        if not items:
+            with self._lock:
+                items = list(self._history)[-limit:]
         return [m.to_dict() for m in items]
 
     def get_stats(self) -> dict:
@@ -153,8 +223,10 @@ class MessageQueue:
 
     def get_all_messages_for_display(self, limit: int = 50) -> list:
         """Get recent messages formatted for UI display."""
-        with self._lock:
-            items = list(self._history)[-limit:]
+        items = self._load_persisted_messages(limit)
+        if not items:
+            with self._lock:
+                items = list(self._history)[-limit:]
         result = []
         for m in reversed(items):
             result.append({
