@@ -1819,16 +1819,17 @@ JSON only:"""
             }
         if onboarding:
             agents = normalize_agent_list(list(set(agents + _onboarding_agent_set())))
-            if facts:
-                proceed = True
-                message = ""
-            elif not proceed:
-                proceed = True
-                message = ""
+            missing_facts = _onboarding_missing_facts(facts, user_message)
+            if missing_facts:
+                proceed = False
+                message = _build_onboarding_clarification(facts, user_message)
                 if not limitations:
                     limitations = [
-                        "Some employee details were not in the thread; agents will use placeholders where needed."
+                        "Onboarding details are incomplete; collect all missing facts before running agents."
                     ]
+            else:
+                proceed = True
+                message = ""
             for slug, task in _ONBOARDING_AGENT_TASKS.items():
                 agent_tasks.setdefault(slug, task)
         agents = apply_routing_corrections(
@@ -1862,6 +1863,19 @@ JSON only:"""
         agents = detect_intent_llm(user_message, conversation_history)
         agents = expand_agents_for_multi_task(user_message, agents, conversation_history)
         agents = _finalize_agent_routing(user_message, agents, conversation_history)
+        if _is_onboarding_workflow(user_message, conversation_history):
+            facts = _extract_onboarding_facts(user_message, conversation_history)
+            missing_facts = _onboarding_missing_facts(facts, user_message)
+            if missing_facts:
+                return {
+                    "proceed": False,
+                    "message": _build_onboarding_clarification(facts, user_message),
+                    "agents": [],
+                    "agent_tasks": {},
+                    "limitations": [
+                        "Onboarding details are incomplete; collect all missing facts before running agents."
+                    ],
+                }
         return {
             "proceed": True,
             "message": "",
@@ -2760,6 +2774,11 @@ class Orchestrator:
             onboarding = _is_onboarding_workflow(raw, conversation_history)
             wants_export = detect_finance_export_intent(combined) or onboarding
             if wants_export:
+                if onboarding:
+                    facts = _extract_onboarding_facts(raw, conversation_history)
+                    missing_facts = _onboarding_missing_facts(facts, raw)
+                    if missing_facts:
+                        return {"final_answer": _build_onboarding_clarification(facts, raw)}
                 export_instruction = raw
                 if onboarding:
                     facts = _extract_onboarding_facts(raw, conversation_history)
@@ -2824,6 +2843,9 @@ class Orchestrator:
 
             if _is_onboarding_workflow(raw, conversation_history):
                 facts = _extract_onboarding_facts(raw, conversation_history)
+                missing_facts = _onboarding_missing_facts(facts, raw)
+                if missing_facts:
+                    return {"final_answer": _build_onboarding_clarification(facts, raw)}
                 doc_req = (
                     f"Employment offer letter and onboarding summary for new hire. Facts: {facts}. "
                     f"Full request context:\n{contextual[:8000]}"

@@ -119,6 +119,15 @@ Format as numbered list."""
 
 def generate_onboarding_checklist(job_title: str, department: str) -> str:
     """Generate a detailed onboarding checklist."""
+    if not (job_title or "").strip() or not (department or "").strip():
+        missing = []
+        if not (job_title or "").strip():
+            missing.append("job title")
+        if not (department or "").strip():
+            missing.append("department")
+        if len(missing) == 1:
+            return f"Please provide the employee's {missing[0]} so I can generate the onboarding checklist."
+        return "Please provide the employee's job title and department so I can generate the onboarding checklist."
     llm = _get_llm()
     prompt = f"""You are an HR specialist.
 Create a detailed onboarding checklist for a new {job_title} in the {department} department.

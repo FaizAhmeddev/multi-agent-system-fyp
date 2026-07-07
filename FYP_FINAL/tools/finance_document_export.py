@@ -478,6 +478,16 @@ def run_finance_document_export(
     Returns: ok, output (markdown summary for UI), export_files (list of file dicts), error (optional).
     """
     try:
+        if not (source_data or "").strip():
+            return {
+                "ok": False,
+                "output": (
+                    "I need the source data before I can generate a document file.\n\n"
+                    "Please paste the employee details, payroll figures, invoice text, or upload the data first."
+                ),
+                "export_files": [],
+                "error": "missing_source_data",
+            }
         formats = infer_formats_from_text(user_request, export_formats)
         structured = llm_finance_document_structure(
             user_request=user_request,
