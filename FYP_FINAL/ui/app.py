@@ -647,27 +647,58 @@ div[data-baseweb="base-input"] {
 }
 [data-testid="stExpander"] summary { color: var(--text) !important; }
 
-/* ===== Pinned chat input bar ===== */
+/* ===== Pinned chat input bar =====
+   Selectors are written defensively (width:100% at every level, not just
+   one assumed nesting depth) because the internal DOM structure of
+   st.chat_input has changed across Streamlit versions; deployed
+   environments can render an extra/fewer wrapper <div> than local dev,
+   which otherwise leaves the raw <textarea> at its browser-default
+   ~20-character width. */
 [data-testid="stChatInput"] {
     background: transparent !important;
     border-top: none !important;
     padding-bottom: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
 }
-[data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] { background: transparent !important; }
+[data-testid="stBottom"],
+[data-testid="stBottom"] > div,
+[data-testid="stBottomBlockContainer"] {
+    background: transparent !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+[data-testid="stChatInput"] > div,
+[data-testid="stChatInput"] div {
+    box-sizing: border-box !important;
+}
 [data-testid="stChatInput"] > div {
     max-width: 820px !important;
+    width: 100% !important;
     margin: 0 auto !important;
+    display: flex !important;
+}
+[data-testid="stChatInput"] section,
+[data-testid="stChatInput"] [data-baseweb="base-input"],
+[data-testid="stChatInput"] [data-baseweb="textarea"] {
+    flex: 1 1 auto !important;
+    width: 100% !important;
 }
 [data-testid="stChatInput"] textarea,
+textarea[data-testid="stChatInputTextArea"],
 [data-testid="stChatInput"] > div > div {
     border-radius: 16px !important;
     background: #ffffff !important;
     color: var(--text) !important;
     border: 1px solid var(--border) !important;
     box-shadow: var(--shadow-lg) !important;
+    width: 100% !important;
+    min-width: 0 !important;
 }
-[data-testid="stChatInput"] textarea {
+[data-testid="stChatInput"] textarea,
+textarea[data-testid="stChatInputTextArea"] {
     font-size: 15px !important;
+    min-height: 52px !important;
 }
 /* leave room so messages don't hide behind the fixed bar */
 [data-testid="stAppViewBlockContainer"], .block-container { padding-bottom: 120px !important; }
