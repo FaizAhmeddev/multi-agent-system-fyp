@@ -33,11 +33,12 @@ section[data-testid="stSidebar"] { display: none !important; }
 section[data-testid="stSidebar"] ~ div { margin-left: 0 !important; }
 [data-testid="stHeader"] { display: none !important; }
 footer { visibility: hidden !important; height: 0 !important; }
+
 .stApp {
-    background-color: #050816 !important;
+    background-color: #f4f6fb !important;
     background-image:
-        radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 184, 166, 0.22), transparent 55%),
-        radial-gradient(ellipse 70% 55% at 85% 75%, rgba(124, 58, 237, 0.20), transparent 50%) !important;
+        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(79, 70, 229, 0.07), transparent 55%),
+        radial-gradient(ellipse 70% 55% at 85% 80%, rgba(13, 148, 136, 0.06), transparent 50%) !important;
 }
 .main .block-container {
     max-width: 1100px !important;
@@ -48,10 +49,10 @@ footer { visibility: hidden !important; height: 0 !important; }
     border-radius: 20px;
     padding: 2.25rem 2rem;
     margin-top: 0.5rem;
-    background: linear-gradient(155deg, #0f766e 0%, #1e3a8a 42%, #5b21b6 100%);
+    background: linear-gradient(155deg, #4338ca 0%, #4f46e5 45%, #0f766e 100%);
     color: #f8fafc;
     min-height: 460px;
-    box-shadow: 0 24px 48px -16px rgba(15, 118, 110, 0.45);
+    box-shadow: 0 20px 40px -16px rgba(67, 56, 202, 0.32);
 }
 .auth-hero-badge {
     display: inline-block;
@@ -61,21 +62,23 @@ footer { visibility: hidden !important; height: 0 !important; }
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.22);
-    color: #ccfbf1;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.24);
+    color: #e0e7ff;
     margin-bottom: 1.25rem;
 }
 .auth-hero-logo {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 26px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.25);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.28);
     margin-bottom: 1.25rem;
 }
 .auth-hero-panel h1 {
@@ -88,7 +91,7 @@ footer { visibility: hidden !important; height: 0 !important; }
 }
 .auth-hero-panel p {
     font-size: 15px;
-    color: #e2e8f0 !important;
+    color: #e6e9f5 !important;
     margin: 0 0 1.5rem;
     line-height: 1.6;
 }
@@ -102,18 +105,29 @@ footer { visibility: hidden !important; height: 0 !important; }
     font-weight: 500;
     color: #f1f5f9 !important;
     margin-bottom: 10px;
-    padding-left: 4px;
+    padding-left: 20px;
+    position: relative;
+}
+.auth-feature-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.55);
 }
 .auth-card-header h2 {
     font-size: 1.45rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    color: #f1f5f9 !important;
+    color: #111827 !important;
     margin: 0 0 0.35rem;
 }
 .auth-card-header p {
     font-size: 13.5px;
-    color: #94a3b8 !important;
+    color: #6b7280 !important;
     margin: 0 0 1rem;
     line-height: 1.5;
 }
@@ -122,48 +136,86 @@ footer { visibility: hidden !important; height: 0 !important; }
     padding: 8px 12px;
     border-radius: 10px;
     font-size: 12px;
-    color: #99f6e4 !important;
-    background: rgba(20, 184, 166, 0.12);
-    border: 1px solid rgba(45, 212, 191, 0.25);
+    color: #0f766e !important;
+    background: #e6f7f5;
+    border: 1px solid #a6e5dd;
 }
 .auth-footer-note {
     text-align: center;
     font-size: 11.5px;
-    color: #64748b !important;
+    color: #94a3b8 !important;
     margin-top: 0.75rem;
 }
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    background: rgba(15, 23, 42, 0.88) !important;
-    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e6ef !important;
     border-radius: 20px !important;
     padding: 1.5rem 1.25rem !important;
-    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.45) !important;
+    box-shadow: 0 20px 40px -18px rgba(30, 36, 51, 0.18) !important;
 }
 .stTextInput label, [data-testid="stWidgetLabel"] p {
-    color: #cbd5e1 !important;
+    color: #374151 !important;
     font-weight: 600 !important;
 }
 .stTextInput input {
-    background: rgba(2, 6, 23, 0.65) !important;
-    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e6ef !important;
     border-radius: 12px !important;
-    color: #f8fafc !important;
+    color: #111827 !important;
+}
+.stTextInput input::placeholder {
+    color: #9aa3b2 !important;
+    opacity: 1 !important;
+}
+.stTextInput input:focus {
+    border-color: #a5b4fc !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
+}
+/* Password show/hide toggle — blend it into the same white field instead of a mismatched grey box */
+[data-testid="stTextInput"] button, div[data-baseweb="input"] button {
+    background: #ffffff !important;
+    border: none !important;
+    color: #9aa3b2 !important;
+    box-shadow: none !important;
+}
+[data-testid="stTextInput"] button:hover, div[data-baseweb="input"] button:hover {
+    color: #4f46e5 !important;
+    background: transparent !important;
+}
+div[data-baseweb="base-input"] {
+    background: #ffffff !important;
+    border-radius: 12px !important;
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #14b8a6, #6366f1) !important;
+    background: linear-gradient(135deg, #4f46e5, #0d9488) !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 12px !important;
     font-weight: 700 !important;
+    box-shadow: 0 8px 18px -6px rgba(79, 70, 229, 0.32) !important;
+}
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 10px 22px -6px rgba(79, 70, 229, 0.40) !important;
+    transform: translateY(-1px) !important;
 }
 .stButton > button:not([kind="primary"]) {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(148, 163, 184, 0.2) !important;
-    color: #e2e8f0 !important;
+    background: #f6f7fb !important;
+    border: 1px solid #e2e6ef !important;
+    color: #374151 !important;
     border-radius: 12px !important;
 }
+.stButton > button:not([kind="primary"]):hover {
+    background: #eef0fd !important;
+    border-color: #c7cbf7 !important;
+    color: #4338ca !important;
+}
 .stCaption, [data-testid="stCaptionContainer"] {
-    color: #94a3b8 !important;
+    color: #6b7280 !important;
+}
+hr { border-color: #e2e6ef !important; }
+[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    border: 1px solid #e2e6ef !important;
 }
 </style>
 """
@@ -184,13 +236,13 @@ def _auth_hero_panel() -> None:
         """
         <div class="auth-hero-panel">
             <div class="auth-hero-badge">Secure enterprise portal</div>
-            <div class="auth-hero-logo">🤖</div>
+            <div class="auth-hero-logo">OA</div>
             <h1>Office Automation Pro</h1>
             <p>Multi-agent AI workspace for HR, Finance, IT, and email — powered by orchestrated automation.</p>
             <ul class="auth-feature-list">
-                <li>⚡ Intelligent agent routing</li>
-                <li>🛡️ Role-based secure access</li>
-                <li>📊 Real-time dashboards &amp; history</li>
+                <li>Intelligent agent routing</li>
+                <li>Role-based secure access</li>
+                <li>Real-time dashboards &amp; history</li>
             </ul>
         </div>
         """,

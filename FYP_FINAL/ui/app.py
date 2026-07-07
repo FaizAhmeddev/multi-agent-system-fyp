@@ -48,7 +48,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Office Automation Agents Pro",
-    layout="wide", page_icon="ðŸ¤–",
+    layout="wide", page_icon="",
     initial_sidebar_state="expanded",
 )
 
@@ -63,7 +63,7 @@ def _hydrate_streamlit_secrets_into_environ() -> None:
         sec = st.secrets
         items = sec.items()
     except FileNotFoundError:
-        # No secrets.toml â€” normal for local dev when using .env instead
+        # No secrets.toml — normal for local dev when using .env instead
         return
     except Exception:
         return
@@ -103,31 +103,33 @@ from config import (
 
 refresh_config_from_env()
 
-# â”€â”€ CSS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── CSS ──────────────────────────────────────────────────────────────────
+# ── CSS ──────────────────────────────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 :root {
-    --bg: #0b1220;
-    --surface: #141d30;
-    --surface-2: #1b2740;
-    --border: #28344d;
-    --text: #e8edf6;
-    --muted: #94a3b8;
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
-    --primary-light: #818cf8;
-    --accent: #38bdf8;
-    --accent-light: #0c4a6e;
-    --success: #34d399;
-    --success-bg: #06281f;
-    --warning: #fbbf24;
-    --warning-bg: #2a2008;
-    --danger: #f87171;
-    --danger-bg: #2a1115;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
-    --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.40);
-    --shadow-lg: 0 12px 24px -6px rgba(0, 0, 0, 0.50);
-    --shadow-xl: 0 24px 40px -10px rgba(0, 0, 0, 0.55);
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #f3f5f9;
+    --border: #e2e6ef;
+    --text: #1e2433;
+    --muted: #6b7280;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --primary-light: #6366f1;
+    --primary-tint: #eef0fd;
+    --accent: #0d9488;
+    --accent-tint: #e6f7f5;
+    --success: #15803d;
+    --success-bg: #e7f7ec;
+    --warning: #b45309;
+    --warning-bg: #fef3e2;
+    --danger: #b91c1c;
+    --danger-bg: #fdecec;
+    --shadow-sm: 0 1px 2px 0 rgba(30, 36, 51, 0.05);
+    --shadow-md: 0 4px 10px -2px rgba(30, 36, 51, 0.08);
+    --shadow-lg: 0 12px 24px -6px rgba(30, 36, 51, 0.10);
+    --shadow-xl: 0 24px 40px -10px rgba(30, 36, 51, 0.14);
     --radius-sm: 6px;
     --radius-md: 12px;
     --radius-lg: 18px;
@@ -145,15 +147,37 @@ st.markdown("""<style>
     white-space: nowrap !important;
 }
 .main { padding-top: 0.4rem; background: transparent; }
-.stApp {
-    background-color: var(--bg);
+.stApp, body {
+    background-color: var(--bg) !important;
+    color: var(--text);
     background-image:
-        radial-gradient(900px 500px at 12% -8%, rgba(99,102,241,0.16), transparent 60%),
-        radial-gradient(800px 500px at 100% 0%, rgba(56,189,248,0.10), transparent 55%),
-        radial-gradient(rgba(148, 163, 184, 0.07) 1.4px, transparent 1.4px);
-    background-size: auto, auto, 24px 24px;
+        radial-gradient(1000px 520px at 10% -10%, rgba(79,70,229,0.06), transparent 60%),
+        radial-gradient(800px 480px at 100% 0%, rgba(13,148,136,0.05), transparent 55%);
     background-attachment: fixed;
 }
+
+/* Badges (used across cards, chat bubbles, headers) */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+.badge-green  { background: #e7f7ec; color: #15803d; border-color: #a7e3bb; }
+.badge-blue   { background: #e8f0fe; color: #1d4ed8; border-color: #b3caf9; }
+.badge-indigo { background: #eef0fd; color: #4338ca; border-color: #c7cbf7; }
+.badge-purple { background: #f3edfd; color: #6d28d9; border-color: #d9c8f7; }
+.badge-teal   { background: #e6f7f5; color: #0f766e; border-color: #a6e5dd; }
+.badge-orange { background: #fef0e2; color: #c2410c; border-color: #f8ceab; }
+.badge-yellow { background: #fdf6db; color: #a16207; border-color: #f1e29c; }
+.badge-red    { background: #fdecec; color: #b91c1c; border-color: #f3b8b8; }
+.badge-a2a    { background: #e6f7f5; color: #0f766e; border-color: #a6e5dd; }
+.badge-mcp    { background: #eef0fd; color: #4338ca; border-color: #c7cbf7; }
 
 /* Custom buttons */
 .stButton > button {
@@ -167,20 +191,21 @@ st.markdown("""<style>
     box-shadow: var(--shadow-sm) !important;
 }
 .stButton > button:hover {
+    background: var(--primary-tint) !important;
     transform: translateY(-1px) !important;
     box-shadow: var(--shadow-md) !important;
     border-color: var(--primary-light) !important;
-    color: var(--primary) !important;
+    color: var(--primary-dark) !important;
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
     color: white !important;
     border: none !important;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3) !important;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28) !important;
 }
 .stButton > button[kind="primary"]:hover {
     background: linear-gradient(135deg, var(--primary-dark), var(--primary)) !important;
-    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.4) !important;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35) !important;
     transform: translateY(-2px) !important;
     color: white !important;
 }
@@ -188,11 +213,10 @@ st.markdown("""<style>
 /* Tabs styled as segmented pill control */
 .stTabs [data-baseweb="tab-list"] {
     gap: 8px !important;
-    background: rgba(226, 232, 240, 0.5) !important;
+    background: var(--surface-2) !important;
     padding: 6px !important;
     border-radius: var(--radius-md) !important;
     border: 1px solid var(--border) !important;
-    backdrop-filter: blur(8px) !important;
     margin-bottom: 20px !important;
 }
 .stTabs [data-baseweb="tab"] {
@@ -205,51 +229,49 @@ st.markdown("""<style>
     transition: all 0.2s ease-in-out !important;
 }
 .stTabs [data-baseweb="tab"]:hover {
-    background: rgba(255, 255, 255, 0.6) !important;
+    background: var(--surface) !important;
     color: var(--text) !important;
 }
 .stTabs [aria-selected="true"] {
     background: var(--surface) !important;
     color: var(--primary) !important;
-    box-shadow: var(--shadow-md) !important;
+    box-shadow: var(--shadow-sm) !important;
     border-bottom: none !important;
 }
 
 /* Auth login styles are injected from ui/auth_pages.py when the login gate is shown */
 
-/* Floating Glassmorphic Header */
+/* Floating header */
 .main-header {
-    background: rgba(15, 23, 42, 0.9) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
     backdrop-filter: blur(12px) !important;
     -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--border) !important;
     padding: 20px 28px !important;
     border-radius: var(--radius-md) !important;
     margin-bottom: 24px !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.3) !important;
+    box-shadow: var(--shadow-md) !important;
 }
 .header-title {
     font-size: 24px !important;
     font-weight: 800 !important;
     letter-spacing: -0.6px !important;
-    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
+    color: var(--text) !important;
 }
 .header-sub {
     font-size: 12px !important;
-    color: #94a3b8 !important;
+    color: var(--muted) !important;
     margin-top: 4px !important;
     letter-spacing: 0.2px !important;
 }
 
-/* Modernized Left-Border Section Headers */
+/* Left-border section headers */
 .sec-hdr {
-    background: rgba(255, 255, 255, 0.8) !important;
-    border-left: 5px solid var(--primary) !important;
+    background: var(--primary-tint) !important;
+    border-left: 4px solid var(--primary) !important;
     color: var(--text) !important;
     border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
     padding: 12px 18px !important;
@@ -259,14 +281,14 @@ st.markdown("""<style>
     letter-spacing: 0.1px !important;
     box-shadow: var(--shadow-sm) !important;
     border: 1px solid var(--border) !important;
-    border-left-width: 5px !important;
+    border-left-width: 4px !important;
 }
-.sec-blue   { border-left-color: #3b82f6 !important; }
-.sec-green  { border-left-color: var(--success) !important; }
-.sec-purple { border-left-color: #8b5cf6 !important; }
-.sec-teal   { border-left-color: var(--accent) !important; }
-.sec-orange { border-left-color: #f97316 !important; }
-.sec-wa     { border-left-color: #22c55e !important; }
+.sec-blue   { border-left-color: #2563eb !important; background: #eaf1fe !important; }
+.sec-green  { border-left-color: var(--success) !important; background: #e7f7ec !important; }
+.sec-purple { border-left-color: #7c3aed !important; background: #f3edfd !important; }
+.sec-teal   { border-left-color: var(--accent) !important; background: var(--accent-tint) !important; }
+.sec-orange { border-left-color: #ea580c !important; background: #fef0e2 !important; }
+.sec-wa     { border-left-color: #16a34a !important; background: #e7f7ec !important; }
 
 /* Metrics */
 .metric-card {
@@ -305,38 +327,42 @@ st.markdown("""<style>
 .agent-status-card:hover {
     transform: translateY(-2px) !important;
     box-shadow: var(--shadow-md) !important;
+    border-color: var(--primary) !important;
 }
-.agent-dot { width: 10px; height: 10px; border-radius: 50%; background: #10b981; flex-shrink: 0; animation: pulse 2s infinite; }
+.agent-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); flex-shrink: 0; animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
 
 /* Response boxes */
 .resp-box {
-    background: var(--surface);
+    background: var(--surface-2);
+    color: var(--text);
     border-left: 4px solid var(--primary);
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
     padding: 18px 22px;
     margin: 14px 0;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
     border-left-width: 4px;
     line-height: 1.7;
     white-space: pre-wrap;
 }
-.resp-green  { border-left-color: #059669; }
+.resp-green  { border-left-color: var(--success); }
 .resp-purple { border-left-color: #7c3aed; }
 .resp-orange { border-left-color: #ea580c; }
-.resp-teal   { border-left-color: #0d9488; }
-.resp-red    { border-left-color: #dc2626; }
+.resp-teal   { border-left-color: var(--accent); }
+.resp-red    { border-left-color: var(--danger); }
 
 /* Chat Panel & Conversational Bubbles */
 .chat-panel {
-    background: rgba(248, 250, 252, 0.8) !important;
+    background: var(--surface-2) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-lg) !important;
     padding: 20px !important;
     margin-bottom: 20px !important;
-    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03) !important;
-    backdrop-filter: blur(6px) !important;
+    box-shadow: var(--shadow-sm) !important;
+    max-width: 880px;
+    margin-left: auto;
+    margin-right: auto;
 }
 .chat-user {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
@@ -349,7 +375,7 @@ st.markdown("""<style>
     font-size: 14px !important;
     line-height: 1.6 !important;
     word-wrap: break-word;
-    box-shadow: 0 8px 16px -4px rgba(79, 70, 229, 0.3) !important;
+    box-shadow: 0 6px 14px -4px rgba(79, 70, 229, 0.30) !important;
 }
 .chat-agent {
     background: var(--surface) !important;
@@ -361,47 +387,48 @@ st.markdown("""<style>
     display: block !important;
     font-size: 14px !important;
     border: 1px solid var(--border) !important;
-    box-shadow: var(--shadow-md) !important;
+    box-shadow: var(--shadow-sm) !important;
     line-height: 1.65 !important;
     word-wrap: break-word;
 }
 .chat-wrap  { width: 100%; margin-bottom: 4px; overflow: hidden; }
 .thread-bar {
-    background: linear-gradient(90deg, #f0fdf4, #f8fafc) !important;
-    border: 1px solid #bbf7d0 !important;
+    background: var(--accent-tint) !important;
+    border: 1px solid #a6e5dd !important;
     border-radius: var(--radius-md) !important;
     padding: 12px 18px !important;
     margin-bottom: 16px !important;
     font-size: 13.5px !important;
-    color: #166534 !important;
-    font-weight: 500 !important;
+    color: #0f766e !important;
+    font-weight: 600 !important;
 }
 
 /* Service Pill */
 .svc-pill {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     margin-left: 4px;
     cursor: default;
     border: 1px solid transparent;
 }
-.svc-on  { background: #dcfce7; color: #15803d; border-color: #86efac; }
-.svc-off { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
-.svc-cloud { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+.svc-on    { background: #e7f7ec; color: #15803d; border-color: #a7e3bb; }
+.svc-off   { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
+.svc-cloud { background: #e8f0fe; color: #1d4ed8; border-color: #b3caf9; }
 
 /* Queue messages */
-.qmsg { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 5px; font-size: 12px; font-family: monospace; }
+.qmsg { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; margin-bottom: 5px; font-size: 12px; font-family: monospace; }
 .qmsg-task   { border-left: 3px solid #2563eb; }
 .qmsg-result { border-left: 3px solid #16a34a; }
-.qmsg-status { border-left: 3px solid #f59e0b; }
+.qmsg-status { border-left: 3px solid #d97706; }
 .qmsg-broadcast { border-left: 3px solid #7c3aed; }
 
 /* Candidate ATS cards */
 .cand-card {
     background: var(--surface) !important;
+    color: var(--text) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
     padding: 18px 20px !important;
@@ -416,94 +443,95 @@ st.markdown("""<style>
     border-color: var(--primary-light) !important;
 }
 .cand-card.rejected { border-left-color: var(--danger) !important; opacity: 0.75 !important; }
-.score-bar  { height: 6px; border-radius: 3px; background: #e2e8f0; margin: 8px 0 4px 0; }
+.score-bar  { height: 6px; border-radius: 3px; background: var(--surface-2); margin: 8px 0 4px 0; }
 .score-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--accent)); }
 
 /* History table */
-.hist-row { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
+.hist-row { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
 
 /* Notification */
-.notif { border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
-.notif-info    { background: #eff6ff; border-left: 4px solid #2563eb; }
-.notif-success { background: #f0fdf4; border-left: 4px solid #16a34a; }
-.notif-warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
-.notif-error   { background: #fef2f2; border-left: 4px solid #dc2626; }
+.notif { border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.notif-info    { border-left: 4px solid #2563eb; }
+.notif-success { border-left: 4px solid var(--success); }
+.notif-warning { border-left: 4px solid var(--warning); }
+.notif-error   { border-left: 4px solid var(--danger); }
 
 /* A2A flow */
-.a2a-flow { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 16px 20px; font-family: monospace; font-size: 12px; line-height: 2; }
-.a2a-arrow { color: #22c55e; }
-.a2a-agent { color: #60a5fa; font-weight: 700; }
-.a2a-topic { color: #fbbf24; }
+.a2a-flow { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 16px 20px; font-family: monospace; font-size: 12px; line-height: 2; }
+.a2a-arrow { color: var(--success); }
+.a2a-agent { color: var(--primary); font-weight: 700; }
+.a2a-topic { color: #b45309; }
 
 /* Output alignment */
-.block-container { max-width: 1280px; }
+.block-container { max-width: 1400px; padding-top: 1.4rem !important; }
 .stMarkdown, .stMarkdown p, .stMarkdown li { text-align: left; }
 .resp-box, .hist-row, .cand-card, .qmsg, .a2a-flow, .chat-agent { text-align: left; }
 div[data-testid="column"] { min-width: 0; }
 
 div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
 [data-testid="stFileUploader"] section[data-testid="stFileUploadDropzone"] {
-    border: 1.5px dashed #cbd5e1; border-radius: 12px; background: #fff;
+    border: 1.5px dashed var(--border); border-radius: 12px; background: var(--surface-2);
 }
 [data-testid="stFileUploader"] section button {
-    background: #f8fafc !important; border: 1px solid #e2e8f0 !important;
-    border-radius: 10px !important; min-height: 2.75rem;
+    background: var(--surface) !important; border: 1px solid var(--border) !important;
+    border-radius: 10px !important; min-height: 2.75rem; color: var(--text) !important;
 }
 [data-testid="stFileUploader"] section button p { font-size: 14px !important; line-height: 1.4 !important; }
 [data-testid="stCheckbox"] label { gap: 0.5rem !important; align-items: center !important; }
 [data-testid="stCheckbox"] label p { line-height: 1.4 !important; margin: 0 !important; }
 [data-testid="stExpander"] summary { font-weight: 600 !important; }
 .email-detail-box {
-    background: white; border: 1px solid #e2e8f0; border-radius: 14px;
-    padding: 20px 22px; margin-top: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 22px; margin-top: 12px; box-shadow: var(--shadow-md);
 }
 .email-body-full {
-    white-space: pre-wrap; line-height: 1.65; font-size: 14px; color: #334155;
-    max-height: 420px; overflow-y: auto; padding: 12px; background: #f8fafc;
-    border-radius: 8px; border: 1px solid #e2e8f0;
+    white-space: pre-wrap; line-height: 1.65; font-size: 14px; color: var(--text);
+    max-height: 420px; overflow-y: auto; padding: 12px; background: var(--surface-2);
+    border-radius: 8px; border: 1px solid var(--border);
 }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-track { background: var(--bg); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #cbd2e0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
 </style>""", unsafe_allow_html=True)
 
-# â”€â”€ Sidebar navigation + layout polish â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Sidebar navigation + layout polish ────────────────────────────────────
 st.markdown("""<style>
 /* ===== Sidebar shell ===== */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a 0%, #111c33 55%, #0b1426 100%) !important;
-    border-right: 1px solid rgba(148,163,184,0.12) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f8fc 100%) !important;
+    border-right: 1px solid var(--border) !important;
     width: 290px !important;
 }
 section[data-testid="stSidebar"] > div { padding-top: 0.6rem !important; }
-section[data-testid="stSidebar"] * { color: #e2e8f0; }
+section[data-testid="stSidebar"] * { color: var(--text); }
 
 /* Brand */
 .side-brand {
     display:flex; align-items:center; gap:12px;
     padding: 6px 6px 16px; margin-bottom: 4px;
-    border-bottom: 1px solid rgba(148,163,184,0.14);
+    border-bottom: 1px solid var(--border);
 }
 .side-logo {
     width:42px; height:42px; border-radius:12px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; font-size:22px;
-    background: linear-gradient(135deg,#6366f1,#8b5cf6);
-    box-shadow: 0 6px 16px rgba(99,102,241,0.4);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:800; letter-spacing:-0.02em; color:#fff;
+    background: linear-gradient(135deg,#4f46e5,#0d9488);
+    box-shadow: 0 6px 16px rgba(79,70,229,0.28);
 }
-.side-title { font-size:15px; font-weight:800; letter-spacing:-0.02em; color:#f8fafc; }
-.side-sub   { font-size:11px; color:#94a3b8; margin-top:2px; }
+.side-title { font-size:15px; font-weight:800; letter-spacing:-0.02em; color:#111827; }
+.side-sub   { font-size:11px; color:#6b7280; margin-top:2px; }
 
 .side-nav-label {
     font-size:10.5px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
-    color:#64748b; margin: 14px 6px 8px;
+    color:#94a3b8; margin: 14px 6px 8px;
 }
 
 /* Nav buttons (override global button look inside sidebar) */
 section[data-testid="stSidebar"] .stButton > button {
     background: transparent !important;
     border: 1px solid transparent !important;
-    color: #cbd5e1 !important;
+    color: #374151 !important;
     text-align: left !important;
     justify-content: flex-start !important;
     font-weight: 600 !important;
@@ -516,42 +544,42 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 section[data-testid="stSidebar"] .stButton > button > div { justify-content:flex-start !important; }
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(148,163,184,0.12) !important;
-    border-color: rgba(148,163,184,0.18) !important;
-    color: #ffffff !important;
+    background: var(--primary-tint) !important;
+    border-color: #c7cbf7 !important;
+    color: var(--primary-dark) !important;
     transform: none !important;
 }
 section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, rgba(99,102,241,0.95), rgba(139,92,246,0.95)) !important;
+    background: linear-gradient(135deg, rgba(79,70,229,0.95), rgba(13,148,136,0.90)) !important;
     color: #ffffff !important;
     border: none !important;
-    box-shadow: 0 6px 16px rgba(99,102,241,0.35) !important;
+    box-shadow: 0 6px 16px rgba(79,70,229,0.28) !important;
 }
 section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
     transform: none !important;
-    box-shadow: 0 8px 20px rgba(99,102,241,0.45) !important;
+    box-shadow: 0 8px 20px rgba(79,70,229,0.36) !important;
 }
 
-.side-divider { height:1px; background:rgba(148,163,184,0.14); margin:16px 4px; }
+.side-divider { height:1px; background: var(--border); margin:16px 4px; }
 
 .side-pills { display:flex; gap:6px; flex-wrap:wrap; margin: 0 4px 12px; }
 
 /* User card */
 .side-user {
     display:flex; align-items:center; gap:11px;
-    background: rgba(148,163,184,0.10);
-    border:1px solid rgba(148,163,184,0.16);
+    background: var(--surface-2);
+    border:1px solid var(--border);
     border-radius:12px; padding:10px 12px; margin: 0 4px;
 }
 .side-avatar {
     width:36px; height:36px; border-radius:10px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
     font-weight:800; font-size:15px; color:#fff;
-    background: linear-gradient(135deg,#0ea5e9,#6366f1);
+    background: linear-gradient(135deg,#0ea5e9,#4f46e5);
 }
-.side-user-name { font-size:13.5px; font-weight:700; color:#f1f5f9; line-height:1.2; }
-.side-user-role { font-size:11px; color:#94a3b8; margin-top:2px; }
-.side-stack { font-size:10.5px; color:#64748b; margin:8px 6px 12px; }
+.side-user-name { font-size:13.5px; font-weight:700; color:#111827; line-height:1.2; }
+.side-user-role { font-size:11px; color:#6b7280; margin-top:2px; }
+.side-stack { font-size:10.5px; color:#94a3b8; margin:8px 6px 12px; }
 
 /* ===== Main page heading ===== */
 .page-head {
@@ -559,18 +587,9 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
     margin: 2px 0 16px; padding-bottom:14px;
     border-bottom:1px solid var(--border);
 }
-.page-head-icon {
-    width:40px; height:40px; border-radius:12px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; font-size:20px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    box-shadow: 0 6px 16px rgba(79,70,229,0.28);
-}
 .page-head-title { font-size:1.55rem; font-weight:800; letter-spacing:-0.03em; color:var(--text); }
 
-/* Block container width breathing room */
-.block-container { padding-top: 1.4rem !important; max-width: 1400px; }
-
-/* Metric cards (native st.metric) polish */
+/* ===== Metric cards (native st.metric) polish ===== */
 [data-testid="stMetric"] {
     background: var(--surface);
     border:1px solid var(--border);
@@ -584,11 +603,37 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
     transform: translateY(-2px);
     border-color: var(--primary-light);
 }
-[data-testid="stMetricValue"] { font-weight:800 !important; color:var(--primary-dark) !important; }
+[data-testid="stMetricValue"] { font-weight:800 !important; color:var(--primary) !important; }
 
 /* Inputs */
 [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
-[data-baseweb="select"] > div {
+[data-baseweb="select"] > div, [data-baseweb="input"] {
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+[data-testid="stTextInput"] input::placeholder, [data-testid="stTextArea"] textarea::placeholder {
+    color: #9aa3b2 !important;
+    opacity: 1 !important;
+}
+[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus {
+    border-color: var(--primary-light) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
+}
+/* Password show/hide toggle button — blend into the input instead of floating as a mismatched box */
+[data-testid="stTextInput"] button, div[data-baseweb="input"] button {
+    background: #ffffff !important;
+    border: none !important;
+    color: var(--muted) !important;
+    box-shadow: none !important;
+}
+[data-testid="stTextInput"] button:hover, div[data-baseweb="input"] button:hover {
+    color: var(--primary) !important;
+    background: transparent !important;
+}
+div[data-baseweb="base-input"] {
+    background: #ffffff !important;
     border-radius: 10px !important;
 }
 
@@ -598,13 +643,13 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
     border-radius: var(--radius-md) !important;
     box-shadow: var(--shadow-sm) !important;
     overflow:hidden;
+    background: var(--surface) !important;
 }
+[data-testid="stExpander"] summary { color: var(--text) !important; }
 
-/* ===== Pinned chat input bar (Assistant) â€” ChatGPT / Claude style ===== */
+/* ===== Pinned chat input bar ===== */
 [data-testid="stChatInput"] {
     background: transparent !important;
-    /* background: rgba(248, 250, 252, 0.85) !important; */
-    backdrop-filter: none !important;
     border-top: none !important;
     padding-bottom: 10px !important;
 }
@@ -616,15 +661,16 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] > div > div {
     border-radius: 16px !important;
+    background: #ffffff !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-lg) !important;
 }
 [data-testid="stChatInput"] textarea {
     font-size: 15px !important;
 }
 /* leave room so messages don't hide behind the fixed bar */
 [data-testid="stAppViewBlockContainer"], .block-container { padding-bottom: 120px !important; }
-
-/* ===== Chat panel: roomier + subtle scroll ===== */
-.chat-panel { max-width: 880px; margin-left:auto; margin-right:auto; }
 
 /* ===== Alerts (info / success / warning / error) ===== */
 [data-testid="stAlert"] {
@@ -649,6 +695,7 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
     border-radius: var(--radius-md) !important;
     overflow: hidden;
     box-shadow: var(--shadow-sm) !important;
+    background: var(--surface) !important;
 }
 
 /* ===== Download buttons ===== */
@@ -661,86 +708,18 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
 .stTabs [data-baseweb="tab-list"] { border-radius: var(--radius-md) !important; }
 
 /* ===== Dividers / captions ===== */
-hr { border-color: var(--border) !important; opacity: 0.7; }
+hr { border-color: var(--border) !important; opacity: 1; }
 [data-testid="stCaptionContainer"], .stCaption { color: var(--muted) !important; }
 
 /* ===== File uploader dropzone ===== */
 [data-testid="stFileUploaderDropzone"] {
     border-radius: var(--radius-md) !important;
     border: 1.5px dashed var(--border) !important;
-    background: rgba(255,255,255,0.03) !important;
-}
-
-/* ===================================================================== */
-/* DARK THEME OVERRIDES â€” custom components that used hardcoded light hues */
-/* ===================================================================== */
-.chat-panel {
-    background: rgba(20, 29, 48, 0.6) !important;
-    border-color: var(--border) !important;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
-}
-.chat-agent {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-}
-.thread-bar {
-    background: linear-gradient(90deg, rgba(52,211,153,0.10), rgba(20,29,48,0.6)) !important;
-    border-color: rgba(52,211,153,0.30) !important;
-    color: #86efac !important;
-}
-.metric-card, .agent-status-card, .cand-card, .hist-row, .qmsg, .notif {
-    background: var(--surface) !important;
-    border-color: var(--border) !important;
-    color: var(--text) !important;
-}
-.metric-card:hover, .agent-status-card:hover, .cand-card:hover {
-    border-color: var(--primary) !important;
-}
-.resp-box {
     background: var(--surface-2) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
 }
-.sec-hdr {
-    color: var(--text) !important;
-    background: linear-gradient(90deg, rgba(99,102,241,0.10), transparent) !important;
-}
-.a2a-flow {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text) !important;
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-}
-.a2a-agent { color: var(--primary-light) !important; }
-.score-bar { background: var(--surface-2) !important; }
-.main-header { background: rgba(2, 6, 18, 0.6) !important; }
-
-/* Native widgets / containers on dark */
-[data-testid="stMetric"] { background: var(--surface) !important; border-color: var(--border) !important; }
-[data-testid="stMetricValue"] { color: var(--primary-light) !important; }
-[data-testid="stExpander"] { background: var(--surface) !important; }
-[data-testid="stExpander"] summary { color: var(--text) !important; }
-[data-testid="stDataFrame"] { background: var(--surface) !important; }
-.stTextInput input, .stTextArea textarea, [data-baseweb="select"] > div, [data-baseweb="input"] {
-    background: var(--surface-2) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-}
-[data-testid="stChatInput"] { background: transparent !important; }
-[data-testid="stChatInput"] textarea, [data-testid="stChatInput"] > div > div {
-    background: var(--surface-2) !important; color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: 0 10px 28px -6px rgba(0,0,0,0.55) !important;
-}
-/* secondary buttons readable on dark */
-.stButton > button { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-.stButton > button:hover { background: var(--surface-2) !important; color: #fff !important; }
-
 </style>""", unsafe_allow_html=True)
 
-# â”€â”€ Session defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Session defaults ───────────────────────────────────────────────────────
 _defs = {
     "logged_in": False, "username": "", "user_role": "", "user_name": "",
     "orch_chat": [], "coord_chat": [], "docs_chat": [],
@@ -773,7 +752,7 @@ for k, v in _defs.items():
         st.session_state[k] = v
 
 
-# â”€â”€ Per-agent quick-chat (the pinned bottom bar feeds these) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Per-agent quick-chat (the pinned bottom bar feeds these) ───────────────
 _AGENT_CHAT = {
     "Email":      ("coord_chat", "Email", "Ask the Email agent, for example: email Ahmed about the 3pm meeting."),
     "Documents":  ("docs_chat",  "Documents", "Ask anything about your loaded documents."),
@@ -826,7 +805,7 @@ def _agent_answer(tab: str, prompt: str, user_name: str) -> str:
                     "name": c["name"], "email": c["email"],
                     "subject": f"Message from {user_name}", "body": reply.get("body", prompt),
                 }
-                return f"Found **{c['name']}** ({c['email']}). Drafted a message - review and confirm below."
+                return f"Found **{c['name']}** ({c['email']}). Drafted a message — review & confirm below."
             return f"Could not find **{m.group(1)}**'s email. Provide the address directly."
         reply = generate_reply({"email_content": prompt, "sender_name": user_name})
         return reply.get("body", "")
@@ -858,7 +837,7 @@ def _render_agent_quick_chat(tab: str) -> None:
     if pend:
         st.session_state.setdefault(chat_key, [])
         st.session_state[chat_key].append({"role": "user", "content": pend})
-        with st.spinner(f"{tab} agent workingâ€¦"):
+        with st.spinner(f"{tab} agent working…"):
             try:
                 ans = _agent_answer(tab, pend, st.session_state.user_name or "User")
             except Exception as e:
@@ -886,9 +865,9 @@ def _record_login_event(username: str, display_name: str, role: str, event: str)
         pass
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# AUTH (login Â· sign-up Â· forgot) â€” early exit before heavy UI setup
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# AUTH (login · sign-up · forgot) — early exit before heavy UI setup
+# ══════════════════════════════════════════════════════════════════════════
 if not st.session_state.logged_in:
     from ui.auth_pages import render_auth_gate
 
@@ -996,7 +975,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
         unsafe_allow_html=True,
     )
     if filters.get("required_skills"):
-        st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** Â· Min score: **{filters.get('min_score', 55)}%**")
+        st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** · Min score: **{filters.get('min_score', 55)}%**")
     st.caption("Select candidates, then **Send email** per person, or use bulk actions. Emails are never sent without your action.")
 
     selected: list[str] = []
@@ -1004,9 +983,9 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
         cid = c.get("candidate_id") or f"c{i}"
         name = c.get("candidate_name") or "Candidate"
         score = int(c.get("match_score") or 0)
-        status = c.get("status") or "â€”"
-        skills = ", ".join(c.get("key_skills") or []) or "â€”"
-        exp = c.get("experience_level") or "â€”"
+        status = c.get("status") or "—"
+        skills = ", ".join(c.get("key_skills") or []) or "—"
+        exp = c.get("experience_level") or "—"
         hr_st = c.get("hr_state") or "pending"
         status_cls = "badge-green" if status == "Recommended" else "badge-orange"
         if hr_st == "rejected":
@@ -1015,7 +994,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
             f'<div class="cand-card">'
             f'<b>{_hesc_html(name)}</b> <span class="badge {status_cls}">{_hesc_html(status)}</span> '
             f'<span class="badge badge-blue">{score}% Match</span><br>'
-            f'<span style="font-size:12px;color:#64748b">Skills: {_hesc_html(skills)} Â· {_hesc_html(exp)}</span>'
+            f'<span style="font-size:12px;color:var(--muted)">Skills: {_hesc_html(skills)} · {_hesc_html(exp)}</span>'
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1025,7 +1004,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
             if sel:
                 selected.append(cid)
         with cols[1]:
-            st.caption(f"To: {c.get('recipient') or 'â€”'}")
+            st.caption(f"To: {c.get('recipient') or '—'}")
         with cols[2]:
             if st.button("Send email", key=f"{key_prefix}_send_{bid}_{cid}", disabled=hr_st == "rejected" or not c.get("sendable")):
                 if bid:
@@ -1103,7 +1082,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
 
 
 def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> None:
-    """Structured results (candidates, inbox rows) â€” not raw markdown dumps."""
+    """Structured results (candidates, inbox rows) — not raw markdown dumps."""
     if not ui or not isinstance(ui, dict):
         return
     t = ui.get("type") or ""
@@ -1117,10 +1096,10 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
         stats = ui.get("stats") or {}
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Shortlisted", len(ui.get("candidates") or []))
-        c2.metric("Emails scanned", stats.get("emails_scanned", "â€”"))
-        c3.metric("CVs parsed", stats.get("attachments_parsed", "â€”"))
+        c2.metric("Emails scanned", stats.get("emails_scanned", "—"))
+        c3.metric("CVs parsed", stats.get("attachments_parsed", "—"))
         skills = stats.get("required_skills") or []
-        c4.metric("Skill filter", ", ".join(skills) if skills else "â€”")
+        c4.metric("Skill filter", ", ".join(skills) if skills else "—")
         send_result = ui.get("send_result") or {}
         if send_result.get("ok"):
             st.success(
@@ -1151,11 +1130,11 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
             st.markdown(
                 f'<div class="cand-card" style="margin-bottom:8px">'
                 f"<b>{_hesc_html(em.get('from_name', ''))}</b> "
-                f"<span style='font-size:12px;color:#64748b'>&lt;{_hesc_html(em.get('from_email', ''))}&gt;</span><br>"
+                f"<span style='font-size:12px;color:var(--muted)'>&lt;{_hesc_html(em.get('from_email', ''))}&gt;</span><br>"
                 f"<span style='font-size:13px'>{_hesc_html(em.get('subject', ''))}</span> "
                 f"{badge}"
-                f"<span style='font-size:11px;color:#94a3b8'> Â· {_hesc_html(em.get('date', ''))}</span>"
-                f"<br><span style='font-size:12px;color:#475569'>{_hesc_html(em.get('snippet', ''))}</span>"
+                f"<span style='font-size:11px;color:var(--muted)'> · {_hesc_html(em.get('date', ''))}</span>"
+                f"<br><span style='font-size:12px;color:var(--muted)'>{_hesc_html(em.get('snippet', ''))}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -1197,8 +1176,8 @@ def _render_inbox_email_detail(em: dict) -> None:
 
     header_html = (
         '<div class="email-detail-box">'
-        + f"<h4 style='margin:0 0 12px 0;color:#0f172a'>{subj}</h4>"
-        + f"<p style='margin:0 0 6px 0;font-size:13px;color:#64748b'>"
+        + f"<h4 style='margin:0 0 12px 0;color:var(--text)'>{subj}</h4>"
+        + f"<p style='margin:0 0 6px 0;font-size:13px;color:var(--muted)'>"
         + f"<b>From:</b> {fn} &lt;{fe}&gt;<br><b>Date:</b> {date_s}</p>"
         + "</div>"
     )
@@ -1230,14 +1209,14 @@ def _render_inbox_email_detail(em: dict) -> None:
     else:
         st.caption("No attachments in this message.")
 
-# â”€â”€ DB init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── DB init ─────────────────────────────────────────────────────────────
 try:
     from database.sqlite_db import init_db
     init_db()
 except Exception:
     pass
 
-# â”€â”€ MCP auto-start (local only; skip on Streamlit Cloud â€” set FYP_HOSTED=true in Secrets) â”€
+# ── MCP auto-start (local only; skip on Streamlit Cloud — set FYP_HOSTED=true in Secrets) ─
 if is_hosted_deploy():
     st.session_state.mcp_running = False
 else:
@@ -1251,7 +1230,7 @@ else:
     except Exception:
         st.session_state.mcp_running = False
 
-# â”€â”€ Monitor logs (skip heavy IMAP stack on hosted â€” not usable headless anyway) â”€
+# ── Monitor logs (skip heavy IMAP stack on hosted — not usable headless anyway) ─
 if is_hosted_deploy():
 
     def get_pending_logs():
@@ -1338,10 +1317,10 @@ def _drain_monitor_logs() -> None:
 
 
 def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
-    """Gmail IMAP auto-reply â€” Email and IT tabs (local + Gmail configured)."""
+    """Gmail IMAP auto-reply — Email and IT tabs (local + Gmail configured)."""
     if not can_use_email_monitor(st.session_state.user_role or ""):
         return
-    st.markdown('<div class="sec-hdr sec-orange">ðŸ“¬ Email auto-reply monitor</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-hdr sec-orange">Email auto-reply monitor</div>', unsafe_allow_html=True)
     _hosted = not local_background_services_enabled()
     _gmail_ok = is_gmail_configured()
     if st.session_state.get("monitor_import_error"):
@@ -1359,7 +1338,7 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
         "Auto-reply monitor",
         key=toggle_key,
         disabled=_hosted or not _gmail_ok,
-        help="ON â€” automatically reply to new inbox emails every 30s. OFF â€” no auto-replies.",
+        help="ON — automatically reply to new inbox emails every 30s. OFF — no auto-replies.",
     )
 
     running = is_running()
@@ -1381,14 +1360,14 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
 
     if is_running():
         st.markdown(
-            '<div style="background:#dcfce7;border:1px solid #16a34a;padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">ON <b>Auto-reply ON</b> - checking inbox every 30s</div>',
+            '<div style="background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.35);color:#4ade80;padding:8px 14px;'
+            'border-radius:8px;margin:8px 0"><b>Auto-reply ON</b> — checking inbox every 30s</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div style="background:var(--surface-2);border:1px solid var(--border);padding:8px 14px;'
-            'border-radius:8px;margin:8px 0">OFF <b>Auto-reply OFF</b></div>',
+            '<div style="background:var(--surface-2);border:1px solid var(--border);color:var(--muted);padding:8px 14px;'
+            'border-radius:8px;margin:8px 0"><b>Auto-reply OFF</b></div>',
             unsafe_allow_html=True,
         )
 
@@ -1399,9 +1378,9 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
                 st.caption(log)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
 # MAIN APP (after login)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
 
 if st.session_state.logged_in:
     try:
@@ -1423,7 +1402,7 @@ if st.session_state.logged_in:
     except Exception:
         pass
 
-# â”€â”€ Sidebar navigation (RBAC: visible items depend on role) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Sidebar navigation (RBAC: visible items depend on role) ────────────────
 from html import escape as _hesc
 
 tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
@@ -1432,17 +1411,6 @@ tab_labels = get_visible_tabs_for_role(st.session_state.user_role)
 if st.session_state.get("active_tab") not in tab_labels:
     st.session_state.active_tab = tab_labels[0] if tab_labels else None
 
-_NAV_ICONS = {
-    "Assistant": "💬",
-    "Dashboard": "📊",
-    "IT Support": "🛠️",
-    "Email": "✉️",
-    "HR": "👥",
-    "Finance": "💰",
-    "Documents": "📄",
-    "History": "🕑",
-}
-
 with st.sidebar:
     _db_label = "PostgreSQL" if use_postgresql_database() else "SQLite"
     st.markdown(
@@ -1450,17 +1418,16 @@ with st.sidebar:
         '<div class="side-logo">OA</div>'
         '<div class="side-brand-text">'
         '<div class="side-title">Office Automation</div>'
-        '<div class="side-sub">Multi-Agent | A2A | MCP</div>'
+        '<div class="side-sub">Multi-Agent · A2A · MCP</div>'
         "</div></div>",
         unsafe_allow_html=True,
     )
 
     st.markdown('<div class="side-nav-label">KIET Workspace</div>', unsafe_allow_html=True)
     for _lbl in tab_labels:
-        _icon = _NAV_ICONS.get(_lbl, "Tab")
         _is_active = st.session_state.active_tab == _lbl
         if st.button(
-            f"{_icon}  {_lbl}",
+            _lbl,
             key=f"nav_{_lbl}",
             use_container_width=True,
             type="primary" if _is_active else "secondary",
@@ -1490,7 +1457,7 @@ with st.sidebar:
         f'<div class="side-user-text"><div class="side-user-name">{_unm}</div>'
         f'<div class="side-user-role">{_rol}</div></div>'
         f"</div>"
-        f'<div class="side-stack">Stack | SQLite | LangGraph | OpenAI</div>',
+        f'<div class="side-stack">Stack · SQLite · LangGraph · OpenAI</div>',
         unsafe_allow_html=True,
     )
 
@@ -1519,15 +1486,14 @@ with st.sidebar:
         st.session_state.active_tab = None
         st.rerun()
 
-# â”€â”€ Main content area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Main content area ───────────────────────────────────────────────────
 active_tab = st.session_state.active_tab
 _MAIN = st.container()
 
 with _MAIN:
     # Page heading + role banner
-    _icon = _NAV_ICONS.get(active_tab, "Workspace")
     st.markdown(
-        f'<div class="page-head"><span class="page-head-icon">{_icon}</span>'
+        f'<div class="page-head">'
         f'<span class="page-head-title">{_hesc(active_tab or "")}</span></div>',
         unsafe_allow_html=True,
     )
@@ -1535,10 +1501,9 @@ with _MAIN:
     if _pb:
         st.markdown(_pb, unsafe_allow_html=True)
 
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 2 â€” DASHBOARD
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 2 — DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Dashboard":
     with _MAIN:
         try:
@@ -1591,7 +1556,7 @@ if active_tab == "Dashboard":
                     f'<div class="agent-status-card" style="margin-bottom:6px">'
                     f'<div class="agent-dot"></div>'
                     f'<div style="flex:1"><b style="font-size:13px">{name}</b><br>'
-                    f'<span style="font-size:11px;color:#64748b">{aid}</span></div>'
+                    f'<span style="font-size:11px;color:var(--muted)">{aid}</span></div>'
                     f'<span class="badge badge-green">{usage} calls</span>'
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1611,7 +1576,7 @@ if active_tab == "Dashboard":
                             f'<div class="qmsg {tc}">'
                             f"<b>{msg['time']}</b> [{msg['topic'].upper()}] "
                             f"<b>{msg['sender']}</b> to <b>{msg['receiver']}</b><br>"
-                            f'<span style="color:#64748b">{pv}</span>'
+                            f'<span style="color:var(--muted)">{pv}</span>'
                             f"</div>",
                             unsafe_allow_html=True,
                         )
@@ -1629,8 +1594,8 @@ if active_tab == "Dashboard":
                         f'<div style="margin-bottom:6px">'
                         f'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'
                         f"<b>{cname}</b><span>{cnt} vectors</span></div>"
-                        f'<div style="background:rgba(148,163,184,0.18);border-radius:4px;height:6px">'
-                        f'<div style="background:#7c3aed;width:{pct}%;height:6px;border-radius:4px"></div></div>'
+                        f'<div style="background:var(--surface-2);border-radius:4px;height:6px">'
+                        f'<div style="background:linear-gradient(90deg,var(--primary),var(--accent));width:{pct}%;height:6px;border-radius:4px"></div></div>'
                         f"</div>",
                         unsafe_allow_html=True,
                     )
@@ -1649,7 +1614,7 @@ if active_tab == "Dashboard":
                     st.markdown(
                         f'<div class="notif {cls}">'
                         f"<b>{nt}</b><br>"
-                        f'<span style="font-size:11px;color:#64748b">{tm} | {ag}</span>'
+                        f'<span style="font-size:11px;color:var(--muted)">{tm} | {ag}</span>'
                         f"</div>",
                         unsafe_allow_html=True,
                     )
@@ -1671,7 +1636,7 @@ if active_tab == "Dashboard":
                 mcp_st = f"Running :{_port_disp}" if st.session_state.mcp_running else "Stopped"
                 mon_st = "Active" if is_running() else "Stopped"
             else:
-                mcp_st = mon_st = "â€”"
+                mcp_st = mon_st = "—"
             vdb_st = "ChromaDB (has rows)" if total_vecs > 0 else "ChromaDB (empty)"
             from html import escape as _escu
             un = _escu(st.session_state.user_name or "")
@@ -1734,9 +1699,9 @@ if active_tab == "Dashboard":
                     f'<span class="a2a-agent">{msg["sender"]}</span> '
                     f'<span class="a2a-arrow">--[<span style="color:{topic_color}">{msg["topic"]}</span>]-- to </span> '
                     f'<span class="a2a-agent">{msg["receiver"]}</span> '
-                    f'<span style="color:#64748b;font-size:11px">({msg["time"]})</span>'
+                    f'<span style="color:var(--muted);font-size:11px">({msg["time"]})</span>'
                 )
-            flow_html = "<br>".join(flow_lines) if flow_lines else '<span style="color:#64748b">No messages yet. Send a task via **Assistant** to see A2A flow.</span>'
+            flow_html = "<br>".join(flow_lines) if flow_lines else '<span style="color:var(--muted)">No messages yet. Send a task via **Assistant** to see A2A flow.</span>'
             st.markdown(f'<div class="a2a-flow">{flow_html}</div>', unsafe_allow_html=True)
         except Exception:
             pass
@@ -1749,9 +1714,9 @@ if active_tab == "Dashboard":
             _cached_vector_stats.clear()
             st.rerun()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 1 â€” ASSISTANT (single entry â†’ orchestrator â†’ sub-agents)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 1 — ASSISTANT (single entry → orchestrator → sub-agents)
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Assistant":
     with _MAIN:
         st.markdown(
@@ -1769,7 +1734,7 @@ if active_tab == "Assistant":
         _allow = get_role_orchestrator_allowlist(st.session_state.user_role)
         if _allow is None:
             st.info(
-                "**One assistant for everything** â€” IT, finance, documents, and **HR hiring** in plain language. "
+                "**One assistant for everything** — IT, finance, documents, and **HR hiring** in plain language. "
                 "Examples: *Fetch the latest 10 candidate emails*, *fetch 20 and select two for python*, "
                 "*Show emails received on 15 May 2026*, *Send interview invitations for Monday at 3 PM*. "
                 "Ask *What can you do?* in chat for the full task list from the orchestrator. "
@@ -1789,11 +1754,11 @@ if active_tab == "Assistant":
                 from database.sqlite_db import list_user_conversations, get_conversation_for_user
 
                 threads = list_user_conversations(st.session_state.username, "orchestrator", limit=20)
-                thread_opts = {0: "â€” Open a saved thread â€”"}
+                thread_opts = {0: "— Open a saved thread —"}
                 for t in threads:
-                    label = f"#{t['id']} Â· {t['updated_at']} Â· {t['message_count']} msgs"
+                    label = f"#{t['id']} · {t['updated_at']} · {t['message_count']} msgs"
                     if t.get("preview"):
-                        label += f" â€” {t['preview'][:50]}"
+                        label += f" — {t['preview'][:50]}"
                     thread_opts[t["id"]] = label
                 pick = st.selectbox(
                     "Saved conversations",
@@ -1829,7 +1794,7 @@ if active_tab == "Assistant":
             unsafe_allow_html=True,
         )
 
-        with st.expander("➕ Attachments & options", expanded=False):
+        with st.expander("Attachments & options", expanded=False):
             orch_up = st.file_uploader(
                 "Attach files (optional, PDF / TXT / DOCX)",
                 accept_multiple_files=True,
@@ -1851,7 +1816,7 @@ if active_tab == "Assistant":
 
         st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
         if not st.session_state.orch_chat:
-            st.caption("Start a conversation â€” messages are saved automatically and reload when you return or open a saved thread.")
+            st.caption("Start a conversation — messages are saved automatically and reload when you return or open a saved thread.")
         for idx, entry in enumerate(st.session_state.orch_chat):
             if entry["role"] == "user":
                 body = _hesc_html(entry.get("content", ""))
@@ -1871,7 +1836,7 @@ if active_tab == "Assistant":
                 ms = entry.get("elapsed_ms", 0)
                 st.markdown(
                     f'<div class="chat-wrap"><div class="chat-agent">{badges} '
-                    f'<small style="color:#94a3b8">({ms} ms)</small><br><br>{body}</div></div>',
+                    f'<small style="color:var(--muted)">({ms} ms)</small><br><br>{body}</div></div>',
                     unsafe_allow_html=True,
                 )
                 ui = entry.get("ui_payload")
@@ -1889,7 +1854,7 @@ if active_tab == "Assistant":
                 for i, fe in enumerate(_orch_fe):
                     with cols[i % ncols]:
                         st.download_button(
-                            label=f"â¬‡ {(fe.get('format') or 'file').upper()}",
+                            label=f"{(fe.get('format') or 'file').upper()}",
                             data=fe.get("data") or b"",
                             file_name=fe.get("filename") or "export.bin",
                             mime=fe.get("mime_type") or "application/octet-stream",
@@ -2020,7 +1985,7 @@ if active_tab == "Assistant":
                 for msg in message_queue.get_all_messages_for_display(limit=15):
                     tc = {"task": "qmsg-task", "result": "qmsg-result", "status": "qmsg-status", "broadcast": "qmsg-broadcast"}.get(msg["topic"], "qmsg")
                     st.markdown(
-                        f'<div class="qmsg {tc}"><b>{msg["time"]}</b> [{msg["topic"].upper()}] <b>{msg["sender"]}</b> to <b>{msg["receiver"]}</b> <span style="color:#64748b">{msg["preview"][:100]}</span></div>',
+                        f'<div class="qmsg {tc}"><b>{msg["time"]}</b> [{msg["topic"].upper()}] <b>{msg["sender"]}</b> to <b>{msg["receiver"]}</b> <span style="color:var(--muted)">{msg["preview"][:100]}</span></div>',
                         unsafe_allow_html=True,
                     )
             except Exception:
@@ -2034,42 +1999,42 @@ if active_tab == "Assistant":
             and not any((e.get("ui_payload") or {}).get("type") == "hr_shortlist" for e in st.session_state.orch_chat if e.get("role") == "agent")
         ):
             st.divider()
-            st.caption("Active shortlist â€” use chat to send invites or the actions below.")
+            st.caption("Active shortlist — use chat to send invites or the actions below.")
             _render_hr_ats_candidate_panel(_pbid, key_prefix="asst_sticky")
             if st.button("Dismiss shortlist panel", key="asst_hitl_clear"):
                 st.session_state.pending_hr_gmail_batch_id = None
                 st.session_state.hr_ats_candidates = []
                 st.rerun()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB â€” IT SUPPORT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB — IT SUPPORT
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "IT Support":
     with _MAIN:
         _render_agent_quick_chat("IT Support")
         st.caption(
-            "Tip: for most tasks, use **Assistant** â€” the orchestrator routes to IT (and other agents) automatically."
+            "Tip: for most tasks, use **Assistant** — the orchestrator routes to IT (and other agents) automatically."
         )
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<div class="sec-hdr sec-blue">ðŸ’» IT Support Agent</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-hdr sec-blue">IT Support Agent</div>', unsafe_allow_html=True)
             it_name = st.text_input("Your Name", value=st.session_state.user_name, key="it_name")
             it_prob = st.text_area("Describe Your IT Problem", placeholder="e.g. WiFi not connecting, laptop freezes, can't login...", height=160)
             pri_col, btn_col = st.columns([1,2])
             with pri_col:
                 priority = st.selectbox("Priority", ["Normal","High","Urgent"], key="it_pri")
             with btn_col:
-                it_btn = st.button("ðŸ” Get Solution", use_container_width=True, key="it_btn")
+                it_btn = st.button("Get Solution", use_container_width=True, key="it_btn")
 
             if it_btn and it_prob.strip():
-                with st.spinner("ðŸ”„ IT Agent analyzing..."):
+                with st.spinner("IT Agent analyzing..."):
                     try:
                         from graph.it_graph import it_graph
                         result = it_graph.invoke({"user_name":it_name,"it_problem":it_prob})
                         sol = result.get("it_solution","")
                         tid = result.get("ticket_id","")
                         if tid:
-                            st.success(f"âœ… Ticket created: **{tid}**")
+                            st.success(f"Ticket created: **{tid}**")
                         if result.get("it_handled"):
                             st.markdown(f'<div class="resp-box">{sol}</div>', unsafe_allow_html=True)
                         else:
@@ -2097,16 +2062,16 @@ if active_tab == "IT Support":
                     st.markdown(
                         f'<div class="hist-row">'
                         f'<b>{tid}</b> &nbsp; <span class="badge badge-{badge}">{t.status}</span><br>'
-                        f'<small style="color:#64748b">{un} | {ts}</small><br>'
+                        f'<small style="color:var(--muted)">{un} | {ts}</small><br>'
                         f"{prob}...</div>",
                         unsafe_allow_html=True,
                     )
             except Exception:
                 st.caption("No tickets yet.")
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 5 â€” EMAIL
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 5 — EMAIL
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Email":
     with _MAIN:
         st.caption(
@@ -2123,7 +2088,7 @@ if active_tab == "Email":
             st.warning(f"**Ready to Send**\n\n**To:** {p.get('name','')} `{p.get('email','')}`\n**Subject:** {p.get('subject','')}\n\n{p.get('body','')[:300]}...")
             cy, cn = st.columns(2)
             with cy:
-                if st.button("âœ… Confirm & Send", use_container_width=True, key="send_yes"):
+                if st.button("Confirm & Send", use_container_width=True, key="send_yes"):
                     try:
                         from tools.gmail_send import send_email
                         from database.sqlite_db import log_email
@@ -2167,7 +2132,7 @@ if active_tab == "Email":
                 labels = []
                 for em in st.session_state.inbox_emails:
                     att_n = em.get("attachment_count") or 0
-                    att_tag = f" attachment {att_n}" if att_n else ""
+                    att_tag = f" {att_n}" if att_n else ""
                     labels.append(
                         f"{em.get('date', '')} | {em.get('from_name', '?')[:28]}{att_tag}\n{em.get('subject', '')[:55]}"
                     )
@@ -2184,9 +2149,9 @@ if active_tab == "Email":
                 sel_em = st.session_state.inbox_emails[st.session_state.selected_inbox_idx or 0]
                 _render_inbox_email_detail(sel_em)
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 6 â€” HR
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 6 — HR
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "HR":
     with _MAIN:
         _render_agent_quick_chat("HR")
@@ -2263,7 +2228,7 @@ if active_tab == "HR":
                 for i, r in enumerate(st.session_state.hr_results, 1):
                     score = r.get("score", 0)
                     rec = r.get("recommendation", "")
-                    color = "#16a34a" if score >= 70 else ("#ca8a04" if score >= 50 else "#dc2626")
+                    color = "var(--success)" if score >= 70 else ("var(--warning)" if score >= 50 else "var(--danger)")
                     rb = {"Highly Recommended": "badge-green", "Recommended": "badge-blue", "Maybe": "badge-yellow", "Not Recommended": "badge-red"}.get(
                         rec, "badge-yellow"
                     )
@@ -2422,9 +2387,9 @@ if active_tab == "HR":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 7 â€” FINANCE
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 7 — FINANCE
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Finance":
     with _MAIN:
         _render_agent_quick_chat("Finance")
@@ -2440,7 +2405,7 @@ if active_tab == "Finance":
                 "Summarize Invoice",
                 "Generate Report",
                 "Budget vs Actual",
-                "Generate documents (PDF / Excel / â€¦)",
+                "Generate documents (PDF / Excel / …)",
             ],
             key="fin_act",
         )
@@ -2574,7 +2539,7 @@ if active_tab == "Finance":
                 for idx, dfile in enumerate(dash_files):
                     key_s = f"{idx}_{abs(hash(dfile.name)) % 10_000_000}"
                     df, err = file_to_dataframe(dfile)
-                    with st.expander(f"ðŸ“„ {dfile.name}", expanded=(idx == 0)):
+                    with st.expander(f"{dfile.name}", expanded=(idx == 0)):
                         if err or df is None:
                             st.error(f"Could not read file: {err or 'unknown error'}")
                             continue
@@ -2694,11 +2659,11 @@ if active_tab == "Finance":
                                 agg=agg_use,
                             )
                             if fig is None:
-                                st.caption(f"**{ct}** â€” could not build (check columns and numeric values).")
+                                st.caption(f"**{ct}** — could not build (check columns and numeric values).")
                             else:
                                 st.plotly_chart(fig, use_container_width=True)
                         if want_ai:
-                            with st.spinner(f"AI summary for {dfile.name}â€¦"):
+                            with st.spinner(f"AI summary for {dfile.name}…"):
                                 try:
                                     from graph.finance_graph import finance_graph
 
@@ -2780,7 +2745,7 @@ if active_tab == "Finance":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif fin_action == "Generate documents (PDF / Excel / â€¦)":
+        elif fin_action == "Generate documents (PDF / Excel / …)":
             st.markdown(
                 "Describe the **report, summary, or analysis** you want and paste **source numbers or text**. "
                 "Pick one or more formats; binaries are built **in parallel** (ThreadPoolExecutor)."
@@ -2800,7 +2765,7 @@ if active_tab == "Finance":
             )
             fin_exp_data = st.text_area(
                 "Source data (optional)",
-                placeholder="Paste CSV rows, budget lines, invoice text, or notesâ€¦",
+                placeholder="Paste CSV rows, budget lines, invoice text, or notes…",
                 height=160,
                 key="fin_exp_data",
             )
@@ -2823,7 +2788,7 @@ if active_tab == "Finance":
                 if not instr and not data_src and not fin_exp_up:
                     st.warning("Add instructions and/or source data, or upload a file.")
                 else:
-                    with st.spinner("LLM structuring + parallel export (PDF / Excel / â€¦)â€¦"):
+                    with st.spinner("LLM structuring + parallel export (PDF / Excel / …)…"):
                         try:
                             from graph.finance_graph import finance_graph
 
@@ -2837,7 +2802,7 @@ if active_tab == "Finance":
                                 upload_blob = "\n\n".join(parts_u)
                             merged_data = "\n\n".join(x for x in (data_src, upload_blob) if (x or "").strip())
 
-                            q = instr or (merged_data[:800] + " â€” finance document export")
+                            q = instr or (merged_data[:800] + " — finance document export")
                             r = finance_graph.invoke(
                                 {
                                     "action": "export_documents",
@@ -2868,19 +2833,19 @@ if active_tab == "Finance":
                         except Exception as e:
                             st.error(str(e))
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 8 â€” DOCUMENTS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 8 — DOCUMENTS
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Documents":
     with _MAIN:
         _render_agent_quick_chat("Documents")
         st.caption("Tip: **Assistant** can route document Q&A; use this tab for Drive load, embeddings, and batch tools.")
-        st.markdown('<div class="sec-hdr sec-teal">ðŸ“‚ Documents Agent <span class="badge badge-mcp">MCP</span> <span class="badge badge-purple">ChromaDB</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr sec-teal">Documents Agent <span class="badge badge-mcp">MCP</span> <span class="badge badge-purple">ChromaDB</span></div>', unsafe_allow_html=True)
         docs_user = st.text_input("Your Name", value=st.session_state.user_name, key="docs_user")
 
         lc1, lc2 = st.columns(2)
         with lc1:
-            if st.button("â˜ï¸ Load from Google Drive", key="load_drive", use_container_width=True):
+            if st.button("Load from Google Drive", key="load_drive", use_container_width=True):
                 if not is_google_drive_configured():
                     st.error("Google Drive is not configured.")
                 else:
@@ -2950,7 +2915,7 @@ if active_tab == "Documents":
                 if st.session_state.drive_documents:
                     from database.vector_db import embed_documents
                     embed_documents([d for d in st.session_state.drive_documents if d.get("content")], "documents")
-                st.success(f"{len(st.session_state.drive_documents)} documents ready and embedded")
+                st.success(f"{len(st.session_state.drive_documents)} documents ready & embedded")
 
         if st.session_state.drive_documents:
             names = " | ".join(d["file"] for d in st.session_state.drive_documents[:5])
@@ -2964,10 +2929,10 @@ if active_tab == "Documents":
             "Extract Data","Compare Two Docs","Batch Analyze","List All"
         ], key="docs_action")
 
-        if docs_action.startswith("Q&A"):
+        if docs_action == "Q&A (RAG via ChromaDB)":
             st.caption("Type your question in the chat bar pinned at the bottom of the page. Your conversation appears at the top of this tab.")
 
-        elif docs_action.startswith("Search"):
+        elif docs_action == "Search":
             sq = st.text_input("Search query", key="doc_sq")
             if st.button("Search", key="doc_srch", use_container_width=True) and sq.strip():
                 with st.spinner("Searching..."):
@@ -2978,7 +2943,7 @@ if active_tab == "Documents":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif docs_action.startswith("Summarize"):
+        elif docs_action == "Summarize":
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="sum_sel")
                 if st.button("Summarize", key="sum_btn", use_container_width=True):
@@ -2994,7 +2959,7 @@ if active_tab == "Documents":
             else:
                 st.info("Load documents first.")
 
-        elif docs_action.startswith("Extract"):
+        elif docs_action == "Extract Data":
             ext_type = st.selectbox("Extract Type", ["all","dates","amounts","parties","clauses","contacts"], key="ext_t")
             if st.session_state.drive_documents:
                 sel = st.selectbox("Select Document", [d["file"] for d in st.session_state.drive_documents], key="ext_sel")
@@ -3009,13 +2974,13 @@ if active_tab == "Documents":
                             except Exception as e:
                                 st.error(f"Error: {e}")
 
-        elif docs_action.startswith("âš–ï¸"):
+        elif docs_action == "Compare Two Docs":
             if len(st.session_state.drive_documents) >= 2:
                 names = [d["file"] for d in st.session_state.drive_documents]
                 cc1, cc2 = st.columns(2)
                 with cc1: d1n = st.selectbox("Document 1", names, key="cmp1")
                 with cc2: d2n = st.selectbox("Document 2", names, index=1, key="cmp2")
-                if st.button("âš–ï¸ Compare", key="cmp_btn", use_container_width=True):
+                if st.button("Compare", key="cmp_btn", use_container_width=True):
                     d1 = next((d for d in st.session_state.drive_documents if d["file"]==d1n), {})
                     d2 = next((d for d in st.session_state.drive_documents if d["file"]==d2n), {})
                     with st.spinner("Comparing..."):
@@ -3028,9 +2993,9 @@ if active_tab == "Documents":
             else:
                 st.info("Load at least 2 documents.")
 
-        elif docs_action.startswith("ðŸ“Š"):
+        elif docs_action == "Batch Analyze":
             bat = st.selectbox("Analysis Type", ["overview","financial","contracts","policies","compliance"], key="bat_t")
-            if st.button("ðŸ“Š Batch Analyze", key="bat_btn", use_container_width=True):
+            if st.button("Batch Analyze", key="bat_btn", use_container_width=True):
                 with st.spinner(f"Analyzing {len(st.session_state.drive_documents)} documents..."):
                     try:
                         from agents.documents_agent import batch_analyze_documents
@@ -3039,14 +3004,14 @@ if active_tab == "Documents":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        elif docs_action.startswith("ðŸ“‹"):
-            if st.button("ðŸ“‹ List All", key="lst_btn", use_container_width=True):
+        elif docs_action == "List All":
+            if st.button("List All", key="lst_btn", use_container_width=True):
                 from agents.documents_agent import list_documents_summary
                 st.markdown(f'<div class="resp-box resp-teal">{list_documents_summary(st.session_state.drive_documents)}</div>', unsafe_allow_html=True)
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB â€” HISTORY
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
+# TAB — HISTORY
+# ══════════════════════════════════════════════════════════════════════════
 if active_tab == "History":
     with _MAIN:
         st.markdown('<div class="sec-hdr sec-blue">Chat &amp; activity history</div>', unsafe_allow_html=True)
@@ -3063,7 +3028,7 @@ if active_tab == "History":
             if threads:
                 for t in threads:
                     with st.expander(
-                        f"Thread #{t['id']} Â· {t['updated_at']} Â· {t['message_count']} messages",
+                        f"Thread #{t['id']} · {t['updated_at']} · {t['message_count']} messages",
                         expanded=False,
                     ):
                         if t.get("preview"):
@@ -3083,10 +3048,10 @@ if active_tab == "History":
                                 st.session_state.orch_conversation_id = t["id"]
                                 st.session_state.orch_chat = []
                                 _sync_orch_chat_from_db(force=True)
-                                st.info(f"Thread #{t['id']} loaded â€” open the **Assistant** tab to continue.")
+                                st.info(f"Thread #{t['id']} loaded — open the **Assistant** tab to continue.")
                                 st.rerun()
             else:
-                st.info("No saved chat threads yet. Use **Assistant** â€” each thread is stored automatically.")
+                st.info("No saved chat threads yet. Use **Assistant** — each thread is stored automatically.")
         except Exception as ex:
             st.error(f"Chat threads: {ex}")
 
@@ -3111,7 +3076,7 @@ if active_tab == "History":
                             f'<div class="hist-row">'
                             f'<span class="badge {src_badge}">{_hesc_html(h.get("source", "ui").upper())}</span> '
                             f'<span class="badge badge-green">{_hesc_html(h.get("role", ""))}</span> '
-                            f'<span style="font-size:12px;color:#64748b"> {h.get("elapsed", 0)}ms</span><br><br>'
+                            f'<span style="font-size:12px;color:var(--muted)"> {h.get("elapsed", 0)}ms</span><br><br>'
                             f'<b>Input:</b> {_hesc_html(h.get("input", ""))}<br><br>'
                             f'<b>Agents:</b> {_hesc_html(h.get("agents", ""))}<br><br>'
                             f'<b>Response:</b><br>{_hesc_html(resp[:500])}{tail}'
@@ -3124,12 +3089,12 @@ if active_tab == "History":
             st.error(f"History error: {e}")
 
         st.divider()
-        st.markdown('<div class="sec-hdr">ðŸ” Login History (database)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hdr">Login History (database)</div>', unsafe_allow_html=True)
         try:
             from database.sqlite_db import get_login_history
             if st.session_state.user_role == "Admin":
                 login_rows = get_login_history(limit=200)
-                st.caption("All users â€” stored in the database login history table.")
+                st.caption("All users — stored in the database login history table.")
             else:
                 login_rows = get_login_history(limit=100, username=st.session_state.username)
                 st.caption("Your sign-in / sign-out events only.")
@@ -3141,8 +3106,8 @@ if active_tab == "History":
                         f'<div class="hist-row">'
                         f'<span class="badge {badge}">{(row.get("event") or "").upper()}</span> '
                         f'<b>{row.get("display_name", "")}</b> '
-                        f'<span style="color:#64748b">({row.get("username", "")} Â· {row.get("role", "")})</span><br>'
-                        f'<small style="color:#94a3b8">{row.get("time", "")}</small>'
+                        f'<span style="color:var(--muted)">({row.get("username", "")} · {row.get("role", "")})</span><br>'
+                        f'<small style="color:var(--muted)">{row.get("time", "")}</small>'
                         f"</div>",
                         unsafe_allow_html=True,
                     )
@@ -3152,16 +3117,15 @@ if active_tab == "History":
             st.error(f"Login history error: {e}")
 
 
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# PINNED CHAT BAR â€” rendered at top level so Streamlit anchors it to the bottom
+# ══════════════════════════════════════════════════════════════════════════
+# PINNED CHAT BAR — rendered at top level so Streamlit anchors it to the bottom
 # of the viewport, like ChatGPT / Claude / Gemini. Shown for every agent tab.
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════
 if st.session_state.get("logged_in"):
     _act = st.session_state.get("active_tab")
     if _act == "Assistant":
         _prompt = st.chat_input(
-            "Message the assistantâ€¦  (e.g. fetch latest 10 candidate emails, then shortlist 2 for Python)"
+            "Message the assistant…  (e.g. fetch latest 10 candidate emails, then shortlist 2 for Python)"
         )
         if _prompt and _prompt.strip():
             st.session_state["_pending_orch_prompt"] = _prompt.strip()
@@ -3172,6 +3136,3 @@ if st.session_state.get("logged_in"):
         if _prompt and _prompt.strip():
             st.session_state[f"_pending_{_act}"] = _prompt.strip()
             st.rerun()
-
-
-
