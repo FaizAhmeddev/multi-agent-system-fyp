@@ -887,6 +887,8 @@ def _looks_like_one_off_email_request(message: str) -> bool:
         return False
     if re.search(r"\b(?:fetch|list|read|show|search)\b.*\b(?:inbox|emails?|gmail)\b", low):
         return False
+    if _looks_like_offer_letter_generation_request(low):
+        return False
     return bool(
         re.search(
             r"\b(?:send|compose|write|draft|mail|email)\b.{0,80}\b(?:to|for)\b",
@@ -895,6 +897,20 @@ def _looks_like_one_off_email_request(message: str) -> bool:
         or re.search(r"\bemail\s+to\s+[a-z0-9_.+-]+", low)
         or re.search(r"\b(?:send|email|mail)\s+(?:him|her|them)\b", low)
     )
+
+
+def _looks_like_offer_letter_generation_request(message: str) -> bool:
+    """True for draft-generation requests like 'generate offer letter for Huzaifa'."""
+    low = (message or "").lower().strip()
+    if not low:
+        return False
+    if "offer letter" not in low and "joining letter" not in low and "employment letter" not in low:
+        return False
+    if not any(k in low for k in ("generate", "create", "draft", "prepare", "write", "make", "build")):
+        return False
+    if any(k in low for k in ("send", "email", "mail", "invite", "welcome email")):
+        return False
+    return True
 
 
 def _looks_like_dashboard_request(message: str) -> bool:
@@ -981,6 +997,20 @@ def _assistant_preflight_result(
             "limitations": [],
         }
 
+    if _looks_like_offer_letter_generation_request(msg):
+        facts = _extract_onboarding_facts(msg, conversation_history)
+        name = facts.get("name") or _parse_compose_recipient_name(msg) or "the employee"
+        return {
+            "proceed": True,
+            "message": "",
+            "agents": ["hr", "documents"],
+            "agent_tasks": {
+                "hr": f"Create the HR-side offer letter content for {name}. Use any known employee facts from the thread.",
+                "documents": "Prepare the offer letter document in a clean, professional format.",
+            },
+            "limitations": [],
+        }
+
     if re.fullmatch(r"[\w.+-]+@[\w.-]+\.\w+", msg):
         prior_email_task = ""
         for entry in reversed(conversation_history or []):
@@ -1034,6 +1064,17 @@ def _assistant_preflight_result(
         return plan
 
     if _is_compose_to_person_request(msg, conversation_history):
+        if _looks_like_offer_letter_generation_request(msg):
+            return {
+                "proceed": True,
+                "message": "",
+                "agents": ["hr", "documents"],
+                "agent_tasks": {
+                    "hr": "Create the HR-side offer letter content using the employee facts in the thread.",
+                    "documents": "Prepare the offer letter document in a professional format.",
+                },
+                "limitations": [],
+            }
         compose_check = validate_compose_email_request(msg, conversation_history)
         task = msg
         resolved = (compose_check.get("recipient_email") or "").strip()

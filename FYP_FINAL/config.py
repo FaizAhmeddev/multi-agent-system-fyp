@@ -240,7 +240,7 @@ def can_use_email_monitor(role: str) -> bool:
 
 def orchestrator_mq_enabled() -> bool:
     """A2A message queue logging (off by default for faster orchestration)."""
-    return _env("FYP_ENABLE_MQ", "false").lower() in ("1", "true", "yes")
+    return _env("FYP_ENABLE_MQ", "true").lower() in ("1", "true", "yes")
 
 
 # ─── Database ──────────────────────────────────────────────

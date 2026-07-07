@@ -690,10 +690,22 @@ textarea[data-testid="stChatInputTextArea"],
     border-radius: 16px !important;
     background: #ffffff !important;
     color: var(--text) !important;
+    caret-color: var(--text) !important;
     border: 1px solid var(--border) !important;
     box-shadow: var(--shadow-lg) !important;
     width: 100% !important;
     min-width: 0 !important;
+}
+[data-testid="stChatInput"] textarea::placeholder,
+textarea[data-testid="stChatInputTextArea"]::placeholder {
+    color: var(--muted) !important;
+    opacity: 1 !important;
+}
+[data-testid="stChatInput"] textarea,
+textarea[data-testid="stChatInputTextArea"],
+[data-testid="stChatInput"] textarea:focus,
+textarea[data-testid="stChatInputTextArea"]:focus {
+    -webkit-text-fill-color: var(--text) !important;
 }
 [data-testid="stChatInput"] textarea,
 textarea[data-testid="stChatInputTextArea"] {
@@ -769,6 +781,7 @@ _defs = {
     "hr_ats_batch_id": None,
     "hr_ats_selected": [],
     "hr_ats_filters": {},
+    "hr_ats_panel_dismissed_batch_id": None,
     "orch_finance_export_files": None,
     "auth_session_id": "",
     "orch_conversation_id": None,
@@ -843,8 +856,154 @@ def _agent_answer(tab: str, prompt: str, user_name: str) -> str:
     return "Unsupported agent."
 
 
+def _clear_hr_ats_panel(batch_id: str | None = None) -> None:
+    """Hide the active HR shortlist panel and reset transient selection state."""
+    st.session_state.pending_hr_gmail_batch_id = None
+    st.session_state.hr_ats_candidates = []
+    st.session_state.hr_ats_selected = []
+    st.session_state.hr_ats_batch_id = None
+    st.session_state.hr_ats_filters = {}
+    st.session_state.hr_ats_panel_dismissed_batch_id = batch_id or ""
+
+
+def _process_pending_chat_prompt(tab: str, *, orch_attachments: list[dict[str, str]] | None = None, use_llm: bool = True) -> None:
+    """Handle a submitted chat prompt before the history panel renders."""
+    if tab == "Assistant":
+        prompt = (st.session_state.pop("_pending_orch_prompt", "") or "").strip()
+        if not prompt:
+            return
+
+        attachments = orch_attachments or []
+        dedupe = (prompt, tuple((a["name"], len(a.get("content", ""))) for a in attachments))
+        if st.session_state.orch_last_proc == dedupe:
+            st.caption("Same request was just processed; change the message or attachments to send again.")
+            return
+
+        orch_hist: list = []
+        if st.session_state.get("orch_conversation_id"):
+            try:
+                from database.sqlite_db import load_conversation_openai_history
+
+                orch_hist = load_conversation_openai_history(st.session_state.orch_conversation_id, limit=16)
+            except Exception:
+                pass
+        if not orch_hist:
+            for e in st.session_state.orch_chat[-14:]:
+                if e.get("role") == "user":
+                    orch_hist.append({"role": "user", "content": e.get("content", "")})
+                elif e.get("role") == "agent":
+                    orch_hist.append({"role": "assistant", "content": e.get("content", "")})
+
+        st.session_state.orch_chat.append({"role": "user", "content": prompt})
+        try:
+            from database.sqlite_db import append_conversation_message
+
+            append_conversation_message(st.session_state.get("orch_conversation_id"), "user", prompt)
+        except Exception:
+            pass
+
+        with st.spinner("Routing and running agents (parallel)..."):
+            try:
+                from Orchestrator.orchestrator_brain import orchestrator
+
+                result = orchestrator.route(
+                    prompt,
+                    st.session_state.user_name,
+                    use_llm_intent=use_llm,
+                    attachments=attachments or None,
+                    allowed_agents=get_role_orchestrator_allowlist(st.session_state.user_role),
+                    conversation_history=orch_hist,
+                    user_role=st.session_state.user_role or "",
+                )
+                st.session_state.orch_last_proc = dedupe
+                if result.get("hr_gmail_pending_cleared"):
+                    _clear_hr_ats_panel(result.get("hr_gmail_batch_id"))
+                elif result.get("hr_gmail_batch_id"):
+                    st.session_state.pending_hr_gmail_batch_id = result["hr_gmail_batch_id"]
+                    st.session_state.hr_ats_panel_dismissed_batch_id = None
+                st.session_state.orch_finance_export_files = result.get("finance_export_files")
+                if "hr_gmail" in (result.get("agents_used") or []):
+                    try:
+                        from database.sqlite_db import hr_shortlist_get_batch
+
+                        bid = result.get("hr_gmail_batch_id")
+                        if bid:
+                            row = hr_shortlist_get_batch(bid)
+                            if row:
+                                payload = row.get("payload") or {}
+                                st.session_state.hr_ats_candidates = payload.get("top") or []
+                                st.session_state.hr_ats_batch_id = bid
+                                st.session_state.hr_ats_filters = (payload.get("session_memory") or {}).get("filters_applied") or {}
+                                st.session_state.hr_ats_panel_dismissed_batch_id = None
+                    except Exception:
+                        pass
+                from tools.assistant_display import prepare_assistant_chat_entry
+
+                chat_entry = prepare_assistant_chat_entry(result)
+                st.session_state.orch_chat.append(chat_entry)
+                try:
+                    from database.sqlite_db import append_conversation_message
+
+                    append_conversation_message(
+                        st.session_state.get("orch_conversation_id"),
+                        "agent",
+                        result["final_answer"],
+                        agents_used=", ".join(result.get("agents_used") or []),
+                        metadata={
+                            "agents_used": result.get("agents_used"),
+                            "elapsed_ms": result.get("elapsed_ms"),
+                            "ui_payload": result.get("ui_payload"),
+                            "display_content": chat_entry.get("display_content"),
+                        },
+                    )
+                except Exception:
+                    pass
+                try:
+                    from database.sqlite_db import log_task, add_notification
+
+                    log_task(
+                        st.session_state.user_name,
+                        st.session_state.user_role,
+                        prompt,
+                        result["agents_used"],
+                        result["final_answer"],
+                        result["elapsed_ms"],
+                    )
+                    add_notification(
+                        "Task completed",
+                        f"Agents: {', '.join(result['agents_used']) if result.get('agents_used') else 'general'}",
+                        "success",
+                        "Orchestrator",
+                    )
+                except Exception:
+                    pass
+            except Exception as e:
+                if st.session_state.orch_chat and st.session_state.orch_chat[-1].get("role") == "user":
+                    st.session_state.orch_chat.pop()
+                st.error(f"Orchestrator error: {e}")
+        return
+
+    if tab not in _AGENT_CHAT:
+        return
+
+    chat_key, _, _ = _AGENT_CHAT[tab]
+    pend = (st.session_state.pop(f"_pending_{tab}", "") or "").strip()
+    if not pend:
+        return
+
+    st.session_state.setdefault(chat_key, [])
+    st.session_state[chat_key].append({"role": "user", "content": pend})
+    with st.spinner(f"{tab} agent working…"):
+        try:
+            ans = _agent_answer(tab, pend, st.session_state.user_name or "User")
+        except Exception as e:
+            ans = f"Error: {e}"
+    st.session_state[chat_key].append({"role": "agent", "content": ans})
+
+
 def _render_agent_quick_chat(tab: str) -> None:
-    """Render a per-agent chat history + process a pending pinned-bar prompt."""
+    """Render a per-agent chat history after processing any pending pinned-bar prompt."""
+    _process_pending_chat_prompt(tab)
     chat_key, icon, _ph = _AGENT_CHAT[tab]
     history = st.session_state.get(chat_key, [])
     if history:
@@ -864,17 +1023,6 @@ def _render_agent_quick_chat(tab: str) -> None:
         if st.button("Clear chat", key=f"clear_{chat_key}"):
             st.session_state[chat_key] = []
             st.rerun()
-    pend = (st.session_state.pop(f"_pending_{tab}", "") or "").strip()
-    if pend:
-        st.session_state.setdefault(chat_key, [])
-        st.session_state[chat_key].append({"role": "user", "content": pend})
-        with st.spinner(f"{tab} agent working…"):
-            try:
-                ans = _agent_answer(tab, pend, st.session_state.user_name or "User")
-            except Exception as e:
-                ans = f"Error: {e}"
-        st.session_state[chat_key].append({"role": "agent", "content": ans})
-        st.rerun()
 
 
 def _new_auth_session_id() -> str:
@@ -989,6 +1137,7 @@ def _sync_hr_ats_from_result(result: dict) -> None:
     st.session_state.hr_ats_filters = result.get("filters_applied") or {}
     if result.get("batch_id"):
         st.session_state.pending_hr_gmail_batch_id = result.get("batch_id")
+        st.session_state.hr_ats_panel_dismissed_batch_id = None
     mem = result.get("session_memory") or {}
     if mem.get("candidates"):
         st.session_state.hr_ats_candidates = mem["candidates"]
@@ -1000,6 +1149,8 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
     if not candidates:
         return
     bid = batch_id or st.session_state.get("hr_ats_batch_id") or ""
+    if st.session_state.get("hr_ats_panel_dismissed_batch_id") == bid and bid:
+        return
     filters = st.session_state.get("hr_ats_filters") or {}
     st.markdown(
         '<div class="sec-hdr sec-teal">Candidate pipeline <span class="badge badge-indigo">ATS</span></div>',
@@ -1008,6 +1159,9 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
     if filters.get("required_skills"):
         st.caption(f"Skill filter: **{', '.join(filters['required_skills'])}** · Min score: **{filters.get('min_score', 55)}%**")
     st.caption("Select candidates, then **Send email** per person, or use bulk actions. Emails are never sent without your action.")
+    if st.button("Dismiss panel", key=f"{key_prefix}_dismiss_{bid or 'noid'}", use_container_width=True):
+        _clear_hr_ats_panel(bid)
+        st.rerun()
 
     selected: list[str] = []
     for i, c in enumerate(candidates):
@@ -1049,6 +1203,8 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                             )
                             if sr.get("ok"):
                                 st.success(f"Sent to **{name}**.")
+                                _clear_hr_ats_panel(bid)
+                                st.rerun()
                             else:
                                 st.error(sr.get("error", "Send failed."))
                         except Exception as ex:
@@ -1072,7 +1228,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="send to selected", ui_selected_ids=selected)
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** email(s).")
-                    st.session_state.pending_hr_gmail_batch_id = None
+                    _clear_hr_ats_panel(bid)
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -1085,6 +1241,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all recommended candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}** to recommended.")
+                    _clear_hr_ats_panel(bid)
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -1095,6 +1252,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="invite top 2 candidates")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
+                    _clear_hr_ats_panel(bid)
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -1106,7 +1264,7 @@ def _render_hr_ats_candidate_panel(batch_id: str | None, key_prefix: str = "ats"
                 sr = approve_and_send_shortlist_batch(bid, user_message="email all candidates send to everyone")
                 if sr.get("ok"):
                     st.success(f"Sent **{sr.get('emails_sent', 0)}**.")
-                    st.session_state.pending_hr_gmail_batch_id = None
+                    _clear_hr_ats_panel(bid)
                     st.rerun()
                 else:
                     st.error(sr.get("error", "Failed"))
@@ -1136,7 +1294,12 @@ def _render_assistant_ui_payload(ui: dict | None, key_prefix: str = "aui") -> No
             st.success(
                 f"Sent {send_result.get('emails_sent', 0)} invitation(s) via Gmail."
             )
-        _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
+            if bid:
+                _clear_hr_ats_panel(bid)
+        if bid and st.session_state.get("hr_ats_panel_dismissed_batch_id") == bid:
+            st.caption("Shortlist panel dismissed.")
+        elif not send_result.get("ok"):
+            _render_hr_ats_candidate_panel(bid, key_prefix=key_prefix)
     elif t == "hr_inventory":
         st.markdown(
             '<div class="sec-hdr sec-blue" style="margin-top:12px">CV inventory</div>',
@@ -1355,13 +1518,16 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
     _hosted = not local_background_services_enabled()
     _gmail_ok = is_gmail_configured()
     if st.session_state.get("monitor_import_error"):
-        st.error(f"Monitor unavailable: {st.session_state.monitor_import_error}")
+        st.warning(f"Auto-reply monitor unavailable: {st.session_state.monitor_import_error}")
     if _hosted:
         st.info("Auto-reply monitor runs on **local** installs only (not Streamlit Cloud).")
     elif not _gmail_ok:
         st.warning(gmail_setup_hint())
 
     toggle_key = f"{key_prefix}_auto_reply_on"
+    sync_key = f"{toggle_key}_sync_next"
+    if sync_key in st.session_state:
+        st.session_state[toggle_key] = st.session_state.pop(sync_key)
     if toggle_key not in st.session_state:
         st.session_state[toggle_key] = is_running()
 
@@ -1378,14 +1544,12 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
             ok, msg = start_monitor()
             st.session_state.monitor_log.append(msg)
             if ok:
-                st.session_state[toggle_key] = True
                 st.success(msg)
             else:
-                st.session_state[toggle_key] = False
+                st.session_state[sync_key] = False
                 st.error(msg)
         else:
             stop_monitor()
-            st.session_state[toggle_key] = False
             st.session_state.monitor_log.append("Auto-reply monitor stopped.")
         st.rerun()
 
@@ -1514,6 +1678,7 @@ with st.sidebar:
         for k in ("orch_conversation_id", "coord_conversation_id", "docs_conversation_id"):
             st.session_state[k] = None
         st.session_state.orch_chat = []
+        st.session_state.hr_ats_panel_dismissed_batch_id = None
         st.session_state.active_tab = None
         st.rerun()
 
@@ -1845,6 +2010,14 @@ if active_tab == "Assistant":
                 if txt.strip():
                     orch_attachments.append({"name": f.name, "content": txt})
 
+        # Process a freshly submitted prompt before the history panel renders,
+        # so the user's message appears immediately instead of one rerun later.
+        _process_pending_chat_prompt(
+            "Assistant",
+            orch_attachments=orch_attachments,
+            use_llm=st.session_state.get("orch_use_llm", True),
+        )
+
         st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
         if not st.session_state.orch_chat:
             st.caption("Start a conversation — messages are saved automatically and reload when you return or open a saved thread.")
@@ -1893,122 +2066,6 @@ if active_tab == "Assistant":
                         )
                         st.caption(fe.get("filename", ""))
 
-        # The input is the chat bar pinned to the bottom of the page (rendered
-        # outside the main container, at the end of the script). It stores the
-        # submitted text in session_state, which we pick up here.
-        use_llm = st.session_state.get("orch_use_llm", True)
-        inp = (st.session_state.pop("_pending_orch_prompt", "") or "")
-
-        if inp.strip():
-            dedupe = (inp.strip(), tuple((a["name"], len(a.get("content", ""))) for a in orch_attachments))
-            if st.session_state.orch_last_proc == dedupe:
-                st.caption("Same request was just processed; change the message or attachments to send again.")
-            else:
-                orch_hist: list = []
-                if st.session_state.get("orch_conversation_id"):
-                    try:
-                        from database.sqlite_db import load_conversation_openai_history
-
-                        orch_hist = load_conversation_openai_history(
-                            st.session_state.orch_conversation_id, limit=16
-                        )
-                    except Exception:
-                        pass
-                if not orch_hist:
-                    for e in st.session_state.orch_chat[-14:]:
-                        if e.get("role") == "user":
-                            orch_hist.append({"role": "user", "content": e.get("content", "")})
-                        elif e.get("role") == "agent":
-                            orch_hist.append({"role": "assistant", "content": e.get("content", "")})
-                st.session_state.orch_chat.append({"role": "user", "content": inp.strip()})
-                try:
-                    from database.sqlite_db import append_conversation_message
-
-                    append_conversation_message(
-                        st.session_state.get("orch_conversation_id"),
-                        "user",
-                        inp.strip(),
-                    )
-                except Exception:
-                    pass
-                with st.spinner("Routing and running agents (parallel)..."):
-                    try:
-                        from Orchestrator.orchestrator_brain import orchestrator
-
-                        result = orchestrator.route(
-                            inp.strip(),
-                            st.session_state.user_name,
-                            use_llm_intent=use_llm,
-                            attachments=orch_attachments or None,
-                            allowed_agents=get_role_orchestrator_allowlist(st.session_state.user_role),
-                            conversation_history=orch_hist,
-                            user_role=st.session_state.user_role or "",
-                        )
-                        st.session_state.orch_last_proc = dedupe
-                        if result.get("hr_gmail_pending_cleared"):
-                            st.session_state.pending_hr_gmail_batch_id = None
-                        elif result.get("hr_gmail_batch_id"):
-                            st.session_state.pending_hr_gmail_batch_id = result["hr_gmail_batch_id"]
-                        st.session_state.orch_finance_export_files = result.get("finance_export_files")
-                        if "hr_gmail" in (result.get("agents_used") or []):
-                            try:
-                                from database.sqlite_db import hr_shortlist_get_batch
-                                bid = result.get("hr_gmail_batch_id")
-                                if bid:
-                                    row = hr_shortlist_get_batch(bid)
-                                    if row:
-                                        payload = row.get("payload") or {}
-                                        st.session_state.hr_ats_candidates = payload.get("top") or []
-                                        st.session_state.hr_ats_batch_id = bid
-                                        st.session_state.hr_ats_filters = (payload.get("session_memory") or {}).get("filters_applied") or {}
-                            except Exception:
-                                pass
-                        from tools.assistant_display import prepare_assistant_chat_entry
-
-                        chat_entry = prepare_assistant_chat_entry(result)
-                        st.session_state.orch_chat.append(chat_entry)
-                        try:
-                            from database.sqlite_db import append_conversation_message
-
-                            append_conversation_message(
-                                st.session_state.get("orch_conversation_id"),
-                                "agent",
-                                result["final_answer"],
-                                agents_used=", ".join(result.get("agents_used") or []),
-                                metadata={
-                                    "agents_used": result.get("agents_used"),
-                                    "elapsed_ms": result.get("elapsed_ms"),
-                                    "ui_payload": result.get("ui_payload"),
-                                    "display_content": chat_entry.get("display_content"),
-                                },
-                            )
-                        except Exception:
-                            pass
-                        try:
-                            from database.sqlite_db import log_task, add_notification
-
-                            log_task(
-                                st.session_state.user_name,
-                                st.session_state.user_role,
-                                inp.strip(),
-                                result["agents_used"],
-                                result["final_answer"],
-                                result["elapsed_ms"],
-                            )
-                            add_notification(
-                                "Task completed",
-                                f"Agents: {', '.join(result['agents_used']) if result.get('agents_used') else 'general'}",
-                                "success",
-                                "Orchestrator",
-                            )
-                        except Exception:
-                            pass
-                        st.rerun()
-                    except Exception as e:
-                        if st.session_state.orch_chat and st.session_state.orch_chat[-1].get("role") == "user":
-                            st.session_state.orch_chat.pop()
-                        st.error(f"Orchestrator error: {e}")
-
         with st.expander("Message queue (live)"):
             try:
                 from message_queue import message_queue
@@ -2027,14 +2084,14 @@ if active_tab == "Assistant":
             _pbid
             and st.session_state.user_role in ("Admin", "HR Manager", "Assistant", "Demo User")
             and st.session_state.get("hr_ats_candidates")
+            and st.session_state.get("hr_ats_panel_dismissed_batch_id") != _pbid
             and not any((e.get("ui_payload") or {}).get("type") == "hr_shortlist" for e in st.session_state.orch_chat if e.get("role") == "agent")
         ):
             st.divider()
             st.caption("Active shortlist — use chat to send invites or the actions below.")
             _render_hr_ats_candidate_panel(_pbid, key_prefix="asst_sticky")
             if st.button("Dismiss shortlist panel", key="asst_hitl_clear"):
-                st.session_state.pending_hr_gmail_batch_id = None
-                st.session_state.hr_ats_candidates = []
+                _clear_hr_ats_panel(_pbid)
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════

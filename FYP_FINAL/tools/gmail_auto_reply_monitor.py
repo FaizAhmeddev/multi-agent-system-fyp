@@ -1,30 +1,29 @@
 """
 AUTO REPLY MONITOR
 ==================
-FIX: Uses thread-safe queue instead of st.session_state directly.
-st.session_state cannot be accessed from background threads — that was the bug.
+Background IMAP monitor for Gmail auto-replies.
+
+The heavy agent/email-sending imports are loaded lazily inside the worker
+thread so the UI can open this panel even when optional dependencies or
+credentials are not fully available yet.
 """
 
-import time
 import email
 import imaplib
-import threading
 import queue
+import threading
+import time
 from email.utils import parseaddr
 
-from config import GMAIL_EMAIL, GMAIL_APP_PASSWORD
-from agents.auto_reply_agent import generate_reply
-from tools.gmail_send import send_email
+from config import GMAIL_APP_PASSWORD, GMAIL_EMAIL
 
 _monitor_running = False
 _monitor_thread = None
-
-# Thread-safe queue for log messages — UI reads from this each rerun
 _log_queue = queue.Queue()
 
 
 def get_pending_logs() -> list:
-    """Drain all pending log messages. Call from the UI (main) thread only."""
+    """Drain all pending log messages. Call from the UI thread only."""
     messages = []
     try:
         while True:
@@ -36,8 +35,10 @@ def get_pending_logs() -> list:
 
 def _do_monitor():
     global _monitor_running
+    from agents.auto_reply_agent import generate_reply
+    from tools.gmail_send import send_email
 
-    _log_queue.put("✅ Auto-reply monitor active. Checking every 30 seconds...")
+    _log_queue.put("Auto-reply monitor active. Checking every 30 seconds...")
 
     while _monitor_running:
         try:
@@ -49,9 +50,9 @@ def _do_monitor():
             mail_ids = data[0].split()
 
             if not mail_ids:
-                _log_queue.put("🔍 No new emails found.")
+                _log_queue.put("No new emails found.")
             else:
-                _log_queue.put(f"📬 Found {len(mail_ids)} new email(s). Processing...")
+                _log_queue.put(f"Found {len(mail_ids)} new email(s). Processing...")
 
             for num in mail_ids:
                 if not _monitor_running:
@@ -62,10 +63,8 @@ def _do_monitor():
 
                     sender_name, sender_email = parseaddr(msg.get("From", ""))
                     subject = msg.get("Subject", "No Subject")
-
                     if not sender_name:
                         sender_name = "Sir/Madam"
-
                     if sender_email == GMAIL_EMAIL:
                         continue
 
@@ -90,27 +89,24 @@ def _do_monitor():
                     reply_state = generate_reply(state)
                     reply_state["recipient"] = sender_email
                     reply_state["subject"] = "Re: " + str(subject)
-
                     send_email(reply_state)
 
-                    msg_text = f"📧 Auto-replied to: {sender_name} ({sender_email})"
+                    msg_text = f"Auto-replied to: {sender_name} ({sender_email})"
                     print(msg_text)
                     _log_queue.put(msg_text)
-
                 except Exception as e:
-                    _log_queue.put(f"⚠️ Error processing email: {e}")
+                    _log_queue.put(f"Error processing email: {e}")
 
             mail.logout()
-
         except Exception as e:
-            _log_queue.put(f"⚠️ Monitor error: {e}")
+            _log_queue.put(f"Monitor error: {e}")
 
         for _ in range(30):
             if not _monitor_running:
                 break
             time.sleep(1)
 
-    _log_queue.put("🛑 Auto-reply monitor stopped.")
+    _log_queue.put("Auto-reply monitor stopped.")
 
 
 def start_monitor() -> tuple[bool, str]:
@@ -118,9 +114,9 @@ def start_monitor() -> tuple[bool, str]:
     global _monitor_running, _monitor_thread
     if _monitor_running:
         return False, "Monitor is already running."
-    email = (GMAIL_EMAIL or "").strip()
+    email_addr = (GMAIL_EMAIL or "").strip()
     pwd = (GMAIL_APP_PASSWORD or "").replace(" ", "")
-    if not email or not pwd:
+    if not email_addr or not pwd:
         return False, "Gmail is not configured. Set GMAIL_EMAIL and GMAIL_APP_PASSWORD in FYP_FINAL/.env"
     _monitor_running = True
     _monitor_thread = threading.Thread(target=_do_monitor, daemon=True)
