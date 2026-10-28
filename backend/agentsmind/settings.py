@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     finance_mcp_token: SecretStr | None = None
     it_mcp_url: str = "http://127.0.0.1:8102/mcp"
     it_mcp_token: SecretStr | None = None
+    calendar_mcp_url: str = "http://127.0.0.1:8103/mcp"
+    calendar_mcp_token: SecretStr | None = None
+    workspace_mcp_url: str = "http://127.0.0.1:8104/mcp"
+    workspace_mcp_token: SecretStr | None = None
     mcp_timeout_seconds: float = Field(default=15.0, ge=1, le=120)
     mcp_read_retries: int = Field(default=2, ge=0, le=5)
     it_portal_public_url: str = "http://127.0.0.1:8202"

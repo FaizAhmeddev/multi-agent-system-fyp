@@ -16,3 +16,6 @@ tzdata==2024.2
 # MCP client (core) and servers. 2.x: FastMCP is renamed MCPServer. Requires pydantic>=2.12.
 mcp==2.3.0
 httpx2==2.13.1
+# Agents: explicit graphs (LangGraph) and the OpenAI client (live mode only; sandbox without a key).
+langgraph==1.1.0
+openai==2.35.1

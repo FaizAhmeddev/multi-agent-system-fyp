@@ -1,0 +1,11 @@
+Bilal Ahmed (synthetic candidate)
+Email: bilal.ahmed@example.com
+
+Summary: Front-end developer moving towards backend work.
+
+Experience
+- 2024-2026  Front-end Developer, Demo Corp. React and TypeScript dashboards.
+- 2023-2024  Intern, Placeholder Ltd. Wrote small Python scripts for data cleanup.
+
+Skills: JavaScript, TypeScript, React, HTML, CSS, basic Python, Git
+Education: BS Software Engineering

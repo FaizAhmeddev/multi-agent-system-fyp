@@ -1,0 +1,11 @@
+Sara Khan (synthetic candidate)
+Email: sara.khan@example.com
+
+Summary: Backend developer with 4 years of Python experience.
+
+Experience
+- 2023-2026  Backend Developer, Example Systems. Built FastAPI services backed by PostgreSQL. Moved deployments to Docker. Wrote pytest suites (85% coverage).
+- 2022-2023  Junior Developer, Sample Labs. Django admin tools, SQL reporting.
+
+Skills: Python, FastAPI, Django, PostgreSQL, SQL, Docker, Git, pytest, code review
+Education: BS Computer Science

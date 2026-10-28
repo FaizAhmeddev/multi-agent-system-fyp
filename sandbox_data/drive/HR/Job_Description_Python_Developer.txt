@@ -1,0 +1,14 @@
+Job description: Python Developer (synthetic)
+
+Must have:
+- 3+ years of professional Python
+- FastAPI or Django
+- SQL (PostgreSQL preferred)
+- Git and code review
+
+Nice to have:
+- Docker
+- Cloud deployment (any provider)
+- Automated testing (pytest)
+
+Responsibilities: build and maintain internal APIs, write tests, review code, support releases.

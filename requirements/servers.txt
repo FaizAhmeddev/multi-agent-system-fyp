@@ -1,0 +1,7 @@
+# MCP servers that talk to Google (calendar-mcp, workspace-mcp) and the OAuth helper.
+-r portals.txt
+google-api-python-client==2.196.0
+google-auth==2.53.0
+google-auth-oauthlib==1.3.1
+cryptography==50.0.1
+pypdf==6.17.0

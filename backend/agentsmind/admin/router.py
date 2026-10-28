@@ -120,7 +120,6 @@ def mcp_health(_: User = Depends(require_roles("admin"))) -> dict:
                 row.update(reachable=False, error=f"{type(exc).__name__}: {exc}")
             row["latency_ms"] = int((time.perf_counter() - start) * 1000)
         else:
-            row.update(reachable=False, error="Not configured. Set the URL and token in .env." if name in
-                       ("finance-mcp", "it-mcp") else "Arrives in Phase 3.")
+            row.update(reachable=False, error="Not configured. Set the URL and token in .env.")
         out.append(row)
     return {"servers": out}

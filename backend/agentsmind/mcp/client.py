@@ -40,7 +40,9 @@ def server_configs() -> dict[str, ServerConfig]:
     s = get_settings()
     out: dict[str, ServerConfig] = {}
     for name, url, tok in (("finance-mcp", s.finance_mcp_url, s.finance_mcp_token),
-                           ("it-mcp", s.it_mcp_url, s.it_mcp_token)):
+                           ("it-mcp", s.it_mcp_url, s.it_mcp_token),
+                           ("calendar-mcp", s.calendar_mcp_url, s.calendar_mcp_token),
+                           ("workspace-mcp", s.workspace_mcp_url, s.workspace_mcp_token)):
         if tok and tok.get_secret_value().strip():
             out[name] = ServerConfig(name, url, tok.get_secret_value().strip())
     return out
@@ -178,4 +180,8 @@ _WRITE_WITH_KEY = {
     "finance_update_person": ("idempotency_key",),
     "finance_delete_person": ("idempotency_key",),
     "it_create_ticket": ("idempotency_key",),
+    "calendar_create_event": ("idempotency_key",),
+    "calendar_update_event": ("idempotency_key",),
+    "calendar_cancel_event": ("idempotency_key",),
+    "gmail_send_email": ("idempotency_key",),
 }

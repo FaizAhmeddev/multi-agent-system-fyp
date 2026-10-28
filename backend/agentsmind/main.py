@@ -24,6 +24,7 @@ from .auth.service import AuthError, bootstrap_first_admin
 from .db.session import SessionLocal, get_engine
 from .departments.router import router as departments_router
 from .departments.workspaces import router as workspaces_router
+from .internal.router import router as internal_router
 from .log_config import configure_logging, request_id_var
 from .settings import get_settings
 
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(departments_router)
     app.include_router(agents_router)
     app.include_router(workspaces_router)
+    app.include_router(internal_router)
     return app
 
 
