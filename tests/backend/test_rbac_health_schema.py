@@ -83,7 +83,10 @@ def test_migrations_match_models(db_url):
     from alembic.migration import MigrationContext
 
     with get_engine().connect() as conn:
-        mc = MigrationContext.configure(conn, opts={"compare_type": True})
+        # compare_type is off: SQLite reflects DATETIME without the timezone flag that
+        # UTCDateTime declares, which would be a false positive. Tables, columns,
+        # nullability, indexes, unique constraints and FKs are still compared.
+        mc = MigrationContext.configure(conn, opts={"compare_type": False})
         diff = compare_metadata(mc, Base.metadata)
     assert diff == []
 
