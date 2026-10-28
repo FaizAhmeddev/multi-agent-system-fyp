@@ -120,17 +120,19 @@ def test_llm_error_silently_rejects_candidate(monkeypatch):
 
 # ── OTP ────────────────────────────────────────────────────────────────────────
 
-@pytest.mark.legacy_bug
-def test_otp_uses_non_crypto_random_and_dev_fallback_on_by_default(monkeypatch):
+def test_otp_uses_secrets_and_dev_fallback_is_off_by_default(monkeypatch):
+    """Flipped in Phase 1b (was test_otp_uses_non_crypto_random_and_dev_fallback_on_by_default)."""
     import inspect
     import auth.otp_service as o
     code = o.generate_otp()
     assert len(code) == 6 and code.isdigit()
-    assert "random.choices" in inspect.getsource(o.generate_otp)
+    src = inspect.getsource(o.generate_otp)
+    assert "secrets.choice" in src and "random." not in src
     monkeypatch.delenv("AUTH_OTP_DEV_FALLBACK", raising=False)
     monkeypatch.setattr("config.is_gmail_configured", lambda: False)
+    monkeypatch.setattr("config.DEMO_MODE", False)
     ok, _msg, shown_on_screen = o.send_email_otp("x@example.com", "123456", "reset")
-    assert ok is True and shown_on_screen is True  # reset code is shown in the UI
+    assert ok is False and shown_on_screen is False  # no code is shown in the UI
 
 
 # ── Uploads ────────────────────────────────────────────────────────────────────

@@ -92,12 +92,12 @@ def refresh_config_from_env() -> None:
     DATABASE_URL = _env("DATABASE_URL", "")
 
     USERS = {
-        "admin": {"password": _env("FYP_PASSWORD_ADMIN", "admin123"), "role": "Admin", "name": "System Admin"},
-        "hr": {"password": _env("FYP_PASSWORD_HR", "hr123"), "role": "HR Manager", "name": "HR Manager"},
-        "finance": {"password": _env("FYP_PASSWORD_FINANCE", "finance123"), "role": "Finance Manager", "name": "Finance Manager"},
-        "it": {"password": _env("FYP_PASSWORD_IT", "it123"), "role": "IT Staff", "name": "IT Support"},
-        "demo": {"password": _env("FYP_PASSWORD_DEMO", "demo123"), "role": "Admin", "name": "Demo User"},
-        "assistant": {"password": _env("FYP_PASSWORD_ASSISTANT", "assistant123"), "role": "Assistant", "name": "Office Assistant"},
+        "admin": {"password": _env("FYP_PASSWORD_ADMIN", ""), "role": "Admin", "name": "System Admin"},
+        "hr": {"password": _env("FYP_PASSWORD_HR", ""), "role": "HR Manager", "name": "HR Manager"},
+        "finance": {"password": _env("FYP_PASSWORD_FINANCE", ""), "role": "Finance Manager", "name": "Finance Manager"},
+        "it": {"password": _env("FYP_PASSWORD_IT", ""), "role": "IT Staff", "name": "IT Support"},
+        "demo": {"password": _env("FYP_PASSWORD_DEMO", ""), "role": "Admin", "name": "Demo User"},
+        "assistant": {"password": _env("FYP_PASSWORD_ASSISTANT", ""), "role": "Assistant", "name": "Office Assistant"},
     }
 
 
@@ -314,35 +314,35 @@ def local_background_services_enabled() -> bool:
     return not is_hosted_deploy()
 
 
-# ─── Login Users (passwords overridable via env for production) ─
+# ─── Login Users: no default passwords. An account works only when FYP_PASSWORD_<NAME> is set. ─
 USERS = {
     "admin": {
-        "password": _env("FYP_PASSWORD_ADMIN", "admin123"),
+        "password": _env("FYP_PASSWORD_ADMIN", ""),
         "role": "Admin",
         "name": "System Admin",
     },
     "hr": {
-        "password": _env("FYP_PASSWORD_HR", "hr123"),
+        "password": _env("FYP_PASSWORD_HR", ""),
         "role": "HR Manager",
         "name": "HR Manager",
     },
     "finance": {
-        "password": _env("FYP_PASSWORD_FINANCE", "finance123"),
+        "password": _env("FYP_PASSWORD_FINANCE", ""),
         "role": "Finance Manager",
         "name": "Finance Manager",
     },
     "it": {
-        "password": _env("FYP_PASSWORD_IT", "it123"),
+        "password": _env("FYP_PASSWORD_IT", ""),
         "role": "IT Staff",
         "name": "IT Support",
     },
     "demo": {
-        "password": _env("FYP_PASSWORD_DEMO", "demo123"),
+        "password": _env("FYP_PASSWORD_DEMO", ""),
         "role": "Admin",
         "name": "Demo User",
     },
     "assistant": {
-        "password": _env("FYP_PASSWORD_ASSISTANT", "assistant123"),
+        "password": _env("FYP_PASSWORD_ASSISTANT", ""),
         "role": "Assistant",
         "name": "Office Assistant",
     },
@@ -381,7 +381,7 @@ ROLE_ORCHESTRATOR_ALLOWLIST = {
     "Admin": None,
     "Demo User": None,
     "HR Manager": ["hr", "recruitment", "email", "hr_gmail"],
-    "Assistant": ["email", "hr_gmail", "hr", "recruitment", "it_support", "finance", "documents"],
+    "Assistant": ["general", "email", "hr_gmail"],
     "Finance Manager": ["finance"],
     "IT Staff": ["it_support"],
     "Employee": ["general"],
@@ -389,6 +389,8 @@ ROLE_ORCHESTRATOR_ALLOWLIST = {
 
 
 def get_visible_tabs_for_role(role: str) -> list[str]:
+    if role not in ROLE_VISIBLE_TABS:
+        return ["Assistant", "History"]  # unknown role: fail closed
     allowed = ROLE_VISIBLE_TABS.get(role)
     if allowed is None:
         return list(_FULL_TABS)
@@ -403,7 +405,7 @@ def get_role_orchestrator_allowlist(role: str):
         return None
     v = ROLE_ORCHESTRATOR_ALLOWLIST.get(role)
     if v is None:
-        return None
+        return ["general"]  # unknown role: fail closed
     return list(v)
 
 

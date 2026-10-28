@@ -23,12 +23,19 @@ def test_send_and_consume_fifo(mq):
     assert mq.pending_count("agent-it-001") == 0
 
 
-@pytest.mark.legacy_bug
-def test_consume_is_destructive_no_ack_no_redelivery(mq):
-    mq.send("orch", "agent-x", "task", {})
-    mq.consume("agent-x")
-    # A crash after consume loses the task: no ack, no visibility timeout, no retry.
-    assert mq.consume("agent-x") == []
+def test_unacked_message_is_redelivered_and_ack_is_final(mq):
+    """Flipped in Phase 1b (was test_consume_is_destructive_no_ack_no_redelivery)."""
+    import time
+
+    mid = mq.send("orch", "agent-x", "task", {})
+    first = mq.consume("agent-x")
+    assert [m.msg_id for m in first] == [mid]
+    assert mq.consume("agent-x") == []  # in flight, not visible
+    assert mq.requeue_expired(now=time.time() + 31) == 1  # consumer "crashed": no ack
+    again = mq.consume("agent-x")
+    assert [m.msg_id for m in again] == [mid]
+    assert mq.ack(mid) is True and mq.ack(mid) is False
+    assert mq.requeue_expired(now=time.time() + 999) == 0
 
 
 def test_broadcast_fans_out_to_known_queues_only(mq):

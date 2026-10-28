@@ -96,7 +96,7 @@ GMAIL_EMAIL=you@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 ```
 
-Do **not** commit `.env`. Demo login passwords default to `admin123` / `hr123` / … unless you set `FYP_PASSWORD_*` in `.env` (see `.env.example`).
+Do **not** commit `.env`. There are no default passwords: a legacy login account exists only when its `FYP_PASSWORD_*` is set in `.env` (see `.env.example`).
 
 For Google Drive (local OAuth):
 1. Go to [Google Cloud Console](https://console.cloud.google.com)

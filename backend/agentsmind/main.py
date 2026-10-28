@@ -17,10 +17,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import inspect
 
 from .admin.router import router as admin_router
+from .agents.router import router as agents_router
 from .api.health import router as health_router
 from .auth.router import router as auth_router
 from .auth.service import AuthError, bootstrap_first_admin
 from .db.session import SessionLocal, get_engine
+from .departments.router import router as departments_router
 from .log_config import configure_logging, request_id_var
 from .settings import get_settings
 
@@ -85,6 +87,8 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(departments_router)
+    app.include_router(agents_router)
     return app
 
 

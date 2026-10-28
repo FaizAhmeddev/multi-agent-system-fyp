@@ -5,12 +5,12 @@ Send one-time passwords by email (Gmail SMTP).
 from __future__ import annotations
 
 import os
-import random
+import secrets
 import string
 
 
 def generate_otp(length: int = 6) -> str:
-    return "".join(random.choices(string.digits, k=length))
+    return "".join(secrets.choice(string.digits) for _ in range(length))
 
 
 def send_email_otp(recipient: str, code: str, purpose: str) -> tuple[bool, str, bool]:
@@ -58,7 +58,8 @@ def send_email_otp(recipient: str, code: str, purpose: str) -> tuple[bool, str, 
 
 
 def _otp_dev_fallback_enabled() -> bool:
-    return os.environ.get("AUTH_OTP_DEV_FALLBACK", "true").lower() in (
+    # Off by default: showing codes on screen let anyone reset any account.
+    return os.environ.get("AUTH_OTP_DEV_FALLBACK", "false").lower() in (
         "1",
         "true",
         "yes",

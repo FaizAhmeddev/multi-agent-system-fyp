@@ -390,14 +390,6 @@ def _render_login(*, new_session_id_fn, record_login_fn) -> None:
             _complete_login(user, new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
         else:
             st.error("Invalid username or password.")
-    st.markdown(
-        """
-        <div class="auth-demo-pill">
-            Demo accounts: <strong>admin</strong> · <strong>hr</strong> · <strong>finance</strong> · <strong>it</strong>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def _render_signup() -> None:

@@ -101,8 +101,29 @@ if ($ok) {
             $body = @{ email = $adm[0]; password = $adm[1] } | ConvertTo-Json
             $t = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/api/auth/login" -Body $body -ContentType "application/json"
             Say ("POST /api/auth/login -> 200, roles=" + ($t.user.roles -join ","))
-            $me = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/auth/me" -Headers @{ Authorization = "Bearer " + $t.access_token }
+            $auth = @{ Authorization = "Bearer " + $t.access_token }
+            $me = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/auth/me" -Headers $auth
             Say ("GET /api/auth/me -> " + $me.email)
+            $deps = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/departments" -Headers $auth
+            Say ("GET /api/departments -> " + (($deps.items | ForEach-Object { $_.slug + "=" + $_.accessible }) -join ", "))
+            # End to end through the persistent queue: API enqueues, a separate worker process runs it.
+            $env:PYTHONPATH = "backend"
+            $wproc = Start-Process -FilePath $vpy -ArgumentList @("-m", "agentsmind.queue.worker") -PassThru -WindowStyle Hidden `
+                -RedirectStandardOutput (Join-Path $LogDir "worker.out.log") -RedirectStandardError (Join-Path $LogDir "worker.err.log")
+            $runBody = @{ action = "troubleshoot"; inputs = @{ problem = "My laptop cannot connect to office wifi" } } | ConvertTo-Json -Depth 4
+            $run = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/api/agents/it/runs" -Headers $auth -Body $runBody -ContentType "application/json"
+            Say ("POST /api/agents/it/runs -> run " + $run.id + " status=" + $run.status)
+            $final = $null
+            for ($j = 0; $j -lt 40; $j++) {
+                Start-Sleep -Milliseconds 500
+                $final = Invoke-RestMethod -Uri ("http://127.0.0.1:$port/api/agents/runs/" + $run.id) -Headers $auth
+                if ($final.status -in @("done", "failed")) { break }
+            }
+            Say ("GET /api/agents/runs/" + $run.id + " -> status=" + $final.status + " simulated=" + $final.simulated)
+            Say ("   output: " + ($final.output.Substring(0, [Math]::Min(160, $final.output.Length))))
+            if ($final.status -ne "done") { $script:Failures += "worker end-to-end" }
+            if ($wproc -and -not $wproc.HasExited) { Stop-Process -Id $wproc.Id -Force }
+            Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
         } catch { Say ("login smoke FAILED: " + $_.Exception.Message); $script:Failures += "login smoke" }
         try {
             Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/admin/users" | Out-Null

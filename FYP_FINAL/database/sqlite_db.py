@@ -850,6 +850,8 @@ def seed_app_users_from_config() -> None:
             _sync_system_accounts_flags()
             return
         for uname, data in USERS.items():
+            if not data.get("password"):
+                continue  # no default passwords: unset accounts are not created
             s.add(
                 AppUser(
                     username=uname,
@@ -886,13 +888,13 @@ def _sync_system_accounts_flags() -> None:
 def authenticate_user(username: str, password: str) -> dict | None:
     """Return {username, role, name} if credentials match DB or config.USERS."""
     username = (username or "").strip()
-    if not username:
+    if not username or not password:
         return None
     try:
         s = get_session()
         row = s.query(AppUser).filter_by(username=username).one_or_none()
         s.close()
-        if row and row.password == password:
+        if row and row.password and row.password == password:
             return {
                 "username": row.username,
                 "role": row.role,
@@ -903,7 +905,7 @@ def authenticate_user(username: str, password: str) -> dict | None:
     try:
         from config import USERS
 
-        if username in USERS and USERS[username]["password"] == password:
+        if username in USERS and USERS[username]["password"] and USERS[username]["password"] == password:
             return {
                 "username": username,
                 "role": USERS[username]["role"],

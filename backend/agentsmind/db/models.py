@@ -137,8 +137,12 @@ class AgentRun(Base):
     conversation_id: Mapped[int | None] = mapped_column(ForeignKey("conversations.id", ondelete="SET NULL"))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     agent: Mapped[str] = mapped_column(String(40), nullable=False)
+    action: Mapped[str] = mapped_column(String(60), default="", nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)
+    # queued | running | done | failed
     input_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     error: Mapped[str] = mapped_column(Text, default="", nullable=False)
     started_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
@@ -218,3 +222,34 @@ class CVRecord(Base):
     missing_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     needs_human_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+
+
+class QueueTask(Base):
+    """Persistent work queue (QUEUE_BACKEND=db).
+
+    Lifecycle: pending -> leased -> done | (pending again with backoff) -> dead.
+    A lease has an owner token; only the current owner can ack or nack, so a
+    worker that was presumed dead cannot overwrite the result of its successor.
+    """
+
+    __tablename__ = "queue_tasks"
+    __table_args__ = (UniqueConstraint("idempotency_key"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    queue: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(60), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), index=True, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
+    leased_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"),
+                                                           nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow,
+                                                 nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

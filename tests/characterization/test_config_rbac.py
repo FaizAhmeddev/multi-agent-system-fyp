@@ -1,5 +1,6 @@
 """Characterization: config.py users, roles, tab visibility and agent allow-lists."""
 import importlib
+import importlib.util
 
 import pytest
 
@@ -14,12 +15,20 @@ def config(monkeypatch):
     return importlib.reload(cfg)
 
 
-@pytest.mark.legacy_bug
-def test_default_demo_passwords_exist_when_env_not_set(config):
-    # Six built-in accounts with guessable defaults (README documents admin123 / hr123 ...).
+def test_no_default_passwords_when_env_not_set(config):
+    """Flipped in Phase 1b (was test_default_demo_passwords_exist_when_env_not_set)."""
     assert set(config.USERS) == {"admin", "hr", "finance", "it", "demo", "assistant"}
-    assert config.USERS["admin"]["password"] == "admin123"
-    assert config.USERS["demo"]["role"] == "Admin"  # a second full-admin account
+    assert all(u["password"] == "" for u in config.USERS.values())
+
+
+@pytest.mark.skipif(importlib.util.find_spec("sqlalchemy") is None, reason="needs SQLAlchemy")
+def test_legacy_login_refuses_empty_and_unset_passwords(config):
+    """Flipped in Phase 1b: an account with no configured password cannot sign in."""
+    import database.sqlite_db as sdb
+
+    sdb._engine, sdb._Session = None, None  # fresh engine on the temp legacy DB
+    assert sdb.authenticate_user("admin", "") is None
+    assert sdb.authenticate_user("admin", "admin123") is None
 
 
 def test_tab_visibility_per_role(config):
@@ -29,15 +38,14 @@ def test_tab_visibility_per_role(config):
     assert config.get_visible_tabs_for_role("Employee") == ["Assistant", "History"]
 
 
-def test_unknown_role_sees_everything(config):
-    # ROLE_VISIBLE_TABS.get(unknown) is None -> treated as "all tabs".
-    assert config.get_visible_tabs_for_role("Nonexistent") == config._FULL_TABS
+def test_unknown_role_sees_only_assistant(config):
+    """Flipped in Phase 1b (was test_unknown_role_sees_everything): fail closed."""
+    assert config.get_visible_tabs_for_role("Nonexistent") == ["Assistant", "History"]
 
 
-@pytest.mark.legacy_bug
-def test_unknown_role_has_unrestricted_agents(config):
-    # Fail-open: an unknown role gets None == no agent restriction.
-    assert config.get_role_orchestrator_allowlist("Nonexistent") is None
+def test_unknown_role_gets_general_agent_only(config):
+    """Flipped in Phase 1b (was test_unknown_role_has_unrestricted_agents)."""
+    assert config.get_role_orchestrator_allowlist("Nonexistent") == ["general"]
 
 
 def test_hr_allowlist_excludes_finance(config):
@@ -45,10 +53,10 @@ def test_hr_allowlist_excludes_finance(config):
     assert config.get_role_orchestrator_allowlist("Finance Manager") == ["finance"]
 
 
-@pytest.mark.legacy_bug
-def test_assistant_role_can_reach_finance_and_hr_agents(config):
+def test_assistant_role_limited_to_email_and_inbox(config):
+    """Flipped in Phase 1b (was test_assistant_role_can_reach_finance_and_hr_agents)."""
     allow = config.get_role_orchestrator_allowlist("Assistant")
-    assert {"finance", "hr", "it_support", "documents"} <= set(allow)
+    assert set(allow) == {"general", "email", "hr_gmail"}
 
 
 def test_mcp_defaults(config):

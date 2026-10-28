@@ -3060,9 +3060,14 @@ class Orchestrator:
         )
 
 
-# ── Singleton ─────────────────────────────────────────────────────────────────
+# ── Per-request instances ─────────────────────────────────────────────────────
+# Orchestrator.route() keeps per-request state on the instance (_agent_tasks,
+# _finance_export_files), so a shared singleton let concurrent users overwrite each
+# other's plans. Every caller now gets a fresh instance. (Phase 1b, legacy fix.)
 
-orchestrator = Orchestrator()
+
+def new_orchestrator() -> Orchestrator:
+    return Orchestrator()
 
 
 def dispatch_user_prompt(
@@ -3079,7 +3084,7 @@ def dispatch_user_prompt(
     Public entry point: one user prompt → orchestrator → sub-agents → merged result.
     Same as ``orchestrator.route``; use whichever reads clearer in your integration.
     """
-    return orchestrator.route(
+    return new_orchestrator().route(
         user_message,
         user_name,
         use_llm_intent=use_llm_intent,
@@ -3094,7 +3099,7 @@ def dispatch_user_prompt(
 
 def route_to_agent(user_message: str, user_name: str = "User") -> dict:
     """Legacy wrapper kept for backward compatibility."""
-    result = orchestrator.route(user_message, user_name, attachments=None)
+    result = new_orchestrator().route(user_message, user_name, attachments=None)
     return {
         "user_message": user_message,
         "agent_used":   ", ".join(result["agents_used"]),

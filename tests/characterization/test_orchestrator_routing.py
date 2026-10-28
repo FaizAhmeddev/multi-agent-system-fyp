@@ -60,9 +60,10 @@ def test_agent_slug_normalization():
     assert ob.normalize_agent_list([]) == ["general"]
 
 
-@pytest.mark.legacy_bug
-def test_orchestrator_is_a_process_wide_singleton_with_per_request_state():
-    # route() writes self._agent_tasks / self._finance_export_files on a shared
-    # instance; concurrent Streamlit sessions can overwrite each other's plan.
-    assert isinstance(ob.orchestrator, ob.Orchestrator)
-    assert hasattr(ob.orchestrator, "_agent_tasks")
+def test_each_caller_gets_its_own_orchestrator():
+    """Flipped in Phase 1b (was test_orchestrator_is_a_process_wide_singleton_with_per_request_state)."""
+    assert not hasattr(ob, "orchestrator")
+    a, b = ob.new_orchestrator(), ob.new_orchestrator()
+    assert a is not b
+    a._agent_tasks["hr"] = "x"
+    assert b._agent_tasks == {}

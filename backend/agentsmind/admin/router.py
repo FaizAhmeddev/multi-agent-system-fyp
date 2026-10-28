@@ -9,8 +9,9 @@ from ..auth import service
 from ..auth.deps import client_ip, require_roles
 from ..auth.router import user_out
 from ..auth.schemas import CreateUserIn, MessageOut, UserOut
-from ..db.models import OutboundEmail, User
+from ..db.models import OutboundEmail, ToolCall, User
 from ..db.session import get_db
+from ..queue.core import STATUSES, get_queue
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -50,3 +51,45 @@ def outbox(limit: int = Query(20, ge=1, le=100), _: User = Depends(require_roles
     return {"items": [{"id": r.id, "to": r.to_address, "subject": r.subject, "body": r.body,
                        "purpose": r.purpose, "simulated": r.simulated, "status": r.status,
                        "created_at": r.created_at.isoformat()} for r in rows]}
+
+
+@router.get("/queue")
+def queue_stats(_: User = Depends(require_roles("admin"))) -> dict:
+    from ..settings import get_settings
+
+    return {"backend": get_settings().queue_backend, "queues": get_queue().stats()}
+
+
+@router.get("/queue/tasks")
+def queue_tasks(status: str | None = Query(None), limit: int = Query(50, ge=1, le=200),
+                offset: int = Query(0, ge=0), _: User = Depends(require_roles("admin"))) -> dict:
+    if status is not None and status not in STATUSES:
+        raise HTTPException(422, detail={"code": "validation_error", "message": f"status must be one of {STATUSES}"})
+    items = get_queue().list(status=status, limit=limit, offset=offset)
+    return {"items": [{"id": t.id, "queue": t.queue, "kind": t.kind, "status": t.status, "attempts": t.attempts,
+                       "max_attempts": t.max_attempts, "last_error": t.last_error,
+                       "available_at": t.available_at.isoformat(),
+                       "finished_at": t.finished_at.isoformat() if t.finished_at else None} for t in items]}
+
+
+@router.post("/queue/tasks/{task_id}/retry", response_model=MessageOut)
+def queue_retry(task_id: int, request: Request, actor: User = Depends(require_roles("admin")),
+                db: Session = Depends(get_db)) -> MessageOut:
+    if not get_queue().retry_dead(task_id):
+        raise HTTPException(409, detail={"code": "not_dead", "message": "Only dead tasks can be retried."})
+    from ..audit import audit
+
+    audit(db, "queue.retry", actor_user_id=actor.id, actor_email=actor.email, ip=client_ip(request),
+          target_type="queue_task", target_id=task_id)
+    return MessageOut(message=f"Task {task_id} queued again.")
+
+
+@router.get("/tool-calls")
+def tool_calls(limit: int = Query(50, ge=1, le=200), status: str | None = Query(None),
+               _: User = Depends(require_roles("admin")), db: Session = Depends(get_db)) -> dict:
+    q = select(ToolCall).order_by(ToolCall.id.desc()).limit(limit)
+    if status:
+        q = q.where(ToolCall.status == status)
+    return {"items": [{"id": c.id, "at": c.at.isoformat(), "agent": c.agent, "tool": c.tool, "server": c.server,
+                       "user_id": c.user_id, "status": c.status, "error": c.error, "latency_ms": c.latency_ms,
+                       "inputs": c.inputs_redacted, "approval_id": c.approval_id} for c in db.scalars(q)]}

@@ -66,8 +66,10 @@ class MessageQueue:
     Thread-safe. Supports agent collaboration via A2A protocol.
     """
 
-    def __init__(self, max_history: int = 500):
+    def __init__(self, max_history: int = 500, visibility_timeout: float = 30.0):
         self._lock          = threading.Lock()
+        self._visibility    = visibility_timeout
+        self._inflight      = {}                   # msg_id -> (agent_id, msg, deadline)
         self._queues        = defaultdict(deque)   # agent_id -> deque of messages
         self._subscribers   = defaultdict(list)    # topic -> [callback]
         self._history       = deque(maxlen=max_history)  # all messages ever
@@ -179,18 +181,46 @@ class MessageQueue:
 
     def consume(self, agent_id: str, max_msgs: int = 10) -> list:
         """
-        Pop up to max_msgs messages from an agent's queue.
-        Marks them as delivered.
+        Deliver up to max_msgs messages and mark them in flight.
+        A delivered message must be ack()-ed; otherwise it is redelivered once its
+        visibility timeout expires (at-least-once, Phase 1b legacy fix).
         """
+        self.requeue_expired()
         msgs = []
+        deadline = time.time() + self._visibility
         with self._lock:
             q = self._queues[agent_id]
             for _ in range(min(max_msgs, len(q))):
                 msg = q.popleft()
                 msg.status = "delivered"
+                self._inflight[msg.msg_id] = (agent_id, msg, deadline)
                 self._agent_stats[agent_id]["received"] += 1
                 msgs.append(msg)
         return msgs
+
+    def ack(self, msg_id: str) -> bool:
+        """Confirm a delivered message was processed. Returns False if unknown or already acked."""
+        with self._lock:
+            item = self._inflight.pop(msg_id, None)
+            if item is None:
+                return False
+            agent_id, msg, _ = item
+            msg.status = "processed"
+            self._agent_stats[agent_id]["processed"] += 1
+            return True
+
+    def requeue_expired(self, now: float | None = None) -> int:
+        """Put back messages whose consumer did not ack in time. Returns how many."""
+        now = time.time() if now is None else now
+        n = 0
+        with self._lock:
+            for mid, (agent_id, msg, deadline) in list(self._inflight.items()):
+                if deadline <= now:
+                    del self._inflight[mid]
+                    msg.status = "pending"
+                    self._queues[agent_id].appendleft(msg)
+                    n += 1
+        return n
 
     def peek(self, agent_id: str) -> list:
         """Return messages without consuming them."""

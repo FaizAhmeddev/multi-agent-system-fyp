@@ -904,7 +904,12 @@ def _process_pending_chat_prompt(tab: str, *, orch_attachments: list[dict[str, s
 
         with st.spinner("Routing and running agents (parallel)..."):
             try:
-                from Orchestrator.orchestrator_brain import orchestrator
+                from Orchestrator.orchestrator_brain import new_orchestrator
+
+                # One orchestrator per Streamlit session: route() keeps per-request state.
+                if "_orchestrator" not in st.session_state:
+                    st.session_state["_orchestrator"] = new_orchestrator()
+                orchestrator = st.session_state["_orchestrator"]
 
                 result = orchestrator.route(
                     prompt,

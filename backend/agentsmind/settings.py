@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     agentsmind_admin_password: SecretStr | None = None
 
     timezone: str = "Asia/Karachi"
+
+    queue_backend: Literal["db", "memory"] = "db"
+    queue_lease_seconds: int = Field(default=60, ge=2, le=3600)
+    queue_backoff_seconds: float = Field(default=2.0, ge=0.0, le=300.0)
+    queue_max_attempts: int = Field(default=3, ge=1, le=20)
+
+    # LLM. Empty key = sandbox mode: agents return output labeled "Simulated".
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4o-mini"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("timezone")
@@ -64,6 +73,10 @@ class Settings(BaseSettings):
         if v.startswith("postgres://"):
             v = "postgresql+psycopg://" + v[len("postgres://"):]
         return v
+
+    @property
+    def llm_configured(self) -> bool:
+        return bool(self.openai_api_key and self.openai_api_key.get_secret_value().strip())
 
     @property
     def is_sqlite(self) -> bool:
