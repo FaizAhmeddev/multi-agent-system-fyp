@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% from "macros.html" import pager %}
+{% block title %}Tickets - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs">IT Helpdesk</div><h1>Tickets</h1></div>
+  <div class="actions"><a class="btn btn-primary" href="/">Raise complaint</a></div>
+</div>
+<form class="toolbar" method="get" action="/staff/tickets" role="search">
+  <div class="field"><label for="q">Search</label><input id="q" type="search" name="q" value="{{ f.q }}" placeholder="Ticket number, summary or name"></div>
+  <div class="field"><label for="status">Status</label>
+    <select id="status" name="status"><option value="">All</option>
+      {% for k, label in statuses.items() %}<option value="{{ k }}" {% if f.status == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="priority">Priority</label>
+    <select id="priority" name="priority"><option value="">All</option>
+      {% for k, label in priorities.items() %}<option value="{{ k }}" {% if f.priority == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="category">Category</label>
+    <select id="category" name="category"><option value="">All</option>
+      {% for k, label in categories.items() %}<option value="{{ k }}" {% if f.category == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <input type="hidden" name="sort" value="{{ f.sort }}"><input type="hidden" name="order" value="{{ f.order }}">
+  <button class="btn" type="submit">Apply</button><a class="btn" href="/staff/tickets">Clear</a>
+</form>
+{% macro th(key, label) -%}
+  {% set next_order = 'asc' if (f.sort == key and f.order == 'desc') else 'desc' %}
+  <th {% if f.sort == key %}aria-sort="{{ 'ascending' if f.order == 'asc' else 'descending' }}"{% endif %}>
+    <a href="?{{ qs_nosort }}&sort={{ key }}&order={{ next_order }}">{{ label }}{% if f.sort == key %} {{ '(asc)' if f.order == 'asc' else '(desc)' }}{% endif %}</a></th>
+{%- endmacro %}
+<div class="table-wrap">
+<table class="data">
+  <thead><tr><th>Ticket</th><th>Summary</th><th>Requester</th>{{ th('priority', 'Priority') }}{{ th('status', 'Status') }}
+    <th>Assignee</th>{{ th('sla_due_at', 'Response due') }}{{ th('created_at', 'Created') }}</tr></thead>
+  <tbody>
+  {% for t, v in rows %}
+    <tr>
+      <td class="mono"><a href="/staff/tickets/{{ t.number }}">{{ t.number }}</a>{% if t.source == 'agentsmind' %}<div class="hint">via AgentsMind</div>{% endif %}</td>
+      <td>{{ t.summary }}<div class="hint">{{ categories[t.category] }}</div></td>
+      <td>{{ t.requester_name }}<div class="hint">{{ t.department }}</div></td>
+      <td><span class="badge {{ 'danger' if t.priority == 'urgent' else ('warn' if t.priority == 'high' else '') }}">{{ priorities[t.priority] }}</span></td>
+      <td>{{ statuses[t.status] }}</td>
+      <td>{{ t.assignee or 'Unassigned' }}</td>
+      <td>{{ t.sla_due_at|dt }}{% if v.sla_breached %} <span class="badge danger">Overdue</span>{% endif %}</td>
+      <td>{{ t.created_at|dt }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="empty">{% if f.q or f.status or f.priority or f.category %}No tickets match these filters. <a href="/staff/tickets">Clear filters</a>.{% else %}No tickets yet.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{{ pager(meta, qs) }}
+{% endblock %}

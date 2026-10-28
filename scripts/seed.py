@@ -19,10 +19,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from sqlalchemy import select  # noqa: E402
+
 from agentsmind.auth.service import bootstrap_first_admin, create_user  # noqa: E402
 from agentsmind.db.models import Candidate, User  # noqa: E402
 from agentsmind.db.session import SessionLocal  # noqa: E402
-from sqlalchemy import select  # noqa: E402
 
 DEMO_USERS = [
     ("hira.siddiqui@example.com", "Hira Siddiqui", ["hr"]),

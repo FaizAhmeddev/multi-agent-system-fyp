@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block title %}Complaint submitted - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="narrow" style="max-width:640px">
+  <div class="panel">
+    <h1 style="font-size:20px;margin:0 0 4px">Complaint submitted</h1>
+    <p style="margin-top:0">Your ticket number is <strong class="mono" id="ticket-number">{{ t.number }}</strong>. Keep it for reference.</p>
+    <dl class="facts">
+      <dt>Summary</dt><dd>{{ t.summary }}</dd>
+      <dt>Category</dt><dd>{{ categories[t.category] }}</dd>
+      <dt>Priority</dt><dd>{{ priorities[t.priority] }}</dd>
+      <dt>Expected response</dt><dd>{{ expected }} (by {{ t.sla_due_at|dt }})</dd>
+      <dt>Submitted by</dt><dd>{{ t.requester_name }} ({{ t.requester_email }})</dd>
+      <dt>Received</dt><dd>{{ t.created_at|dt }}{% if t.source == 'agentsmind' %} via AgentsMind{% endif %}</dd>
+    </dl>
+    <p style="margin-top:16px"><a class="btn btn-primary" href="{{ track_url }}">Track this ticket</a>
+      <a class="btn" href="/">Raise another complaint</a></p>
+    <p class="hint">Bookmark the tracking link. Anyone with the link can see this ticket's status.</p>
+  </div>
+</div>
+{% endblock %}

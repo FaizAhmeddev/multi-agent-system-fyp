@@ -58,8 +58,9 @@ def db(db_url):
 
 @pytest.fixture
 def client(db_url):
-    from agentsmind.main import create_app
     from fastapi.testclient import TestClient
+
+    from agentsmind.main import create_app
 
     with TestClient(create_app()) as c:
         yield c

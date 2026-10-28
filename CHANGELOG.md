@@ -3,6 +3,48 @@
 All notable changes, by phase. Each phase lives on its own `phase/<n>-<name>` branch
 and is merged into `main` by the project owner after the phase gate.
 
+## Phase 2: External systems and MCP, branch `phase/2-portals-mcp`
+
+### Added
+- **AgentsMind Finance Portal** (`external_systems/finance_portal`): its own FastAPI app, SQLite database, staff sign-in (Argon2id, lockout after 5 failures), and REST API.
+  - People CRUD with search, filters, sorting, pagination and CSV export (spreadsheet formulas are neutralised in the export).
+  - Payment records per person, one per month.
+  - Money is stored as integer minor units, so SQL totals are exact.
+  - `GET /api/v1/summary` computes headcount and payroll in SQL.
+  - Duplicate emails return 409. An `Idempotency-Key` makes a repeated create return the original record.
+  - Data changes are audited in `audit_events`.
+  - Web screens: sign-in, people list with stats, add, edit, detail with payments, delete confirmation (type the full name), and payments list. Forms validate inline, carry a CSRF token, and are protected against double submit (form key plus a disabled button).
+  - The API needs `X-API-Key`.
+- **AgentsMind IT Helpdesk** (`external_systems/it_portal`): its own app, database and API.
+  - Public complaint form, with an optional attachment: 5 MB limit, type checked by magic bytes (PDF, PNG, JPEG, text), sanitised name, stored under a random filename.
+  - Dedicated "Complaint submitted" screen showing the ticket number (ITK-000123), summary, expected response time and a "Track this ticket" link. The confirmation and tracking pages need the private tracking token.
+  - Staff screens: ticket list with filters and sorting, ticket detail with the status workflow (open, in progress, resolved, closed; resolved can be reopened; closed is final), assignee, comments and internal notes, and SLA due time (urgent 4 h, high 8 h, medium 24 h, low 72 h).
+  - Tickets created through the API carry `source=agentsmind` and return confirmation and tracking links.
+- Both portals share one visual language (`external_systems/portal_common`): light and dark design tokens, a theme toggle that is remembered, no emoji, and 403, 404 and 500 pages that say what to do next.
+- **MCP servers** on `mcp==2.3.0`: `mcp_servers/finance_mcp` (8 tools) and `mcp_servers/it_mcp` (5 tools), with typed Pydantic inputs and outputs, read/write/destructive annotations, descriptions written for an LLM, and idempotency keys on create, update and delete. Security and timeouts are described in `docs/MCP_TOOLS.md`.
+- **Core MCP client** (`backend/agentsmind/mcp/client.py`): routes the 13 tools through the gateway. Reads retry with backoff, writes pass the approval's idempotency key, and a wrong token is reported as `unauthorized`.
+- **Workspace APIs** (`/api/finance/*`, `/api/it/*`) for the UI. They go through the gateway too; the user's own form submissions are recorded as direct approvals, and deletes need `confirm` plus the exact name.
+- **Row-level scoping in the gateway**: users outside IT only list, open and comment on their own tickets.
+- `GET /api/admin/mcp`: for each MCP server, shows whether it is configured and reachable, its tools, and latency.
+- `scripts/env_setup.py`: creates or completes `.env` with random secrets and never overwrites existing values. `scripts/win/run_all.ps1` and `stop_all.ps1` start and stop the whole system, and `scripts/smoke/mcp_smoke.py` checks the MCP servers. Both portals have seed scripts.
+- Tests:
+  - `tests/portals` (Finance and IT portals: API, web, uploads, workflow, idempotency, SQL total).
+  - `tests/backend/test_mcp_integration.py` (real portal and MCP processes: token required, schemas and annotations, approval flow, no duplicates on retry, payroll equals SQL, HR denied, IT confirmation screen, ticket scoping).
+
+### Changed
+- Dependency pins: `fastapi==0.118.2`, `starlette==0.48.0`, `pydantic==2.12.0` (mcp 2.3.0 needs pydantic 2.12 or later; FastAPI 0.118.1 added Pydantic 2.12 support), plus `mcp==2.3.0` and `httpx2==2.13.1`. `requirements/portals.txt` adds Jinja2 and itsdangerous.
+- The catalog now opens `it_list_tickets` and `it_get_ticket` to all staff, scoped by the gateway.
+
+### Legacy fixes, each flipping a pinned test
+- `FYP_FINAL/mcp_server/server.py`:
+  - Every request needs `Authorization: Bearer $FYP_MCP_TOKEN`.
+  - The server does not start without a token of 24 or more characters.
+  - No CORS headers are sent, and OPTIONS returns 405.
+  - `gmail_send_email` reports failures.
+  - `gmail_read_inbox` passes `max_emails` and `unread_only` through.
+  - The Streamlit UI now shows the server's real running state.
+- `FYP_FINAL/tools/gmail_read.py`: supports `unseen_only`.
+
 ## Phase 1b: Queue, RBAC, tool gateway, wrapped legacy agents, branch `phase/1b-queue-rbac-agents`
 
 ### Added
@@ -81,9 +123,9 @@ Every `legacy_bug` characterization test is flipped on purpose in the phase that
 | test_consume_is_destructive_no_ack_no_redelivery | lossy in-memory queue | DB queue with ack and retry | 1b | flipped in 1b -> test_unacked_message_is_redelivered_and_ack_is_final |
 | test_orchestrator_is_a_process_wide_singleton_with_per_request_state | shared request state | per-request orchestrator | 1b | flipped in 1b -> test_each_caller_gets_its_own_orchestrator |
 | test_otp_uses_non_crypto_random_and_dev_fallback_on_by_default | weak OTP, code shown on screen | hashed single-use reset codes plus sandbox outbox (`test_forgot_password_no_enumeration_and_sandbox_outbox`) | 1b | flipped in 1b -> test_otp_uses_secrets_and_dev_fallback_is_off_by_default |
-| test_no_auth_and_wildcard_cors | open tool server | authenticated MCP servers | 2 | open |
-| test_gmail_send_reports_success_even_when_send_failed | false success | typed MCP results | 2 | open |
-| test_gmail_read_inbox_ignores_its_parameters | ignored params | typed MCP inputs | 2 | open |
+| test_no_auth_and_wildcard_cors | open tool server | authenticated MCP servers | 2 | flipped in 2 -> test_token_required_and_no_cors, test_server_refuses_to_start_without_token |
+| test_gmail_send_reports_success_even_when_send_failed | false success | typed MCP results | 2 | flipped in 2 -> test_gmail_send_reports_failure_when_send_failed |
+| test_gmail_read_inbox_ignores_its_parameters | ignored params | typed MCP inputs | 2 | flipped in 2 -> test_gmail_read_inbox_passes_its_parameters |
 | test_email_is_sent_without_approval_when_address_in_prompt | no approval gate | approval gate | 3 | open |
 | test_auto_reply_hardcodes_shortlist_for_any_mern_email | hard-coded auto reply | "Suggest reply" with approval | 3 | open |
 | test_smtp_fallback_can_send_twice | duplicate send | Gmail API plus idempotency | 3 | open |

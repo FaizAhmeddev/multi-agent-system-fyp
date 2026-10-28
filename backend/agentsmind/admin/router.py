@@ -93,3 +93,34 @@ def tool_calls(limit: int = Query(50, ge=1, le=200), status: str | None = Query(
     return {"items": [{"id": c.id, "at": c.at.isoformat(), "agent": c.agent, "tool": c.tool, "server": c.server,
                        "user_id": c.user_id, "status": c.status, "error": c.error, "latency_ms": c.latency_ms,
                        "inputs": c.inputs_redacted, "approval_id": c.approval_id} for c in db.scalars(q)]}
+
+
+@router.get("/mcp")
+def mcp_health(_: User = Depends(require_roles("admin"))) -> dict:
+    """Each MCP server: configured, reachable, tool count and latency."""
+    import time
+
+    from ..agents.catalog import TOOLS
+    from ..mcp.client import MCPCallError, list_tools, server_configs
+
+    configured = server_configs()
+    out = []
+    for name in sorted({t.server for t in TOOLS.values()}):
+        expected = sorted(t for t, spec in TOOLS.items() if spec.server == name)
+        row = {"server": name, "configured": name in configured, "expected_tools": expected}
+        if name in configured:
+            start = time.perf_counter()
+            try:
+                tools = list_tools(name)
+                row.update(reachable=True, tools=[t["name"] for t in tools],
+                           missing=sorted(set(expected) - {t["name"] for t in tools}))
+            except MCPCallError as exc:
+                row.update(reachable=False, error=str(exc))
+            except Exception as exc:  # noqa: BLE001 - shown on the health screen
+                row.update(reachable=False, error=f"{type(exc).__name__}: {exc}")
+            row["latency_ms"] = int((time.perf_counter() - start) * 1000)
+        else:
+            row.update(reachable=False, error="Not configured. Set the URL and token in .env." if name in
+                       ("finance-mcp", "it-mcp") else "Arrives in Phase 3.")
+        out.append(row)
+    return {"servers": out}

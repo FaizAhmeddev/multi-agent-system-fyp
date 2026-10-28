@@ -59,8 +59,9 @@ def test_validation_errors_are_structured(client):
 
 
 def test_settings_require_jwt_secret(monkeypatch):
-    from agentsmind.settings import Settings
     from pydantic import ValidationError
+
+    from agentsmind.settings import Settings
 
     monkeypatch.delenv("JWT_SECRET", raising=False)
     with pytest.raises(ValidationError, match="jwt_secret"):
@@ -68,8 +69,9 @@ def test_settings_require_jwt_secret(monkeypatch):
 
 
 def test_settings_reject_bad_timezone(monkeypatch):
-    from agentsmind.settings import Settings
     from pydantic import ValidationError
+
+    from agentsmind.settings import Settings
 
     with pytest.raises(ValidationError, match="valid IANA"):
         Settings(_env_file=None, timezone="Mars/Olympus")
@@ -77,10 +79,11 @@ def test_settings_reject_bad_timezone(monkeypatch):
 
 def test_migrations_match_models(db_url):
     """Alembic head must equal the SQLAlchemy models (no drift)."""
-    from agentsmind.db import Base
-    from agentsmind.db.session import get_engine
     from alembic.autogenerate import compare_metadata
     from alembic.migration import MigrationContext
+
+    from agentsmind.db import Base
+    from agentsmind.db.session import get_engine
 
     with get_engine().connect() as conn:
         # compare_type is off: SQLite reflects DATETIME without the timezone flag that
@@ -92,10 +95,11 @@ def test_migrations_match_models(db_url):
 
 
 def test_downgrade_to_base_and_back(db_url):
-    from agentsmind.db.session import get_engine, reset_engine
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect
+
+    from agentsmind.db.session import get_engine, reset_engine
 
     cfg = Config(str(ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(ROOT / "db" / "migrations"))

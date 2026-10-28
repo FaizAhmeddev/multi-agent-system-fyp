@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+{% from "macros.html" import pager %}
+{% block title %}People - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs">Finance Portal</div><h1>People</h1></div>
+  <div class="actions">
+    <a class="btn" href="/people/export.csv?{{ qs }}">Export CSV</a>
+    <a class="btn btn-primary" href="/people/new">Add person</a>
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="k">Active people</div><div class="v">{{ summary.people_active }}</div></div>
+  <div class="stat"><div class="k">Inactive people</div><div class="v">{{ summary.people_inactive }}</div></div>
+  {% for row in summary.payroll_by_currency %}
+  <div class="stat"><div class="k">Monthly payroll ({{ row.currency }}, active)</div>
+    <div class="v">{{ row.total_monthly_payroll }}</div></div>
+  {% else %}
+  <div class="stat"><div class="k">Monthly payroll</div><div class="v">0.00</div></div>
+  {% endfor %}
+</div>
+
+<form class="toolbar" method="get" action="/people" role="search">
+  <div class="field"><label for="q">Search</label><input id="q" type="search" name="q" value="{{ f.q }}" placeholder="Name, email or job title"></div>
+  <div class="field"><label for="department">Department</label>
+    <select id="department" name="department"><option value="">All</option>
+      {% for d in departments %}<option {% if f.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="status">Status</label>
+    <select id="status" name="status"><option value="">All</option>
+      {% for s in person_statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="employment_type">Employment type</label>
+    <select id="employment_type" name="employment_type"><option value="">All</option>
+      {% for e in employment_types %}<option value="{{ e }}" {% if f.employment_type == e %}selected{% endif %}>{{ employment_labels[e] }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="currency">Currency</label>
+    <select id="currency" name="currency"><option value="">All</option>
+      {% for c in currencies %}<option {% if f.currency == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  <input type="hidden" name="sort" value="{{ f.sort }}"><input type="hidden" name="order" value="{{ f.order }}">
+  <button class="btn" type="submit">Apply</button>
+  <a class="btn" href="/people">Clear</a>
+</form>
+
+{% macro th(key, label, cls='') -%}
+  {% set next_order = 'desc' if (f.sort == key and f.order == 'asc') else 'asc' %}
+  <th class="{{ cls }}" {% if f.sort == key %}aria-sort="{{ 'ascending' if f.order == 'asc' else 'descending' }}"{% endif %}>
+    <a href="?{{ qs_nosort }}&sort={{ key }}&order={{ next_order }}">{{ label }}{% if f.sort == key %} {{ '(asc)' if f.order == 'asc' else '(desc)' }}{% endif %}</a></th>
+{%- endmacro %}
+
+<div class="table-wrap">
+<table class="data">
+  <thead><tr>
+    {{ th('full_name', 'Name') }}{{ th('department', 'Department') }}{{ th('job_title', 'Job title') }}
+    <th>Type</th>{{ th('monthly_salary', 'Monthly salary', 'num') }}<th>Currency</th>
+    {{ th('status', 'Status') }}{{ th('start_date', 'Start date') }}
+  </tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr>
+      <td><a href="/people/{{ p.id }}">{{ p.full_name }}</a><div class="hint">{{ p.email }}</div></td>
+      <td>{{ p.department }}</td><td>{{ p.job_title }}</td><td>{{ employment_labels[p.employment_type] }}</td>
+      <td class="num">{{ money(p.salary_minor) }}</td><td>{{ p.currency }}</td>
+      <td><span class="badge {{ 'ok' if p.status == 'active' else '' }}">{{ p.status|capitalize }}</span></td>
+      <td>{{ p.start_date|date }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="empty">
+      {% if f.q or f.department or f.status or f.employment_type or f.currency %}No people match these filters. <a href="/people">Clear filters</a>.
+      {% else %}No people yet. <a href="/people/new">Add the first person</a>.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{{ pager(meta, qs) }}
+{% endblock %}

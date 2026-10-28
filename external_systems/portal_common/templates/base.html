@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ portal_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='portal.css') }}">
+  <script>
+    (function () {
+      try { var t = localStorage.getItem("agentsmind-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="wordmark" href="{% block home_url %}/{% endblock %}">AgentsMind <span>{{ short_name }}</span></a>
+  <nav aria-label="Main">{% block nav %}{% endblock %}</nav>
+  <div class="spacer"></div>
+  {% block who %}{% endblock %}
+  <button class="btn" type="button" id="theme-toggle" aria-label="Switch colour theme">Theme</button>
+</header>
+<main id="main">
+  {% for f in pop_flashes(request) %}
+    <div class="notice {{ 'ok' if f.kind == 'ok' else ('error' if f.kind == 'error' else 'info') }}" role="status">{{ f.message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="site">{{ portal_name }}. Synthetic demo data only.</footer>
+<script>
+  (function () {
+    var btn = document.getElementById("theme-toggle");
+    btn.addEventListener("click", function () {
+      var root = document.documentElement;
+      var cur = root.getAttribute("data-theme") ||
+        (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      var next = cur === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("agentsmind-theme", next); } catch (e) {}
+    });
+    // Prevent double submit: disable the submit button after the first click.
+    document.querySelectorAll("form[data-once]").forEach(function (f) {
+      f.addEventListener("submit", function () {
+        f.querySelectorAll("button[type=submit]").forEach(function (b) { b.disabled = true; b.textContent = "Saving..."; });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

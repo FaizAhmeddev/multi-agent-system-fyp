@@ -129,7 +129,7 @@ def read_emails(state: dict) -> dict:
 
     try:
         mail = _connect_imap()
-        status, data = mail.search(None, "ALL")
+        status, data = mail.search(None, "UNSEEN" if state.get("unseen_only") else "ALL")
         mail_ids = data[0].split() if data and data[0] else []
 
         emails: list[dict[str, Any]] = []

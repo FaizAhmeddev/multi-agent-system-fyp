@@ -29,6 +29,7 @@ def test_hash_and_verify():
 
 def test_access_token_round_trip_and_tamper(monkeypatch):
     import jwt as pyjwt
+
     from agentsmind.security.tokens import TokenError, create_access_token, decode_access_token
 
     tok, ttl = create_access_token(7, ["hr", "admin"])

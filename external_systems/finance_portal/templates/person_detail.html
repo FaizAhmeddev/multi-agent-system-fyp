@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% from "macros.html" import field %}
+{% block title %}{{ p.full_name }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="/people">People</a></div><h1>{{ p.full_name }}</h1></div>
+  <div class="actions">
+    <a class="btn" href="/people/{{ p.id }}/edit">Edit</a>
+    <a class="btn btn-danger" href="/people/{{ p.id }}/delete">Delete</a>
+  </div>
+</div>
+<div class="panel">
+  <dl class="facts">
+    <dt>Email</dt><dd>{{ p.email }}</dd>
+    <dt>Department</dt><dd>{{ p.department }}</dd>
+    <dt>Job title</dt><dd>{{ p.job_title }}</dd>
+    <dt>Employment type</dt><dd>{{ employment_labels[p.employment_type] }}</dd>
+    <dt>Monthly salary</dt><dd class="mono">{{ money(p.salary_minor) }} {{ p.currency }}</dd>
+    <dt>Status</dt><dd><span class="badge {{ 'ok' if p.status == 'active' else '' }}">{{ p.status|capitalize }}</span></dd>
+    <dt>Start date</dt><dd>{{ p.start_date|date }}</dd>
+    <dt>Notes</dt><dd>{{ p.notes or 'None' }}</dd>
+    <dt>Record created</dt><dd>{{ p.created_at|dt }} via {{ 'AgentsMind (API)' if p.created_via == 'api' else 'this portal' }}</dd>
+  </dl>
+</div>
+
+<div class="panel">
+  <h2 style="font-size:16px;margin:0 0 12px">Payments</h2>
+  <div class="table-wrap">
+  <table class="data">
+    <thead><tr><th>Month</th><th class="num">Amount</th><th>Status</th><th>Paid on</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for pm in p.payments %}
+      <tr><td>{{ pm.month }}</td><td class="num">{{ money(pm.amount_minor) }} {{ pm.currency }}</td>
+        <td><span class="badge {{ 'ok' if pm.status == 'paid' else ('danger' if pm.status == 'failed' else 'warn') }}">{{ pm.status|capitalize }}</span></td>
+        <td>{{ pm.paid_on|date if pm.paid_on else '' }}</td><td>{{ pm.note }}</td></tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">No payments recorded yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="font-size:14px;margin:16px 0 8px">Record a payment</h3>
+  <form method="post" action="/people/{{ p.id }}/payments" data-once novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+    <div class="grid2">
+      {{ field('month', 'Month', pv.month, type='month', errors=errors, required=True, hint='Format YYYY-MM') }}
+      {{ field('amount', 'Amount (' ~ p.currency ~ ')', pv.amount, type='number', errors=errors, required=True, attrs='step="0.01" min="0"') }}
+      <div class="field"><label for="f-pstatus">Status</label>
+        <select id="f-pstatus" name="status">{% for s in payment_statuses %}<option value="{{ s }}" {% if pv.status == s %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}</select></div>
+      {{ field('paid_on', 'Paid on', pv.paid_on, type='date', errors=errors) }}
+    </div>
+    {{ field('note', 'Note', pv.note, errors=errors) }}
+    <button class="btn btn-primary" type="submit">Record payment</button>
+  </form>
+</div>
+{% endblock %}

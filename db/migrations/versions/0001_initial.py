@@ -5,8 +5,9 @@ Revises:
 Create Date: 2026-10-28
 """
 import sqlalchemy as sa
-from agentsmind.db.base import UTCDateTime
 from alembic import op
+
+from agentsmind.db.base import UTCDateTime
 
 revision = "0001_initial"
 down_revision = None

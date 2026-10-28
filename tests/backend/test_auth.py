@@ -137,6 +137,7 @@ def test_passwords_are_hashed_with_argon2id(db, client):
 
 def test_no_users_and_no_admin_env_fails_clearly(db_url, monkeypatch):
     import pytest
+
     from agentsmind.auth.service import bootstrap_first_admin
     from agentsmind.db.session import SessionLocal
     from agentsmind.settings import reset_settings_cache
@@ -150,6 +151,7 @@ def test_no_users_and_no_admin_env_fails_clearly(db_url, monkeypatch):
 
 def test_weak_first_admin_password_refused(db_url, monkeypatch):
     import pytest
+
     from agentsmind.auth.service import AuthError, bootstrap_first_admin
     from agentsmind.db.session import SessionLocal
     from agentsmind.settings import reset_settings_cache

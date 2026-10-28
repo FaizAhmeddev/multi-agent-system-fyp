@@ -94,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging(s.log_level, s.log_json)
     if s.queue_backend != "db":
         log.warning("QUEUE_BACKEND=memory: a separate worker process cannot see API tasks; use db")
+    from ..mcp.client import register_mcp_executors
+
+    register_mcp_executors()
     w = Worker(queue=a.queue, worker_id=a.worker_id, lease_seconds=a.lease)
     signal.signal(signal.SIGINT, w.stop)
     if hasattr(signal, "SIGTERM"):

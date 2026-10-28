@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %}{{ t.number }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">IT Helpdesk / Track ticket</div><h1>{{ t.number }}: {{ t.summary }}</h1></div></div>
+<div class="panel">
+  <dl class="facts">
+    <dt>Status</dt><dd><span class="badge {{ 'ok' if t.status in ('resolved','closed') else ('warn' if t.status == 'in_progress' else 'info') }}">{{ statuses[t.status] }}</span>
+      {% if view.sla_breached %}<span class="badge danger">Past response target</span>{% endif %}</dd>
+    <dt>Priority</dt><dd>{{ priorities[t.priority] }} (first response {{ view.expected_response }})</dd>
+    <dt>Category</dt><dd>{{ categories[t.category] }}</dd>
+    <dt>Assigned to</dt><dd>{{ t.assignee or 'Not assigned yet' }}</dd>
+    <dt>Submitted</dt><dd>{{ t.created_at|dt }}</dd>
+    <dt>Last update</dt><dd>{{ t.updated_at|dt }}</dd>
+  </dl>
+</div>
+<div class="panel">
+  <h2 style="font-size:16px;margin:0 0 8px">Description</h2>
+  <p style="white-space:pre-wrap;margin:0">{{ t.description }}</p>
+</div>
+<div class="panel">
+  <h2 style="font-size:16px;margin:0 0 8px">Updates</h2>
+  {% for c in view.comments %}
+    <div class="comment"><div class="meta">{{ c.author }}, {{ c.created_at[:16].replace('T', ' ') }} UTC</div>
+      <div style="white-space:pre-wrap">{{ c.body }}</div></div>
+  {% else %}
+    <p class="empty">No updates yet. IT will respond {{ view.expected_response }}.</p>
+  {% endfor %}
+</div>
+{% endblock %}

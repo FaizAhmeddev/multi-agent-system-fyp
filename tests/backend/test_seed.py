@@ -13,8 +13,9 @@ def _load_seed():
 
 
 def test_seed_is_synthetic_idempotent_and_has_no_fixed_passwords(db_url, tmp_path, capsys, db):
-    from agentsmind.db.models import Candidate, User
     from sqlalchemy import select
+
+    from agentsmind.db.models import Candidate, User
 
     seed = _load_seed()
     seed.ROOT = tmp_path

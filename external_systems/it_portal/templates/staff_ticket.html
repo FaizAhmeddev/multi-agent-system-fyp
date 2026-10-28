@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block title %}{{ t.number }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="/staff/tickets">Tickets</a></div><h1><span class="mono">{{ t.number }}</span> {{ t.summary }}</h1></div>
+</div>
+<div class="grid2" style="align-items:start">
+  <div>
+    <div class="panel">
+      <dl class="facts">
+        <dt>Status</dt><dd>{{ statuses[t.status] }}</dd>
+        <dt>Priority</dt><dd>{{ priorities[t.priority] }}</dd>
+        <dt>Category</dt><dd>{{ categories[t.category] }}</dd>
+        <dt>Requester</dt><dd>{{ t.requester_name }} ({{ t.requester_email }}), {{ t.department }}</dd>
+        <dt>Response due</dt><dd>{{ t.sla_due_at|dt }}{% if view.sla_breached %} <span class="badge danger">Overdue</span>{% endif %}</dd>
+        <dt>Source</dt><dd>{{ 'AgentsMind' if t.source == 'agentsmind' else 'Complaint form' }}</dd>
+        <dt>Created</dt><dd>{{ t.created_at|dt }}</dd>
+      </dl>
+    </div>
+    <div class="panel"><h2 style="font-size:16px;margin:0 0 8px">Description</h2>
+      <p style="white-space:pre-wrap;margin:0">{{ t.description }}</p>
+      {% for a in t.attachments %}<p><a href="/staff/attachments/{{ a.id }}">{{ a.original_name }}</a> <span class="hint">({{ a.mime_type }}, {{ (a.size_bytes / 1024)|round(1) }} KB)</span></p>{% endfor %}
+    </div>
+    <div class="panel"><h2 style="font-size:16px;margin:0 0 8px">Comments</h2>
+      {% for c in t.comments %}
+        <div class="comment"><div class="meta">{{ c.author }}, {{ c.created_at|dt }}{% if c.internal %} <span class="badge">Internal</span>{% endif %}</div>
+          <div style="white-space:pre-wrap">{{ c.body }}</div></div>
+      {% else %}<p class="empty">No comments yet.</p>{% endfor %}
+      {% if t.status != 'closed' %}
+      <form method="post" action="/staff/tickets/{{ t.number }}/comment" data-once>
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+        <div class="field"><label for="c-body">Add a comment</label><textarea id="c-body" name="body" required maxlength="5000"></textarea></div>
+        <div class="field"><label style="font-weight:400"><input type="checkbox" name="internal" value="1"> Internal note (hidden from the requester)</label></div>
+        <button class="btn btn-primary" type="submit">Add comment</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="panel"><h2 style="font-size:16px;margin:0 0 8px">Change status</h2>
+      {% if transitions[t.status] %}
+      <form method="post" action="/staff/tickets/{{ t.number }}/status" data-once>
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+        <div class="field"><label for="s-status">New status</label>
+          <select id="s-status" name="status">{% for s in transitions[t.status]|sort %}<option value="{{ s }}">{{ statuses[s] }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="s-comment">Comment for the requester</label><textarea id="s-comment" name="comment" maxlength="5000"></textarea></div>
+        <button class="btn btn-primary" type="submit">Update status</button>
+      </form>
+      {% else %}<p class="hint">This ticket is closed. Closed tickets cannot change.</p>{% endif %}
+    </div>
+    <div class="panel"><h2 style="font-size:16px;margin:0 0 8px">Assignee</h2>
+      <form method="post" action="/staff/tickets/{{ t.number }}/assign" data-once>
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+        <div class="field"><label for="a-assignee">Assign to</label>
+          <select id="a-assignee" name="assignee"><option value="">Unassigned</option>
+            {% for e in staff_emails %}<option value="{{ e }}" {% if t.assignee == e %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></div>
+        <button class="btn" type="submit">Save assignee</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

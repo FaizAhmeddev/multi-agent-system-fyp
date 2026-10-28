@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% from "macros.html" import field %}
+{% block title %}{{ 'Add person' if mode == 'new' else 'Edit ' ~ p.full_name }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="/people">People</a>{% if mode == 'edit' %} / <a href="/people/{{ p.id }}">{{ p.full_name }}</a>{% endif %}</div>
+  <h1>{{ 'Add person' if mode == 'new' else 'Edit person' }}</h1></div>
+</div>
+{% if errors %}<div class="notice error" role="alert">Fix the highlighted fields and save again.</div>{% endif %}
+<form class="panel" method="post" action="{{ '/people/new' if mode == 'new' else '/people/' ~ p.id ~ '/edit' }}" data-once novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+  {% if mode == 'new' %}<input type="hidden" name="form_key" value="{{ form_key }}">{% endif %}
+  <div class="grid2">
+    {{ field('full_name', 'Full name', v.full_name, errors=errors, required=True) }}
+    {{ field('email', 'Email', v.email, type='email', errors=errors, required=True) }}
+    <div class="field{% if errors.get('department') %} invalid{% endif %}">
+      <label for="f-department">Department <span class="req" aria-hidden="true">*</span></label>
+      <select id="f-department" name="department" required aria-required="true">
+        <option value="">Select a department</option>
+        {% for d in departments %}<option {% if v.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+      {% if errors.get('department') %}<div class="error">{{ errors['department'] }}</div>{% endif %}
+    </div>
+    {{ field('job_title', 'Job title', v.job_title, errors=errors, required=True) }}
+    <div class="field{% if errors.get('employment_type') %} invalid{% endif %}">
+      <label for="f-employment_type">Employment type <span class="req" aria-hidden="true">*</span></label>
+      <select id="f-employment_type" name="employment_type">
+        {% for e in employment_types %}<option value="{{ e }}" {% if v.employment_type == e %}selected{% endif %}>{{ employment_labels[e] }}</option>{% endfor %}
+      </select>
+    </div>
+    {{ field('monthly_salary', 'Monthly salary', v.monthly_salary, type='number', errors=errors, required=True, attrs='step="0.01" min="0"') }}
+    <div class="field">
+      <label for="f-currency">Currency <span class="req" aria-hidden="true">*</span></label>
+      <select id="f-currency" name="currency">{% for c in currencies %}<option {% if v.currency == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <label for="f-status">Status</label>
+      <select id="f-status" name="status">{% for s in person_statuses %}<option value="{{ s }}" {% if v.status == s %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}</select>
+    </div>
+    {{ field('start_date', 'Start date', v.start_date, type='date', errors=errors, required=True) }}
+  </div>
+  <div class="field{% if errors.get('notes') %} invalid{% endif %}">
+    <label for="f-notes">Notes</label>
+    <textarea id="f-notes" name="notes" maxlength="2000">{{ v.notes or '' }}</textarea>
+    {% if errors.get('notes') %}<div class="error">{{ errors['notes'] }}</div>{% endif %}
+  </div>
+  <button class="btn btn-primary" type="submit">{{ 'Add person' if mode == 'new' else 'Save changes' }}</button>
+  <a class="btn" href="{{ '/people' if mode == 'new' else '/people/' ~ p.id }}">Cancel</a>
+</form>
+{% endblock %}

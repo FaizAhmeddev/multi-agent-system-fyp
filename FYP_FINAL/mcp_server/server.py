@@ -16,7 +16,9 @@ This is a simplified MCP implementation using HTTP.
 In production, this would be a full MCP-compliant server.
 """
 
+import hmac
 import json
+import os
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -124,8 +126,8 @@ def drive_search(params: dict) -> dict:
 def gmail_read_inbox(params: dict) -> dict:
     try:
         from tools.gmail_read import read_emails
-        state = {}
-        result = read_emails(state)
+        max_emails = max(1, min(int(params.get("max_emails", 5) or 5), 50))
+        result = read_emails({"max_emails": max_emails, "unseen_only": bool(params.get("unread_only"))})
         return {"success": True, "emails": result.get("emails", [])}
     except Exception as e:
         return {"success": False, "error": str(e), "emails": []}
@@ -147,7 +149,10 @@ def gmail_read_inbox(params: dict) -> dict:
 def gmail_send_email(params: dict) -> dict:
     try:
         from tools.gmail_send import send_email
-        send_email(params)
+        state = send_email(dict(params))
+        status = str(state.get("send_status", ""))
+        if "Email sent" not in status:
+            return {"success": False, "error": status or "Email was not sent."}
         return {"success": True, "message": f"Email sent to {params['recipient']}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -182,22 +187,35 @@ def agent_status(params: dict) -> dict:
 
 # ── HTTP Handler ─────────────────────────────────────────────────────────────
 
+def _token() -> str:
+    return (os.environ.get("FYP_MCP_TOKEN") or "").strip()
+
+
 class MCPHandler(BaseHTTPRequestHandler):
+    """Legacy tool server. Phase 2: every request needs `Authorization: Bearer $FYP_MCP_TOKEN`,
+    and no cross-origin access is granted (browsers can no longer call it from other sites)."""
 
     def log_message(self, format, *args):
         pass  # Suppress default logging
+
+    def _authorized(self) -> bool:
+        expected = _token()
+        given = (self.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+        return bool(expected) and bool(given) and hmac.compare_digest(given.encode(), expected.encode())
 
     def _send_json(self, data: dict, status: int = 200):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path != "/health" and not self._authorized():
+            self._send_json({"error": "Unauthorized"}, 401)
+            return
         if parsed.path == "/tools":
             tools_list = [
                 {"name": t["name"], "description": t["description"],
@@ -211,6 +229,9 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Not found"}, 404)
 
     def do_POST(self):
+        if not self._authorized():
+            self._send_json({"error": "Unauthorized"}, 401)
+            return
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length)
         try:
@@ -235,10 +256,8 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Not found"}, 404)
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # No CORS: cross-origin browser requests are refused.
+        self.send_response(405)
         self.end_headers()
 
 
@@ -252,6 +271,9 @@ def start_mcp_server(host: str | None = None, port: int | None = None):
     global _server_thread, _httpd
     if _server_thread and _server_thread.is_alive():
         return  # already running
+    if len(_token()) < 24:
+        # Refuse to run an unauthenticated tool server (Phase 2 legacy fix).
+        return
 
     bind_host, bind_port = host, port
     if bind_host is None or bind_port is None:

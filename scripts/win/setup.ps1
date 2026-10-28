@@ -3,7 +3,7 @@
   Run from the repo root:   powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1
   - Creates .venv with Python 3.11 or 3.12
   - Installs pinned dependencies
-  - Creates .env from .env.example with a random JWT_SECRET and a random first-admin password
+  - Creates or completes .env from .env.example with random secrets (scripts\env_setup.py)
   - Applies database migrations
 #>
 param([switch]$Dev)
@@ -27,11 +27,6 @@ function Find-Python {
     throw "Python 3.11 or 3.12 not found. Install it from python.org and re-run."
 }
 
-function Write-Utf8NoBom([string]$Path, [string[]]$Lines) {
-    $full = Join-Path (Get-Location) $Path
-    [System.IO.File]::WriteAllLines($full, $Lines, (New-Object System.Text.UTF8Encoding($false)))
-}
-
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     $py = Find-Python
     $pa = $py.Args
@@ -45,20 +40,9 @@ $req = if ($Dev) { "requirements\dev.txt" } else { "requirements\backend.txt" }
 & $vpy -m pip install -r $req
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
-if (-not (Test-Path ".env")) {
-    $secret = & $vpy -c "import secrets;print(secrets.token_urlsafe(48))"
-    $adminPw = & $vpy -c "import secrets,string;a=string.ascii_letters+string.digits;print('-'.join(''.join(secrets.choice(a) for _ in range(5)) for _ in range(4)))"
-    $lines = (Get-Content ".env.example") `
-        -replace '^JWT_SECRET=$', "JWT_SECRET=$secret" `
-        -replace '^AGENTSMIND_ADMIN_EMAIL=$', "AGENTSMIND_ADMIN_EMAIL=admin@example.com" `
-        -replace '^AGENTSMIND_ADMIN_PASSWORD=$', "AGENTSMIND_ADMIN_PASSWORD=$adminPw"
-    Write-Utf8NoBom ".env" $lines
-    New-Item -ItemType Directory -Force -Path "data" | Out-Null
-    Write-Utf8NoBom "data\first_admin.txt" @("admin@example.com`t$adminPw")
-    Write-Host ""
-    Write-Host "Created .env. First admin: admin@example.com  password: $adminPw"
-    Write-Host "(also saved in data\first_admin.txt, which is gitignored)"
-}
+# Create .env, or fill in any settings added by a newer version (existing values are kept).
+& $vpy scripts\env_setup.py
+if ($LASTEXITCODE -ne 0) { throw "env setup failed" }
 
 & $vpy -m alembic upgrade head
 if ($LASTEXITCODE -ne 0) { throw "alembic upgrade failed" }

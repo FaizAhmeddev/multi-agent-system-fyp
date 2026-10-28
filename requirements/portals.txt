@@ -1,0 +1,4 @@
+# External systems: Finance Portal and IT Helpdesk (separate apps, separate databases).
+-r backend.txt
+Jinja2==3.1.6
+itsdangerous==2.2.0

@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% from "macros.html" import field %}
+{% block title %}Raise an IT complaint - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">IT Helpdesk</div><h1>Raise an IT complaint</h1></div></div>
+<p class="hint" style="margin-top:-8px">Tell us what is wrong. You will get a ticket number and a link to track it.</p>
+{% if errors %}<div class="notice error" role="alert">Fix the highlighted fields and submit again.</div>{% endif %}
+<form class="panel" method="post" action="/complaint" enctype="multipart/form-data" data-once novalidate style="max-width:820px">
+  <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+  <input type="hidden" name="form_key" value="{{ form_key }}">
+  <div class="grid2">
+    {{ field('requester_name', 'Your name', v.requester_name, errors=errors, required=True, attrs='autocomplete="name"') }}
+    {{ field('requester_email', 'Work email', v.requester_email, type='email', errors=errors, required=True, attrs='autocomplete="email"') }}
+    <div class="field{% if errors.get('department') %} invalid{% endif %}">
+      <label for="f-department">Department <span class="req" aria-hidden="true">*</span></label>
+      <select id="f-department" name="department" required aria-required="true">
+        <option value="">Select your department</option>
+        {% for d in departments %}<option {% if v.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+      {% if errors.get('department') %}<div class="error">{{ errors['department'] }}</div>{% endif %}
+    </div>
+    <div class="field{% if errors.get('category') %} invalid{% endif %}">
+      <label for="f-category">Category <span class="req" aria-hidden="true">*</span></label>
+      <select id="f-category" name="category" required aria-required="true">
+        <option value="">Select a category</option>
+        {% for k, label in categories.items() %}<option value="{{ k }}" {% if v.category == k %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      {% if errors.get('category') %}<div class="error">{{ errors['category'] }}</div>{% endif %}
+    </div>
+    <div class="field">
+      <label for="f-priority">Priority</label>
+      <select id="f-priority" name="priority">
+        {% for k, label in priorities.items() %}<option value="{{ k }}" {% if v.priority == k %}selected{% endif %}>{{ label }} (first response within {{ sla_hours[k] }} h)</option>{% endfor %}
+      </select>
+    </div>
+    {{ field('summary', 'Short summary', v.summary, errors=errors, hint='Optional. One line, for example "Laptop cannot join office Wi-Fi".') }}
+  </div>
+  <div class="field{% if errors.get('description') %} invalid{% endif %}">
+    <label for="f-description">What is happening? <span class="req" aria-hidden="true">*</span></label>
+    <textarea id="f-description" name="description" required aria-required="true" minlength="10" maxlength="5000">{{ v.description or '' }}</textarea>
+    <div class="hint">Include any error message and when it started.</div>
+    {% if errors.get('description') %}<div class="error">{{ errors['description'] }}</div>{% endif %}
+  </div>
+  <div class="field{% if errors.get('attachment') %} invalid{% endif %}">
+    <label for="f-attachment">Attachment</label>
+    <input id="f-attachment" name="attachment" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt">
+    <div class="hint">Optional. PDF, PNG, JPEG or text, up to 5 MB.</div>
+    {% if errors.get('attachment') %}<div class="error">{{ errors['attachment'] }}</div>{% endif %}
+  </div>
+  <button class="btn btn-primary" type="submit">Submit complaint</button>
+</form>
+{% endblock %}

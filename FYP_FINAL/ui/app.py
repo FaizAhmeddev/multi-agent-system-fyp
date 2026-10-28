@@ -1424,8 +1424,8 @@ else:
         from config import MCP_SERVER_HOST, MCP_SERVER_PORT
 
         if not is_mcp_running():
-            start_mcp_server(MCP_SERVER_HOST, MCP_SERVER_PORT)
-        st.session_state.mcp_running = True
+            start_mcp_server(MCP_SERVER_HOST, MCP_SERVER_PORT)  # no-op unless FYP_MCP_TOKEN is set
+        st.session_state.mcp_running = is_mcp_running()
     except Exception:
         st.session_state.mcp_running = False
 

@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block title %}Delete {{ p.full_name }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="/people">People</a> / <a href="/people/{{ p.id }}">{{ p.full_name }}</a></div><h1>Delete person</h1></div>
+</div>
+<div class="panel" style="max-width:640px">
+  <div class="notice warn" role="alert">
+    This permanently deletes <strong>{{ p.full_name }}</strong> ({{ p.email }}, {{ p.job_title }}, {{ p.department }})
+    and {{ p.payments|length }} payment record(s). It cannot be undone.
+  </div>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/people/{{ p.id }}/delete" data-once>
+    <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+    <div class="field">
+      <label for="confirm_name">Type the full name to confirm</label>
+      <input id="confirm_name" name="confirm_name" type="text" autocomplete="off" required>
+    </div>
+    <button class="btn btn-danger" type="submit">Delete permanently</button>
+    <a class="btn" href="/people/{{ p.id }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

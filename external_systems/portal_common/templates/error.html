@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - {{ portal_name }}{% endblock %}
+{% block content %}
+<div class="narrow panel">
+  <p class="crumbs">Error {{ status }}</p>
+  <h1 style="font-size:20px;margin:0 0 8px">{{ title }}</h1>
+  <p>{{ message }}</p>
+  <p><a class="btn" href="{{ back_url or '/' }}">{{ back_label or 'Go to the start page' }}</a></p>
+</div>
+{% endblock %}

@@ -63,7 +63,8 @@ def test_role_check_applies_inside_allowed_agent(db, users):
     from agentsmind.agents.gateway import call_tool
 
     emp = _user(db, users["emp"]["id"])
-    out = call_tool(db, agent="it", tool="it_list_tickets", args={}, user=emp)  # staff-only tool
+    out = call_tool(db, agent="it", tool="it_update_ticket_status", args={"number": "ITK-000001", "status": "closed"},
+                    user=emp)  # IT-staff-only tool
     assert out.status == "denied" and out.code == "role_forbidden"
 
 

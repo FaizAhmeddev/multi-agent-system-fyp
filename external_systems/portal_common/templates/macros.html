@@ -1,0 +1,30 @@
+{% macro field(name, label, value='', type='text', errors={}, required=False, hint='', attrs='') -%}
+<div class="field{% if errors.get(name) %} invalid{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value if value is not none else '' }}"
+         {% if required %}required aria-required="true"{% endif %}
+         {% if errors.get(name) %}aria-invalid="true" aria-describedby="e-{{ name }}"{% endif %} {{ attrs|safe }}>
+  {% if hint %}<div class="hint">{{ hint }}</div>{% endif %}
+  {% if errors.get(name) %}<div class="error" id="e-{{ name }}">{{ errors[name] }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro select(name, label, options, value='', errors={}, required=False, blank='') -%}
+<div class="field{% if errors.get(name) %} invalid{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <select id="f-{{ name }}" name="{{ name }}" {% if required %}required aria-required="true"{% endif %}
+          {% if errors.get(name) %}aria-invalid="true" aria-describedby="e-{{ name }}"{% endif %}>
+    {% if blank %}<option value="">{{ blank }}</option>{% endif %}
+    {% for v, text in options %}<option value="{{ v }}" {% if v == value %}selected{% endif %}>{{ text }}</option>{% endfor %}
+  </select>
+  {% if errors.get(name) %}<div class="error" id="e-{{ name }}">{{ errors[name] }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro pager(meta, base_qs) -%}
+<div class="pager" aria-label="Pagination">
+  <span>{{ meta.total }} result{{ '' if meta.total == 1 else 's' }}. Page {{ meta.page }} of {{ meta.pages }}.</span>
+  {% if meta.has_prev %}<a class="btn" href="?{{ base_qs }}&page={{ meta.page - 1 }}">Previous</a>{% endif %}
+  {% if meta.has_next %}<a class="btn" href="?{{ base_qs }}&page={{ meta.page + 1 }}">Next</a>{% endif %}
+</div>
+{%- endmacro %}

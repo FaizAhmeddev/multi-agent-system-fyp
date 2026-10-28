@@ -12,13 +12,16 @@ markers = [
 addopts = "-p no:cacheprovider"
 
 [tool.ruff]
-line-length = 120
+line-length = 128
 target-version = "py311"
 extend-exclude = ["FYP_FINAL"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "S", "UP"]
 ignore = ["S101", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agentsmind", "portal_common", "finance_portal", "it_portal", "mcp_servers"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106", "S108", "S311", "S603", "E501"]

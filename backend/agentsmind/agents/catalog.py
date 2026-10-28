@@ -41,10 +41,10 @@ TOOLS: dict[str, ToolSpec] = {t.name: t for t in (
     _t("finance_delete_person", "finance-mcp", DESTRUCTIVE, {"finance"}, "Delete a person record."),
     # it-mcp (IT Helpdesk)
     _t("it_create_ticket", "it-mcp", WRITE, ALL_STAFF, "Raise an IT complaint ticket."),
-    _t("it_get_ticket", "it-mcp", READ, ALL_STAFF, "Get one ticket."),
-    _t("it_list_tickets", "it-mcp", READ, {"it"}, "List tickets."),
+    _t("it_get_ticket", "it-mcp", READ, ALL_STAFF, "Get one ticket (non-IT users: own tickets only)."),
+    _t("it_list_tickets", "it-mcp", READ, ALL_STAFF, "List tickets (non-IT users: own tickets only)."),
     _t("it_update_ticket_status", "it-mcp", WRITE, {"it"}, "Change ticket status."),
-    _t("it_add_comment", "it-mcp", WRITE, ALL_STAFF, "Comment on a ticket."),
+    _t("it_add_comment", "it-mcp", WRITE, ALL_STAFF, "Comment on a ticket (non-IT users: own tickets only)."),
     # calendar-mcp
     _t("calendar_list_events", "calendar-mcp", READ, ALL_STAFF, "List calendar events."),
     _t("calendar_check_availability", "calendar-mcp", READ, ALL_STAFF, "Free/busy check."),

@@ -4,9 +4,13 @@ import socket
 import urllib.error
 import urllib.request
 
+import os
+
 import pytest
 
 import mcp_server.server as srv
+
+TOKEN = "legacy-mcp-test-token-" + "z" * 10
 
 
 def _free_port():
@@ -19,6 +23,7 @@ def _free_port():
 
 @pytest.fixture(scope="module")
 def base_url():
+    os.environ["FYP_MCP_TOKEN"] = TOKEN
     port = _free_port()
     srv._server_thread = None
     srv.start_mcp_server("127.0.0.1", port)
@@ -26,14 +31,22 @@ def base_url():
     srv.stop_mcp_server()
 
 
-def _get(url):
-    with urllib.request.urlopen(url, timeout=5) as r:
-        return r.status, dict(r.headers), json.loads(r.read())
+AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
-def _post(url, body, raw=False):
+def _get(url, headers=None):
+    req = urllib.request.Request(url, headers=AUTH if headers is None else headers)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, dict(r.headers), json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), json.loads(e.read())
+
+
+def _post(url, body, raw=False, headers=None):
     data = body if raw else json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json",
+                                                          **(AUTH if headers is None else headers)})
     try:
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, json.loads(r.read())
@@ -53,12 +66,25 @@ def test_lists_seven_tools(base_url):
     assert {t["name"] for t in body["tools"]} == EXPECTED_TOOLS
 
 
-@pytest.mark.legacy_bug
-def test_no_auth_and_wildcard_cors(base_url):
-    # Any local process, and any web page via CORS "*", can call tools without a token.
-    status, headers, _ = _get(base_url + "/health")
-    assert status == 200
-    assert headers.get("Access-Control-Allow-Origin") == "*"
+def test_token_required_and_no_cors(base_url):
+    """Flipped in Phase 2 (was test_no_auth_and_wildcard_cors)."""
+    status, headers, _ = _get(base_url + "/health", headers={})
+    assert status == 200 and "Access-Control-Allow-Origin" not in headers
+    assert _get(base_url + "/tools", headers={})[0] == 401
+    assert _post(base_url + "/call", {"name": "gmail_send_email", "params": {}}, headers={})[0] == 401
+    bad = {"Authorization": "Bearer wrong"}
+    assert _post(base_url + "/call", {"name": "agent_status", "params": {}}, headers=bad)[0] == 401
+
+
+def test_server_refuses_to_start_without_token(monkeypatch):
+    monkeypatch.delenv("FYP_MCP_TOKEN", raising=False)
+    saved = srv._server_thread
+    srv._server_thread = None
+    try:
+        srv.start_mcp_server("127.0.0.1", _free_port())
+        assert srv._server_thread is None
+    finally:
+        srv._server_thread = saved
 
 
 def test_unknown_tool_404(base_url):
@@ -77,8 +103,8 @@ def test_agent_status_tool(base_url):
     assert body["result"]["agents"]["orchestrator"] == "orch-001"
 
 
-@pytest.mark.legacy_bug
-def test_gmail_send_reports_success_even_when_send_failed(monkeypatch):
+def test_gmail_send_reports_failure_when_send_failed(monkeypatch):
+    """Flipped in Phase 2 (was test_gmail_send_reports_success_even_when_send_failed)."""
     import tools.gmail_send as gs
 
     def fake_send(state):
@@ -87,11 +113,11 @@ def test_gmail_send_reports_success_even_when_send_failed(monkeypatch):
 
     monkeypatch.setattr(gs, "send_email", fake_send)
     res = srv.call_mcp_tool("gmail_send_email", {"recipient": "a@example.com", "subject": "s", "body": "b"})
-    assert res["success"] is True  # wrong: the email was not sent
+    assert res["success"] is False and "auth error" in res["error"]
 
 
-@pytest.mark.legacy_bug
-def test_gmail_read_inbox_ignores_its_parameters(monkeypatch):
+def test_gmail_read_inbox_passes_its_parameters(monkeypatch):
+    """Flipped in Phase 2 (was test_gmail_read_inbox_ignores_its_parameters)."""
     import tools.gmail_read as gr
     captured = {}
 
@@ -101,7 +127,7 @@ def test_gmail_read_inbox_ignores_its_parameters(monkeypatch):
 
     monkeypatch.setattr(gr, "read_emails", fake_read)
     srv.call_mcp_tool("gmail_read_inbox", {"max_emails": 2, "unread_only": True})
-    assert captured == {}  # max_emails / unread_only are never passed on
+    assert captured == {"max_emails": 2, "unseen_only": True}
 
 
 def test_call_in_process_unknown_tool():

@@ -68,11 +68,12 @@ Run "python version" $vpy @("--version") | Out-Null
 Run "pip freeze" $vpy @("-m", "pip", "freeze") | Out-Null
 
 Step "Lint"
-Run "ruff" $vpy @("-m", "ruff", "check", "backend", "db", "scripts", "tests/backend") | Out-Null
+Run "ruff" $vpy @("-m", "ruff", "check", "backend", "db", "scripts", "mcp_servers", "external_systems", "tests/backend", "tests/portals", "tests/mcp") | Out-Null
 
 Step "Tests"
-Run "pytest backend" $vpy @("-m", "pytest", "tests/backend", "-q", "-rA") | Out-Null
-Run "pytest characterization" $vpy @("-m", "pytest", "tests/characterization", "-q") | Out-Null
+Run "pytest backend" $vpy @("-m", "pytest", "tests/backend", "-q", "-rfE") | Out-Null
+Run "pytest portals" $vpy @("-m", "pytest", "tests/portals", "-q", "-rfE") | Out-Null
+Run "pytest characterization" $vpy @("-m", "pytest", "tests/characterization", "-q", "-rfE") | Out-Null
 
 Step "Migrations from a clean database"
 $env:DATABASE_URL = "sqlite:///" + ((Join-Path $Repo "data\gate-clean.db") -replace '\\', '/')
@@ -82,61 +83,70 @@ Run "alembic current" $vpy @("-m", "alembic", "current") | Out-Null
 Run "seed (clean db)" $vpy @("scripts\seed.py") | Out-Null
 Run "seed again (idempotent)" $vpy @("scripts\seed.py") | Out-Null
 Remove-Item Env:\DATABASE_URL
+Run "seed core" $vpy @("scripts\seed.py") | Out-Null
+Run "seed Finance Portal" $vpy @("external_systems\finance_portal\seed.py") | Out-Null
+Run "seed IT Helpdesk" $vpy @("external_systems\it_portal\seed.py") | Out-Null
 
-Step "Live smoke test (uvicorn on 127.0.0.1:18765)"
-$port = 18765
-$proc = Start-Process -FilePath $vpy -ArgumentList @("-m", "uvicorn", "agentsmind.main:app", "--app-dir", "backend",
-    "--host", "127.0.0.1", "--port", "$port") -PassThru -WindowStyle Hidden `
-    -RedirectStandardOutput (Join-Path $LogDir "uvicorn.out.log") -RedirectStandardError (Join-Path $LogDir "uvicorn.err.log")
-$ok = $false
-for ($i = 0; $i -lt 30; $i++) {
-    Start-Sleep -Milliseconds 500
-    try { $h = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2; $ok = $true; break } catch { }
+Step "Live system: portals, MCP servers, core API, worker"
+$es = Join-Path $Repo "external_systems"
+$parts = [ordered]@{
+    "finance-portal" = @("-m", "uvicorn", "finance_portal.app:create_app", "--factory", "--app-dir", $es, "--host", "127.0.0.1", "--port", "8201")
+    "it-portal"      = @("-m", "uvicorn", "it_portal.app:create_app", "--factory", "--app-dir", $es, "--host", "127.0.0.1", "--port", "8202")
+    "finance-mcp"    = @("-m", "mcp_servers.finance_mcp.server")
+    "it-mcp"         = @("-m", "mcp_servers.it_mcp.server")
+    "core-api"       = @("-m", "uvicorn", "agentsmind.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port", "18000")
+    "worker"         = @("-m", "agentsmind.queue.worker")
 }
-if ($ok) {
-    Say ("GET /health -> " + ($h | ConvertTo-Json -Compress))
-    $adm = (Get-Content (Join-Path $Repo "data\first_admin.txt") -ErrorAction SilentlyContinue) -split "`t"
-    if ($adm.Count -ge 2) {
-        try {
-            $body = @{ email = $adm[0]; password = $adm[1] } | ConvertTo-Json
-            $t = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/api/auth/login" -Body $body -ContentType "application/json"
-            Say ("POST /api/auth/login -> 200, roles=" + ($t.user.roles -join ","))
-            $auth = @{ Authorization = "Bearer " + $t.access_token }
-            $me = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/auth/me" -Headers $auth
-            Say ("GET /api/auth/me -> " + $me.email)
-            $deps = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/departments" -Headers $auth
-            Say ("GET /api/departments -> " + (($deps.items | ForEach-Object { $_.slug + "=" + $_.accessible }) -join ", "))
-            # End to end through the persistent queue: API enqueues, a separate worker process runs it.
-            $env:PYTHONPATH = "backend"
-            $wproc = Start-Process -FilePath $vpy -ArgumentList @("-m", "agentsmind.queue.worker") -PassThru -WindowStyle Hidden `
-                -RedirectStandardOutput (Join-Path $LogDir "worker.out.log") -RedirectStandardError (Join-Path $LogDir "worker.err.log")
-            $runBody = @{ action = "troubleshoot"; inputs = @{ problem = "My laptop cannot connect to office wifi" } } | ConvertTo-Json -Depth 4
-            $run = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/api/agents/it/runs" -Headers $auth -Body $runBody -ContentType "application/json"
-            Say ("POST /api/agents/it/runs -> run " + $run.id + " status=" + $run.status)
-            $final = $null
-            for ($j = 0; $j -lt 40; $j++) {
-                Start-Sleep -Milliseconds 500
-                $final = Invoke-RestMethod -Uri ("http://127.0.0.1:$port/api/agents/runs/" + $run.id) -Headers $auth
-                if ($final.status -in @("done", "failed")) { break }
-            }
-            Say ("GET /api/agents/runs/" + $run.id + " -> status=" + $final.status + " simulated=" + $final.simulated)
-            Say ("   output: " + ($final.output.Substring(0, [Math]::Min(160, $final.output.Length))))
-            if ($final.status -ne "done") { $script:Failures += "worker end-to-end" }
-            if ($wproc -and -not $wproc.HasExited) { Stop-Process -Id $wproc.Id -Force }
-            Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
-        } catch { Say ("login smoke FAILED: " + $_.Exception.Message); $script:Failures += "login smoke" }
-        try {
-            Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/admin/users" | Out-Null
-            Say "GET /api/admin/users without token -> UNEXPECTED SUCCESS"; $script:Failures += "unauth check"
-        } catch { Say ("GET /api/admin/users without token -> " + [int]$_.Exception.Response.StatusCode + " (expected 401)") }
-    } else { Say "data\first_admin.txt missing (an existing .env was reused); login smoke skipped" }
-} else {
-    Say "API did not start. uvicorn stderr:"; Get-Content (Join-Path $LogDir "uvicorn.err.log") | Tee-Object -FilePath $Log -Append
-    $script:Failures += "api start"
+$procs = @{}
+$env:PYTHONPATH = "backend"
+foreach ($k in $parts.Keys) {
+    $procs[$k] = Start-Process -FilePath $vpy -ArgumentList $parts[$k] -PassThru -WindowStyle Hidden -WorkingDirectory $Repo `
+        -RedirectStandardOutput (Join-Path $LogDir "$k.out.log") -RedirectStandardError (Join-Path $LogDir "$k.err.log")
+    Start-Sleep -Milliseconds 800
 }
-if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
-Get-Content (Join-Path $LogDir "uvicorn.out.log"), (Join-Path $LogDir "uvicorn.err.log") -ErrorAction SilentlyContinue |
-    Select-Object -Last 15 | ForEach-Object { Say "uvicorn| $_" }
+Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
+function WaitUrl([string]$u) { for ($i = 0; $i -lt 40; $i++) { try { Invoke-WebRequest -UseBasicParsing -Uri $u -TimeoutSec 2 | Out-Null; return $true } catch { if ($_.Exception.Response) { return $true } }; Start-Sleep -Milliseconds 500 }; return $false }
+$up = @{ "finance-portal" = WaitUrl "http://127.0.0.1:8201/api/v1/health"; "it-portal" = WaitUrl "http://127.0.0.1:8202/api/v1/health";
+         "finance-mcp" = WaitUrl "http://127.0.0.1:8101/mcp"; "it-mcp" = WaitUrl "http://127.0.0.1:8102/mcp"; "core-api" = WaitUrl "http://127.0.0.1:18000/health" }
+foreach ($k in $up.Keys) { Say ("{0,-15} {1}" -f $k, $(if ($up[$k]) { "up" } else { "NOT UP" })); if (-not $up[$k]) { $script:Failures += "$k start" } }
+
+Run "MCP smoke" $vpy @("scripts\smoke\mcp_smoke.py") | Out-Null
+
+$cred = @{}
+Get-Content (Join-Path $Repo "data\local_credentials.txt") -ErrorAction SilentlyContinue | ForEach-Object { $c = $_ -split "`t"; if ($c.Count -ge 3) { $cred[$c[0]] = $c } }
+$base = "http://127.0.0.1:18000"
+try {
+    $adm = $cred["AgentsMind"]
+    $t = Invoke-RestMethod -Method Post -Uri "$base/api/auth/login" -ContentType "application/json" -Body (@{ email = $adm[1]; password = $adm[2] } | ConvertTo-Json)
+    $auth = @{ Authorization = "Bearer " + $t.access_token }
+    Say ("POST /api/auth/login -> roles=" + ($t.user.roles -join ","))
+    $deps = Invoke-RestMethod -Uri "$base/api/departments" -Headers $auth
+    Say ("GET /api/departments -> " + (($deps.items | ForEach-Object { $_.slug + "=" + $_.accessible }) -join ", "))
+    $mcp = Invoke-RestMethod -Uri "$base/api/admin/mcp" -Headers $auth
+    foreach ($srv in $mcp.servers) { Say ("MCP {0,-14} configured={1} reachable={2} tools={3}" -f $srv.server, $srv.configured, $srv.reachable, (@($srv.tools) -join ",")) }
+    $sum = Invoke-RestMethod -Uri "$base/api/finance/summary" -Headers $auth
+    Say ("GET /api/finance/summary -> active=" + $sum.result.people_active + " payroll=" + (($sum.result.payroll_by_currency | ForEach-Object { $_.currency + " " + $_.total_monthly_payroll }) -join "; ") + " source=" + $sum.source)
+    $tk = Invoke-RestMethod -Method Post -Uri "$base/api/it/tickets" -Headers ($auth + @{ "Idempotency-Key" = "gate-" + (Get-Date -Format "yyyyMMddHHmmss") }) -ContentType "application/json" `
+        -Body (@{ department = "Operations"; category = "network"; priority = "medium"; summary = "Laptop cannot join office Wi-Fi"; description = "My laptop cannot connect to office wifi (gate check)." } | ConvertTo-Json)
+    Say ("POST /api/it/tickets -> " + $tk.result.ticket.number + " via " + $tk.result.ticket.source)
+    $conf = Invoke-WebRequest -UseBasicParsing -Uri $tk.result.confirmation_url
+    Say ("confirmation page -> HTTP " + $conf.StatusCode + ", contains 'Complaint submitted': " + ($conf.Content -match "Complaint submitted"))
+    if (-not ($conf.Content -match "Complaint submitted")) { $script:Failures += "confirmation page" }
+    $runBody = @{ action = "troubleshoot"; inputs = @{ problem = "My laptop cannot connect to office wifi" } } | ConvertTo-Json -Depth 4
+    $run = Invoke-RestMethod -Method Post -Uri "$base/api/agents/it/runs" -Headers $auth -Body $runBody -ContentType "application/json"
+    $final = $null
+    for ($j = 0; $j -lt 40; $j++) { Start-Sleep -Milliseconds 500; $final = Invoke-RestMethod -Uri ("$base/api/agents/runs/" + $run.id) -Headers $auth; if ($final.status -in @("done", "failed")) { break } }
+    Say ("agent run via queue worker -> status=" + $final.status + " simulated=" + $final.simulated)
+    if ($final.status -ne "done") { $script:Failures += "worker end-to-end" }
+} catch {
+    Say ("live check FAILED: " + $_.Exception.Message); $script:Failures += "live checks"
+}
+foreach ($k in $procs.Keys) { if ($procs[$k] -and -not $procs[$k].HasExited) { Stop-Process -Id $procs[$k].Id -Force } }
+foreach ($k in $parts.Keys) {
+    $errf = Join-Path $LogDir "$k.err.log"
+    $lines = Get-Content $errf -ErrorAction SilentlyContinue | Select-String -Pattern "Error|Traceback|refus" | Select-Object -First 6
+    foreach ($l in $lines) { Say "$k| $l" }
+}
 
 Step "Summary"
 if ($script:Failures.Count -eq 0) { Say "GATE RESULT: GREEN" } else { Say ("GATE RESULT: RED -> " + ($script:Failures -join "; ")) }

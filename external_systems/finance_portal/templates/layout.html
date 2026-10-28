@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block home_url %}/people{% endblock %}
+{% block nav %}
+  {% if user %}
+  <a href="/people" {% if nav == 'people' %}aria-current="page"{% endif %}>People</a>
+  <a href="/payments" {% if nav == 'payments' %}aria-current="page"{% endif %}>Payments</a>
+  {% endif %}
+{% endblock %}
+{% block who %}
+  {% if user %}
+  <span class="who">{{ user.email }}</span>
+  <form method="post" action="/logout" style="margin:0">
+    <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+    <button class="btn" type="submit">Sign out</button>
+  </form>
+  {% endif %}
+{% endblock %}

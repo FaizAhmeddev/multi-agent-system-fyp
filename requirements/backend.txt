@@ -1,9 +1,9 @@
 # AgentsMind core backend - exact pins (Python 3.11).
-# Verified by installing into a clean venv; see docs/API_VERIFICATION.md.
-fastapi==0.115.6
-starlette==0.41.3
+# Installed and verified in a clean venv; see docs/API_VERIFICATION.md.
+fastapi==0.118.2
+starlette==0.48.0
 uvicorn==0.34.0
-pydantic==2.10.4
+pydantic==2.12.0
 pydantic-settings==2.7.1
 email-validator==2.2.0
 SQLAlchemy==2.0.36
@@ -13,3 +13,6 @@ PyJWT==2.10.1
 python-multipart==0.0.20
 # Windows has no system IANA time zone database; zoneinfo needs this package there.
 tzdata==2024.2
+# MCP client (core) and servers. 2.x: FastMCP is renamed MCPServer. Requires pydantic>=2.12.
+mcp==2.3.0
+httpx2==2.13.1
