@@ -29,6 +29,9 @@ and is merged into `main` by the project owner after the phase gate.
 - Root `.gitignore` covering secrets, `data/`, `*.db`, logs, `FYP_FINAL/database/fyp_data.db` and `FYP_FINAL/logs/`.
 - `tests/backend/`: auth, RBAC, health, settings, migrations, seed and unit tests.
 
+### Fixed (from gate run 2026-10-28 22:41)
+- Windows: `zoneinfo` had no time zone data (`TIMEZONE 'Asia/Karachi' is not a valid IANA time zone`), which failed setup, 27 backend tests and the API start. Added `tzdata==2024.2`.
+
 ### Changed
 - `tests/characterization/conftest.py` now points the legacy database at a temp file, so tests never write to `FYP_FINAL/database/fyp_data.db`.
 
