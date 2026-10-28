@@ -31,6 +31,10 @@ os.environ["OPENAI_API_KEY"] = ""
 os.environ["GMAIL_EMAIL"] = ""
 os.environ["GMAIL_APP_PASSWORD"] = ""
 os.environ.setdefault("FYP_HOSTED", "false")
+# Legacy code writes to FYP_FINAL/database/fyp_data.db by default; point it at a temp file.
+import tempfile as _tempfile
+_LEGACY_TMP = _tempfile.mkdtemp(prefix="fyp_legacy_")
+os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(_LEGACY_TMP, "legacy.db").replace("\\", "/")
 
 STUBBED: list[str] = []
 

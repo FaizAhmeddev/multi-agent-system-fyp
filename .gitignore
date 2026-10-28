@@ -1,3 +1,35 @@
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Secrets and credentials (never commit)
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+*.token.json
+secrets/
+
+# Local data, uploads, logs
+data/
+uploads/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+logs/
+FYP_FINAL/logs/
+FYP_FINAL/database/fyp_data.db
+FYP_FINAL/database/chroma_db/
+gate-logs/
+
+# Node / frontend (Phase 4)
+node_modules/
+dist/
