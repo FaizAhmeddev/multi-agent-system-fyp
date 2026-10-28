@@ -1,0 +1,42 @@
+/* One palette for authentication, workspace, portals and native chart surfaces.
+   light-dark() follows Streamlit's native color-scheme, including its saved preference. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;750&display=swap');
+:root {
+    color-scheme: dark;
+    --brand-blue:#1265ff; --brand-cyan:#22c7ff; --brand-purple:#5125c8;
+    --bg: light-dark(#f8faff, #090b12);
+    --sidebar: light-dark(#ffffff, #0d101a);
+    --surface: light-dark(#ffffff, #141925);
+    --surface-2: light-dark(#eff3fc, #1b2232);
+    --field: light-dark(#ffffff, #141925);
+    --hover: light-dark(#eaf1ff, #1c2942);
+    --text: light-dark(#151c30, #f8faff);
+    --muted: light-dark(#5c6880, #a7b3ca);
+    --subtle: light-dark(#5c6880, #a7b3ca);
+    --border: light-dark(#dfe6f3, #29334a);
+    --border-hover: light-dark(#a3b9e3, #49628d);
+    --primary:var(--brand-blue);
+    --on-primary:#ffffff;
+    --primary-dark: var(--primary); --primary-light: var(--text);
+    --primary-tint: var(--hover); --accent:light-dark(#1256d0, #77b6ff); --accent-tint: var(--hover);
+    --success: light-dark(#166534, #86efac); --success-bg: light-dark(#f0fdf4, #142219); --success-border: light-dark(#bbf7d0, #254231);
+    --warning: light-dark(#92400e, #e8c885); --warning-bg: light-dark(#fffbeb, #252014); --warning-border: light-dark(#fde68a, #493b23);
+    --danger: light-dark(#b4233b, #f1a5b4); --danger-bg: light-dark(#fff1f2, #27191e); --danger-border: light-dark(#fecdd3, #4d2d37);
+    --cyan:var(--brand-cyan); --gradient:linear-gradient(115deg,var(--brand-blue),var(--brand-purple));
+    --radius-sm:8px; --radius-md:12px; --radius-lg:14px;
+    --ring:0 0 0 3px #1265ff26;
+    --shadow-sm:0 1px 3px #00000006; --shadow-md:0 8px 24px #0000000a; --shadow-lg:0 14px 40px #00000012;
+}
+.stApp { background:var(--bg); color:var(--text); }
+.office-brand-artwork { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; background:transparent; padding:0; border:0; vertical-align:middle; }
+.office-brand-artwork img { display:block; width:100%; height:auto; min-width:0; max-width:100%; object-fit:contain; }
+.stApp, .stApp :is(p,li,input,textarea,button,label,h1,h2,h3,select) { font-family:Inter,system-ui,sans-serif; }
+[data-testid="stAppDeployButton"] { display:none; }
+html.oa-selecting-theme [role="menu"] { visibility:hidden; }
+
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+
+
+.office-brand-artwork .brand-light { display:none; }
+html[data-oa-appearance-mode="light"] .office-brand-artwork .brand-light { display:block; }
+html[data-oa-appearance-mode="light"] .office-brand-artwork .brand-dark { display:none; }

@@ -12,7 +12,7 @@ langchain-core>=0.3.0,<1.0.0
 langgraph>=0.2.0
 
 # Streamlit UI
-streamlit>=1.32.0
+streamlit>=1.66.1,<2
 
 # Database
 sqlalchemy>=2.0.0

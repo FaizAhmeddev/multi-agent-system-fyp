@@ -1,0 +1,243 @@
+/* Authentication-only theme. Shared tokens and one field layout for both Streamlit renderers. */
+.stApp {
+    --auth-bg: var(--bg);
+    --auth-surface: var(--surface);
+    --auth-field: var(--field);
+    --auth-text: var(--text);
+    --auth-muted: var(--muted);
+    --auth-border: var(--border);
+    --auth-hover: var(--border-hover);
+    --auth-indigo: var(--accent);
+    --auth-focus: var(--primary);
+    --auth-ring: var(--ring);
+    --auth-error: var(--danger);
+    --auth-radius: 10px;
+    --auth-control-height: 50px;
+    --auth-outer-gap: clamp(16px, 2.2dvh, 32px);
+    --auth-panel-pad: clamp(20px, 3dvh, 48px);
+    --auth-stack-gap: clamp(12px, 1.8dvh, 20px);
+    --auth-user-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818189' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='8' r='3.5'/%3E%3Cpath d='M5 21v-3a7 7 0 0 1 14 0v3'/%3E%3C/svg%3E");
+    --auth-lock-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818189' stroke-width='1.6' stroke-linecap='round'%3E%3Crect x='5' y='10' width='14' height='11' rx='3'/%3E%3Cpath d='M8 10V6a4 4 0 0 1 8 0v4M12 14v3'/%3E%3C/svg%3E");
+    background: var(--auth-bg) !important;
+}
+html, body { margin: 0; }
+.stApp, .stApp *, .stApp *::before, .stApp *::after { box-sizing: border-box; }
+.stApp:has(.st-key-auth_root) section[data-testid="stSidebar"],
+.stApp:has(.st-key-auth_root) [data-testid="stHeader"],
+.stApp:has(.st-key-auth_root) footer { display:none !important; }
+.stApp, .stApp :is(p,input,button,label,h1,h2) { font-family: Inter, system-ui, sans-serif !important; }
+[data-testid="stMainBlockContainer"], .main .block-container {
+    max-width: 1728px !important;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: safe center;
+    flex-shrink: 0;
+    padding: var(--auth-outer-gap) !important;
+}
+[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] { gap: 0 !important; flex: 0 0 auto !important; }
+/* Streamlit subtracts a paragraph margin even for a custom HTML panel. */
+[data-testid="stMarkdownContainer"]:has(> .auth-hero-panel) { margin-bottom: 0 !important; }
+[data-testid="stHorizontalBlock"]:has(.auth-hero-panel) {
+    gap: 0 !important;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    min-height: min(900px, calc(100dvh - 2 * var(--auth-outer-gap)));
+    background: var(--auth-surface);
+    box-shadow: 0 20px 80px #00000012;
+}
+[data-testid="stColumn"]:has(.auth-hero-panel) { background: var(--sidebar); border-radius: 13px 0 0 13px; }
+[data-testid="stColumn"]:has(.auth-card-header) {
+    display: flex;
+    justify-content: center;
+    border-radius: 0 13px 13px 0;
+    background: var(--auth-surface);
+}
+[data-testid="stColumn"]:has(.auth-card-header) > div { width: 100%; justify-content: center; }
+/* Both panels grow together; shorter viewports tighten spacing, never clip content. */
+.auth-hero-panel {
+    position: relative;
+    isolation: isolate;
+    padding: var(--auth-panel-pad) clamp(28px, 3.2vw, 56px);
+    min-height: 0;
+    border-radius: 13px 0 0 13px;
+    color: var(--text);
+    background: transparent;
+}
+.auth-hero-panel::before { content:none; }
+.auth-orb { display:none; }
+.auth-orb.teal { background: var(--surface); top: auto; bottom: 60px; right: 50px; width: 160px; height: 160px; animation-delay: -6s; opacity: .12; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand .office-brand-artwork { width:clamp(240px, 25vw, 340px); max-width:100%; }
+.auth-eyebrow { display: flex; align-items: center; gap: 8px; margin-top: clamp(20px, 3.5dvh, 52px); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+.auth-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); box-shadow:none; flex-shrink: 0; }
+.auth-hero-panel h1 { font-size: clamp(48px, 3.55vw, 56px) !important; font-weight: 650 !important; letter-spacing: -2.4px !important; line-height: 1.12 !important; margin: clamp(12px, 1.8dvh, 22px) 0 clamp(14px, 2dvh, 24px) !important; padding: 0 !important; color: var(--text) !important; }
+.auth-gradient { color:var(--text); -webkit-text-fill-color:currentColor; }
+.stApp .auth-description { max-width: 520px; color: var(--muted) !important; font-size: 16px !important; line-height: 1.75; margin: 0 0 clamp(16px, 2dvh, 28px); }
+.auth-feature-list { display: grid; gap: clamp(10px, 1.5dvh, 16px); margin: 0 0 clamp(16px, 2.2dvh, 32px); padding: 0; list-style: none; }
+.auth-feature-list li { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.auth-feature-list svg { width: 19px; height: 19px; color: var(--muted); flex-shrink: 0; }
+.auth-workflow { position: relative; margin: 0 0 clamp(14px, 1.8dvh, 26px); border: 1px solid var(--border); border-radius: 14px; padding: clamp(14px, 2dvh, 22px); background: var(--surface); box-shadow: var(--shadow-sm); backdrop-filter: blur(12px); transition: border-color .2s, box-shadow .2s; }
+.auth-workflow:hover { border-color: var(--border); box-shadow: var(--shadow-md); }
+.auth-workflow-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.auth-workflow-head > span:last-child { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.auth-flow { display: flex; align-items: center; justify-content: center; gap: 8px; padding: clamp(12px, 2dvh, 26px) 0; }
+.auth-flow-node { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; padding: 12px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
+.auth-flow-node svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
+.auth-flow-node.core { background: var(--surface); border-color: var(--border); color: var(--text); box-shadow: none; }
+.auth-connector { position: relative; height: 1px; flex: 1; max-width: 32px; min-width: 12px; background: var(--border-hover); }
+.auth-connector::after { content: ""; position: absolute; width: 4px; height: 4px; border-radius: 50%; top: -1.5px; background: var(--muted); animation: flow-pulse 3s ease-in-out infinite; }
+.auth-flow-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); padding-top: clamp(10px, 1.4dvh, 15px); font-size: 12px; line-height: 1.6; color: var(--muted); }
+.auth-flow-foot svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+.auth-flow-foot span:last-child { color: var(--muted); }
+.auth-hero-footer { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.auth-hero-footer svg { width: 15px; height: 15px; flex-shrink: 0; }
+/* Stable container key avoids relying on Streamlit's incidental nested layout. */
+.st-key-auth_form_panel { width: 100%; max-width: 520px; margin: auto; padding: var(--auth-panel-pad) 32px !important; gap: var(--auth-stack-gap) !important; }
+.auth-form-mark { display: grid; place-items: center; height: 44px; width: 44px; background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 13px; margin-bottom: clamp(10px, 1.5dvh, 22px); }
+.auth-form-mark svg { width: 22px; height: 22px; }
+.auth-kicker { text-transform: uppercase; letter-spacing: 1.3px; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: clamp(8px, 1.2dvh, 12px); }
+.auth-card-header h2 { font-size: 34px !important; font-weight: 650 !important; letter-spacing: -1.2px !important; color: var(--auth-text) !important; margin: 0 0 clamp(8px, 1.2dvh, 12px) !important; padding: 0 !important; }
+.stApp .auth-card-header p { font-size: 16px !important; line-height: 1.6; color: var(--auth-muted) !important; margin: 0; }
+.st-key-auth_root [data-testid="stForm"], .st-key-auth_root [data-testid="stForm"] > div { border: 0 !important; padding: 0 !important; }
+.st-key-auth_root [data-testid="stForm"] [data-testid="stVerticalBlock"] { gap: clamp(14px, 2dvh, 20px) !important; }
+.st-key-auth_root [data-testid="stWidgetLabel"] { margin-bottom: 8px !important; }
+.st-key-auth_root [data-testid="stWidgetLabel"] p { font-size: 14px !important; font-weight: 500 !important; line-height: 1.5; color: var(--muted) !important; }
+/* Icons occupy an absolute gutter; only the input and native toggle participate in layout. */
+.st-key-auth_root [data-testid="stTextInput"] :is([data-testid="stTextInputRootElement"], [data-baseweb="input"]) {
+    position: relative; display: flex; align-items: center; box-sizing: border-box;
+    width: 100%; min-width: 0; height: var(--auth-control-height); min-height: var(--auth-control-height);
+    border: 1px solid var(--auth-border) !important; border-radius: var(--auth-radius) !important;
+    background-color: var(--auth-field) !important;
+    box-shadow: none; transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+.st-key-auth_root [data-testid="stTextInput"] [data-baseweb="base-input"] { flex: 1 1 auto; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.st-key-auth_root [data-testid="stTextInput"] input {
+    box-sizing: border-box; width: 100%; min-width: 0; flex: 1 1 0%; height: 48px;
+    margin: 0; padding: 12px 15px !important; border: 0 !important; border-radius: var(--auth-radius) !important;
+    background: transparent !important; color: var(--auth-text) !important;
+    font-size: 16px !important; line-height: 24px !important; box-shadow: none !important; outline: none !important;
+}
+.st-key-login_username { --auth-field-icon: var(--auth-user-icon); }
+.st-key-login_password { --auth-field-icon: var(--auth-lock-icon); }
+:is(.st-key-login_username, .st-key-login_password) :is([data-testid="stTextInputRootElement"], [data-baseweb="input"])::before {
+    content: ""; position: absolute; z-index: 1; left: 15px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; background: var(--auth-field-icon) center/contain no-repeat; pointer-events: none;
+}
+.st-key-auth_root :is(.st-key-login_username, .st-key-login_password) [data-testid="stTextInput"] input,
+.st-key-auth_root [data-testid="stTextInput"]:is(.st-key-login_username, .st-key-login_password) input { padding-left: 44px !important; }
+.st-key-auth_root [data-testid="stTextInput"] input::placeholder { color: var(--muted) !important; opacity: 1; }
+.st-key-auth_root [data-testid="stTextInput"] :is([data-testid="stTextInputRootElement"], [data-baseweb="input"]):hover { border-color: var(--auth-hover) !important; }
+.st-key-auth_root [data-testid="stTextInput"] :is([data-testid="stTextInputRootElement"], [data-baseweb="input"]):focus-within {
+    border-color: var(--auth-focus) !important; box-shadow: var(--auth-ring) !important;
+}
+.st-key-auth_root [data-testid="stTextInput"] button {
+    display: grid; place-items: center; flex: 0 0 44px; min-width: 44px; width: 44px; height: 44px;
+    margin: 0 2px 0 0; padding: 10px !important; border: 0 !important; border-radius: 8px;
+    color: var(--muted) !important; background: transparent !important; box-shadow: none !important;
+    transition: color .18s, background-color .18s;
+}
+.st-key-auth_root [data-testid="stTextInput"] button:hover { color: var(--auth-indigo) !important; background: var(--surface) !important; }
+.st-key-auth_root [data-testid="stTextInput"] input:is(:autofill, :-webkit-autofill) {
+    -webkit-text-fill-color: var(--auth-text) !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--auth-field) inset !important;
+    caret-color: var(--auth-text);
+}
+.st-key-auth_root [data-testid="stTextInput"] :is([data-testid="stTextInputRootElement"], [data-baseweb="input"]):has(input:disabled) { background-color: var(--surface) !important; border-color: var(--border) !important; box-shadow: none !important; }
+.st-key-auth_root [data-testid="stTextInput"] input:disabled { color: var(--muted) !important; cursor: not-allowed; }
+.st-key-auth_root [data-testid="stTextInput"] :is([data-testid="stTextInputRootElement"], [data-baseweb="input"]):has(input[aria-invalid="true"]),
+.st-key-auth_form_panel:has([data-testid="stAlertContainer"] [data-testid="stAlertContentError"]) [data-testid="stTextInputRootElement"] { border-color: var(--auth-error) !important; }
+.st-key-auth_root .stButton > button[kind="primary"], .st-key-auth_root [data-testid="stFormSubmitButton"] button {
+    min-height: var(--auth-control-height); height: var(--auth-control-height);
+    background: var(--gradient) !important;
+    color: var(--on-primary) !important; border: 1px solid var(--primary) !important; border-radius: var(--auth-radius) !important;
+    box-shadow: 0 5px 12px #00000012 !important;
+    transition: box-shadow .18s ease, filter .18s ease !important;
+}
+.st-key-auth_root .stButton > button[kind="primary"] p, .st-key-auth_root [data-testid="stFormSubmitButton"] button p { font-size: 16px !important; font-weight: 600; }
+.st-key-auth_root .stButton > button[kind="primary"]:hover, .st-key-auth_root [data-testid="stFormSubmitButton"] button:hover { transform: none !important; filter: brightness(1.05); box-shadow: 0 8px 20px #00000012 !important; }
+.st-key-auth_root button:focus-visible { outline: 2px solid var(--text) !important; outline-offset: 3px; }
+.st-key-auth_root button:disabled { opacity: .55; cursor: not-allowed; transform: none !important; }
+.auth-demo-label { display: flex; align-items: center; gap: 12px; color: var(--auth-muted); font-size: 12px; line-height: 1.5; margin: 0; }
+.auth-demo-label::before, .auth-demo-label::after { content: ""; height: 1px; background: var(--surface); flex: 1; }
+[class*="st-key-demo_"] button {
+    min-height: 42px; height: 42px; border: 1px solid var(--auth-border) !important; border-radius: 8px !important;
+    background: var(--surface) !important; color: var(--muted) !important; box-shadow: none !important;
+    padding: 8px !important; transition: border-color .18s, background-color .18s, color .18s !important;
+}
+[class*="st-key-demo_"] button p { font-size: 14px !important; font-weight: 500; }
+[class*="st-key-demo_"] button:hover { color: var(--text) !important; border-color: var(--border-hover) !important; background: var(--hover) !important; transform: none !important; filter: none; }
+[class*="st-key-demo_"] button[kind="primary"] { color: var(--text) !important; border-color: var(--border-hover) !important; background: var(--hover) !important; box-shadow:none !important; filter: none; }
+[data-testid="stHorizontalBlock"]:has([class*="st-key-demo_"]) { gap: 10px !important; }
+.stApp .auth-demo-note { font-size: 12px !important; line-height: 1.65; color: var(--auth-muted) !important; text-align: center; margin: 0; }
+:is(.st-key-link_signup,.st-key-link_forgot,.st-key-link_login) button { background: transparent !important; border: 0 !important; min-height: 40px; box-shadow: none !important; color: var(--muted) !important; padding: 4px 0 !important; transition: color .18s !important; }
+:is(.st-key-link_signup,.st-key-link_forgot,.st-key-link_login) button p { font-size: 14px !important; font-weight: 500; }
+:is(.st-key-link_signup,.st-key-link_forgot,.st-key-link_login) button:hover { color: var(--muted) !important; text-decoration: underline; text-underline-offset: 4px; transform: none !important; }
+.stApp .auth-footer-note { display: flex; justify-content: center; align-items: center; gap: 8px; color: var(--auth-muted) !important; font-size: 12px !important; line-height: 1.6; border-top: 1px solid var(--border); padding-top: clamp(12px, 1.8dvh, 22px); margin: 0; }
+.auth-footer-note svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+[data-testid="stAlert"] { border-radius: var(--auth-radius) !important; }
+[data-testid="stAlert"] p { font-size: 14px !important; line-height: 1.6; }
+.auth-card-header [data-testid="stHeaderActionElements"], .auth-hero-panel [data-testid="stHeaderActionElements"] { display: none; }
+@keyframes orb-drift { to { transform: translate(-45px, 35px); } }
+@keyframes flow-pulse { from { left: 0; opacity: .2; } 50% { opacity: 1; } to { left: 90%; opacity: .2; } }
+@media (min-width: 1600px) {
+    .st-key-auth_form_panel { max-width: 560px; padding-inline: 40px !important; }
+}
+@media (max-width: 1150px) and (min-width: 901px) {
+    .auth-hero-panel { padding-inline: 28px; }
+    .auth-hero-panel h1 { font-size: 44px !important; }
+    .st-key-auth_form_panel { padding-inline: 24px !important; }
+    .auth-workflow { padding: 18px; }
+    .auth-flow-node { flex-direction: column; gap: 5px; padding: 10px 8px; }
+}
+/* Compact laptop heights keep all content and the original type/control sizes. */
+@media (min-width: 901px) and (max-height: 740px) {
+    .stApp { --auth-panel-pad: 18px; --auth-stack-gap: 12px; }
+    .auth-eyebrow { margin-top: 16px; }
+    .auth-hero-panel h1 { margin-block: 12px !important; }
+    .stApp .auth-description { margin-bottom: 12px; }
+    .auth-feature-list { gap: 8px; margin-bottom: 12px; }
+    .auth-workflow { padding-block: 12px; margin-bottom: 12px; }
+    .auth-flow { padding-block: 10px; }
+    .auth-form-mark { width: 36px; height: 36px; margin-bottom: 8px; }
+}
+@media (max-width: 900px) {
+    [data-testid="stMainBlockContainer"], .main .block-container { padding: 12px !important; }
+    [data-testid="stHorizontalBlock"]:has(.auth-hero-panel) { flex-direction: column !important; min-height: 0; border-radius: 18px; }
+    [data-testid="stColumn"]:has(.auth-hero-panel), [data-testid="stColumn"]:has(.auth-card-header) { width: 100% !important; flex: 0 0 auto !important; }
+    [data-testid="stColumn"]:has(.auth-card-header) { display: block; }
+    [data-testid="stColumn"]:has(.auth-hero-panel), .auth-hero-panel { border-radius: 17px 17px 0 0; }
+    [data-testid="stColumn"]:has(.auth-card-header) { border-radius: 0 0 17px 17px; }
+    .auth-hero-panel { min-height: 0; padding: 24px 28px; }
+    .auth-eyebrow, .auth-feature-list, .auth-workflow, .auth-hero-footer, .auth-description { display: none !important; }
+    .auth-hero-panel h1 { font-size: clamp(25px, 4.3vw, 32px) !important; letter-spacing: -1.2px !important; line-height: 1.2 !important; margin: 20px 0 0 !important; }
+    .auth-hero-panel h1 br { display: none; }
+    .st-key-auth_form_panel { max-width: 540px; padding: 36px 28px !important; }
+    .auth-form-mark { display: none; }
+    .auth-card-header h2 { font-size: 32px !important; }
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-demo_"]), [data-testid="stHorizontalBlock"]:has(.st-key-link_signup) { flex-wrap: nowrap !important; }
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-demo_"]) > [data-testid="stColumn"], [data-testid="stHorizontalBlock"]:has(.st-key-link_signup) > [data-testid="stColumn"] { width: auto !important; min-width: 0 !important; flex: 1 !important; }
+}
+@media (max-width: 400px) {
+    .auth-hero-panel { padding: 22px 20px; }
+    .st-key-auth_form_panel { padding: 30px 20px !important; }
+    .stApp .auth-card-header p { font-size: 15px !important; }
+    [data-testid="stHorizontalBlock"]:has([class*="st-key-demo_"]) { gap: 6px !important; }
+    [class*="st-key-demo_"] button { padding: 6px 3px !important; }
+    [data-testid="stHorizontalBlock"]:has(.st-key-link_signup) { gap: 8px !important; }
+    :is(.st-key-link_signup,.st-key-link_forgot) button p { font-size: 13px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Intrinsic SVG dimensions remain safe even before the auth stylesheet arrives. */
+.st-key-auth_root { gap:0 !important; }
+.auth-brand svg, .auth-feature-list svg, .auth-flow-node svg, .auth-footer-note svg, .auth-hero-footer svg { flex:none; max-width:24px; max-height:24px; }
+.auth-footer-note svg, .auth-hero-footer svg { width:16px; height:16px; }
+.st-key-auth_root [data-testid="stTextInput"] button svg { width:18px; height:18px; flex:none; }
+
+.auth-configuration { font-size:12px; color:var(--warning); line-height:1.5; margin-top:8px; }
+.auth-configuration summary { cursor:pointer; text-align:center; }
+.stApp .auth-configuration p { color:var(--muted); font-size:12px; line-height:1.6; margin:10px 0 0; }

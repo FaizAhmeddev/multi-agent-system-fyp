@@ -45,12 +45,17 @@ for _lg in (
     logging.getLogger(_lg).setLevel(logging.CRITICAL)
 
 import streamlit as st
+from ui.branding import FAVICON, logo_html
 
 st.set_page_config(
     page_title="Office Automation Agents Pro",
-    layout="wide", page_icon="",
+    layout="wide", page_icon=str(FAVICON),
     initial_sidebar_state="expanded",
 )
+
+
+from ui.appearance import init_appearance
+init_appearance()
 
 
 def _hydrate_streamlit_secrets_into_environ() -> None:
@@ -103,664 +108,15 @@ from config import (
 
 refresh_config_from_env()
 
-# ── CSS ──────────────────────────────────────────────────────────────────
-# ── CSS ──────────────────────────────────────────────────────────────────
-st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-:root {
-    --bg: #f4f6fb;
-    --surface: #ffffff;
-    --surface-2: #f3f5f9;
-    --border: #e2e6ef;
-    --text: #1e2433;
-    --muted: #6b7280;
-    --primary: #4f46e5;
-    --primary-dark: #4338ca;
-    --primary-light: #6366f1;
-    --primary-tint: #eef0fd;
-    --accent: #0d9488;
-    --accent-tint: #e6f7f5;
-    --success: #15803d;
-    --success-bg: #e7f7ec;
-    --warning: #b45309;
-    --warning-bg: #fef3e2;
-    --danger: #b91c1c;
-    --danger-bg: #fdecec;
-    --shadow-sm: 0 1px 2px 0 rgba(30, 36, 51, 0.05);
-    --shadow-md: 0 4px 10px -2px rgba(30, 36, 51, 0.08);
-    --shadow-lg: 0 12px 24px -6px rgba(30, 36, 51, 0.10);
-    --shadow-xl: 0 24px 40px -10px rgba(30, 36, 51, 0.14);
-    --radius-sm: 6px;
-    --radius-md: 12px;
-    --radius-lg: 18px;
-}
-.stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, .stTextInput label, .stTextArea label,
-.stSelectbox label, .stHeader label, .stButton button, .stForm label, .stCaption, .stAlert,
-[data-testid="stWidgetLabel"], input, textarea, select {
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
-}
-[data-testid="stIconMaterial"], .material-symbols-rounded, .material-icons {
-    font-family: 'Material Symbols Rounded', 'Material Icons' !important;
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
-    letter-spacing: normal !important;
-    text-transform: none !important;
-    white-space: nowrap !important;
-}
-.main { padding-top: 0.4rem; background: transparent; }
-.stApp, body {
-    background-color: var(--bg) !important;
-    color: var(--text);
-    background-image:
-        radial-gradient(1000px 520px at 10% -10%, rgba(79,70,229,0.06), transparent 60%),
-        radial-gradient(800px 480px at 100% 0%, rgba(13,148,136,0.05), transparent 55%);
-    background-attachment: fixed;
-}
+# Authenticated presentation is loaded after the authentication gate.
+from ui.theme import (
+    inject_workspace_theme, page_header, assistant_empty_state, suggested_prompts,
+    activity_overview, configuration_notice,
+)
 
-/* Badges (used across cards, chat bubbles, headers) */
-.badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    line-height: 1.6;
-    border: 1px solid transparent;
-    white-space: nowrap;
-}
-.badge-green  { background: #e7f7ec; color: #15803d; border-color: #a7e3bb; }
-.badge-blue   { background: #e8f0fe; color: #1d4ed8; border-color: #b3caf9; }
-.badge-indigo { background: #eef0fd; color: #4338ca; border-color: #c7cbf7; }
-.badge-purple { background: #f3edfd; color: #6d28d9; border-color: #d9c8f7; }
-.badge-teal   { background: #e6f7f5; color: #0f766e; border-color: #a6e5dd; }
-.badge-orange { background: #fef0e2; color: #c2410c; border-color: #f8ceab; }
-.badge-yellow { background: #fdf6db; color: #a16207; border-color: #f1e29c; }
-.badge-red    { background: #fdecec; color: #b91c1c; border-color: #f3b8b8; }
-.badge-a2a    { background: #e6f7f5; color: #0f766e; border-color: #a6e5dd; }
-.badge-mcp    { background: #eef0fd; color: #4338ca; border-color: #c7cbf7; }
-
-/* Custom buttons */
-.stButton > button {
-    border-radius: 10px !important;
-    padding: 10px 20px !important;
-    font-weight: 600 !important;
-    border: 1px solid var(--border) !important;
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: var(--shadow-sm) !important;
-}
-.stButton > button:hover {
-    background: var(--primary-tint) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: var(--shadow-md) !important;
-    border-color: var(--primary-light) !important;
-    color: var(--primary-dark) !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
-    color: white !important;
-    border: none !important;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28) !important;
-}
-.stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, var(--primary-dark), var(--primary)) !important;
-    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35) !important;
-    transform: translateY(-2px) !important;
-    color: white !important;
-}
-
-/* Tabs styled as segmented pill control */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px !important;
-    background: var(--surface-2) !important;
-    padding: 6px !important;
-    border-radius: var(--radius-md) !important;
-    border: 1px solid var(--border) !important;
-    margin-bottom: 20px !important;
-}
-.stTabs [data-baseweb="tab"] {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 8px !important;
-    color: var(--muted) !important;
-    padding: 10px 20px !important;
-    font-weight: 600 !important;
-    transition: all 0.2s ease-in-out !important;
-}
-.stTabs [data-baseweb="tab"]:hover {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-}
-.stTabs [aria-selected="true"] {
-    background: var(--surface) !important;
-    color: var(--primary) !important;
-    box-shadow: var(--shadow-sm) !important;
-    border-bottom: none !important;
-}
-
-/* Auth login styles are injected from ui/auth_pages.py when the login gate is shown */
-
-/* Floating header */
-.main-header {
-    background: rgba(255, 255, 255, 0.92) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid var(--border) !important;
-    padding: 20px 28px !important;
-    border-radius: var(--radius-md) !important;
-    margin-bottom: 24px !important;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: var(--shadow-md) !important;
-}
-.header-title {
-    font-size: 24px !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.6px !important;
-    color: var(--text) !important;
-}
-.header-sub {
-    font-size: 12px !important;
-    color: var(--muted) !important;
-    margin-top: 4px !important;
-    letter-spacing: 0.2px !important;
-}
-
-/* Left-border section headers */
-.sec-hdr {
-    background: var(--primary-tint) !important;
-    border-left: 4px solid var(--primary) !important;
-    color: var(--text) !important;
-    border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
-    padding: 12px 18px !important;
-    margin: 20px 0 14px 0 !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    letter-spacing: 0.1px !important;
-    box-shadow: var(--shadow-sm) !important;
-    border: 1px solid var(--border) !important;
-    border-left-width: 4px !important;
-}
-.sec-blue   { border-left-color: #2563eb !important; background: #eaf1fe !important; }
-.sec-green  { border-left-color: var(--success) !important; background: #e7f7ec !important; }
-.sec-purple { border-left-color: #7c3aed !important; background: #f3edfd !important; }
-.sec-teal   { border-left-color: var(--accent) !important; background: var(--accent-tint) !important; }
-.sec-orange { border-left-color: #ea580c !important; background: #fef0e2 !important; }
-.sec-wa     { border-left-color: #16a34a !important; background: #e7f7ec !important; }
-
-/* Metrics */
-.metric-card {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    padding: 20px 24px !important;
-    box-shadow: var(--shadow-md) !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-.metric-card:hover {
-    transform: translateY(-4px) !important;
-    box-shadow: var(--shadow-lg) !important;
-    border-color: var(--primary-light) !important;
-}
-.metric-num {
-    font-size: 36px !important;
-    font-weight: 800 !important;
-    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-}
-
-/* Agent cards */
-.agent-status-card {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    padding: 16px 20px !important;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: var(--shadow-sm) !important;
-    transition: all 0.3s ease !important;
-}
-.agent-status-card:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: var(--shadow-md) !important;
-    border-color: var(--primary) !important;
-}
-.agent-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); flex-shrink: 0; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
-
-/* Response boxes */
-.resp-box {
-    background: var(--surface-2);
-    color: var(--text);
-    border-left: 4px solid var(--primary);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-    padding: 18px 22px;
-    margin: 14px 0;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border);
-    border-left-width: 4px;
-    line-height: 1.7;
-    white-space: pre-wrap;
-}
-.resp-green  { border-left-color: var(--success); }
-.resp-purple { border-left-color: #7c3aed; }
-.resp-orange { border-left-color: #ea580c; }
-.resp-teal   { border-left-color: var(--accent); }
-.resp-red    { border-left-color: var(--danger); }
-
-/* Chat Panel & Conversational Bubbles */
-.chat-panel {
-    background: var(--surface-2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-lg) !important;
-    padding: 20px !important;
-    margin-bottom: 20px !important;
-    box-shadow: var(--shadow-sm) !important;
-    max-width: 880px;
-    margin-left: auto;
-    margin-right: auto;
-}
-.chat-user {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
-    color: white !important;
-    padding: 12px 18px !important;
-    border-radius: 18px 18px 4px 18px !important;
-    margin: 10px 0 10px auto !important;
-    max-width: 75% !important;
-    display: block !important;
-    font-size: 14px !important;
-    line-height: 1.6 !important;
-    word-wrap: break-word;
-    box-shadow: 0 6px 14px -4px rgba(79, 70, 229, 0.30) !important;
-}
-.chat-agent {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    padding: 14px 20px !important;
-    border-radius: 18px 18px 18px 4px !important;
-    margin: 10px 0 !important;
-    max-width: 80% !important;
-    display: block !important;
-    font-size: 14px !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--shadow-sm) !important;
-    line-height: 1.65 !important;
-    word-wrap: break-word;
-}
-.chat-wrap  { width: 100%; margin-bottom: 4px; overflow: hidden; }
-.thread-bar {
-    background: var(--accent-tint) !important;
-    border: 1px solid #a6e5dd !important;
-    border-radius: var(--radius-md) !important;
-    padding: 12px 18px !important;
-    margin-bottom: 16px !important;
-    font-size: 13.5px !important;
-    color: #0f766e !important;
-    font-weight: 600 !important;
-}
-
-/* Service Pill */
-.svc-pill {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    margin-left: 4px;
-    cursor: default;
-    border: 1px solid transparent;
-}
-.svc-on    { background: #e7f7ec; color: #15803d; border-color: #a7e3bb; }
-.svc-off   { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
-.svc-cloud { background: #e8f0fe; color: #1d4ed8; border-color: #b3caf9; }
-
-/* Queue messages */
-.qmsg { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; margin-bottom: 5px; font-size: 12px; font-family: monospace; }
-.qmsg-task   { border-left: 3px solid #2563eb; }
-.qmsg-result { border-left: 3px solid #16a34a; }
-.qmsg-status { border-left: 3px solid #d97706; }
-.qmsg-broadcast { border-left: 3px solid #7c3aed; }
-
-/* Candidate ATS cards */
-.cand-card {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    padding: 18px 20px !important;
-    margin-bottom: 12px !important;
-    box-shadow: var(--shadow-sm) !important;
-    border-left: 4px solid var(--primary) !important;
-    transition: all 0.2s ease !important;
-}
-.cand-card:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: var(--shadow-md) !important;
-    border-color: var(--primary-light) !important;
-}
-.cand-card.rejected { border-left-color: var(--danger) !important; opacity: 0.75 !important; }
-.score-bar  { height: 6px; border-radius: 3px; background: var(--surface-2); margin: 8px 0 4px 0; }
-.score-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--accent)); }
-
-/* History table */
-.hist-row { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
-
-/* Notification */
-.notif { border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-.notif-info    { border-left: 4px solid #2563eb; }
-.notif-success { border-left: 4px solid var(--success); }
-.notif-warning { border-left: 4px solid var(--warning); }
-.notif-error   { border-left: 4px solid var(--danger); }
-
-/* A2A flow */
-.a2a-flow { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 16px 20px; font-family: monospace; font-size: 12px; line-height: 2; }
-.a2a-arrow { color: var(--success); }
-.a2a-agent { color: var(--primary); font-weight: 700; }
-.a2a-topic { color: #b45309; }
-
-/* Output alignment */
-.block-container { max-width: 1400px; padding-top: 1.4rem !important; }
-.stMarkdown, .stMarkdown p, .stMarkdown li { text-align: left; }
-.resp-box, .hist-row, .cand-card, .qmsg, .a2a-flow, .chat-agent { text-align: left; }
-div[data-testid="column"] { min-width: 0; }
-
-div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
-[data-testid="stFileUploader"] section[data-testid="stFileUploadDropzone"] {
-    border: 1.5px dashed var(--border); border-radius: 12px; background: var(--surface-2);
-}
-[data-testid="stFileUploader"] section button {
-    background: var(--surface) !important; border: 1px solid var(--border) !important;
-    border-radius: 10px !important; min-height: 2.75rem; color: var(--text) !important;
-}
-[data-testid="stFileUploader"] section button p { font-size: 14px !important; line-height: 1.4 !important; }
-[data-testid="stCheckbox"] label { gap: 0.5rem !important; align-items: center !important; }
-[data-testid="stCheckbox"] label p { line-height: 1.4 !important; margin: 0 !important; }
-[data-testid="stExpander"] summary { font-weight: 600 !important; }
-.email-detail-box {
-    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
-    padding: 20px 22px; margin-top: 12px; box-shadow: var(--shadow-md);
-}
-.email-body-full {
-    white-space: pre-wrap; line-height: 1.65; font-size: 14px; color: var(--text);
-    max-height: 420px; overflow-y: auto; padding: 12px; background: var(--surface-2);
-    border-radius: 8px; border: 1px solid var(--border);
-}
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); border-radius: 4px; }
-::-webkit-scrollbar-thumb { background: #cbd2e0; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
-</style>""", unsafe_allow_html=True)
-
-# ── Sidebar navigation + layout polish ────────────────────────────────────
-st.markdown("""<style>
-/* ===== Sidebar shell ===== */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #ffffff 0%, #f7f8fc 100%) !important;
-    border-right: 1px solid var(--border) !important;
-    width: 290px !important;
-}
-section[data-testid="stSidebar"] > div { padding-top: 0.6rem !important; }
-section[data-testid="stSidebar"] * { color: var(--text); }
-
-/* Brand */
-.side-brand {
-    display:flex; align-items:center; gap:12px;
-    padding: 6px 6px 16px; margin-bottom: 4px;
-    border-bottom: 1px solid var(--border);
-}
-.side-logo {
-    width:42px; height:42px; border-radius:12px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:14px; font-weight:800; letter-spacing:-0.02em; color:#fff;
-    background: linear-gradient(135deg,#4f46e5,#0d9488);
-    box-shadow: 0 6px 16px rgba(79,70,229,0.28);
-}
-.side-title { font-size:15px; font-weight:800; letter-spacing:-0.02em; color:#111827; }
-.side-sub   { font-size:11px; color:#6b7280; margin-top:2px; }
-
-.side-nav-label {
-    font-size:10.5px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
-    color:#94a3b8; margin: 14px 6px 8px;
-}
-
-/* Nav buttons (override global button look inside sidebar) */
-section[data-testid="stSidebar"] .stButton > button {
-    background: transparent !important;
-    border: 1px solid transparent !important;
-    color: #374151 !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    padding: 11px 14px !important;
-    border-radius: 10px !important;
-    box-shadow: none !important;
-    margin-bottom: 2px !important;
-    transition: all 0.15s ease !important;
-}
-section[data-testid="stSidebar"] .stButton > button > div { justify-content:flex-start !important; }
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: var(--primary-tint) !important;
-    border-color: #c7cbf7 !important;
-    color: var(--primary-dark) !important;
-    transform: none !important;
-}
-section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, rgba(79,70,229,0.95), rgba(13,148,136,0.90)) !important;
-    color: #ffffff !important;
-    border: none !important;
-    box-shadow: 0 6px 16px rgba(79,70,229,0.28) !important;
-}
-section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-    transform: none !important;
-    box-shadow: 0 8px 20px rgba(79,70,229,0.36) !important;
-}
-
-.side-divider { height:1px; background: var(--border); margin:16px 4px; }
-
-.side-pills { display:flex; gap:6px; flex-wrap:wrap; margin: 0 4px 12px; }
-
-/* User card */
-.side-user {
-    display:flex; align-items:center; gap:11px;
-    background: var(--surface-2);
-    border:1px solid var(--border);
-    border-radius:12px; padding:10px 12px; margin: 0 4px;
-}
-.side-avatar {
-    width:36px; height:36px; border-radius:10px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    font-weight:800; font-size:15px; color:#fff;
-    background: linear-gradient(135deg,#0ea5e9,#4f46e5);
-}
-.side-user-name { font-size:13.5px; font-weight:700; color:#111827; line-height:1.2; }
-.side-user-role { font-size:11px; color:#6b7280; margin-top:2px; }
-.side-stack { font-size:10.5px; color:#94a3b8; margin:8px 6px 12px; }
-
-/* ===== Main page heading ===== */
-.page-head {
-    display:flex; align-items:center; gap:12px;
-    margin: 2px 0 16px; padding-bottom:14px;
-    border-bottom:1px solid var(--border);
-}
-.page-head-title { font-size:1.55rem; font-weight:800; letter-spacing:-0.03em; color:var(--text); }
-
-/* ===== Metric cards (native st.metric) polish ===== */
-[data-testid="stMetric"] {
-    background: var(--surface);
-    border:1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
-}
-[data-testid="stMetric"]:hover {
-    box-shadow: var(--shadow-lg);
-    transform: translateY(-2px);
-    border-color: var(--primary-light);
-}
-[data-testid="stMetricValue"] { font-weight:800 !important; color:var(--primary) !important; }
-
-/* Inputs */
-[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
-[data-baseweb="select"] > div, [data-baseweb="input"] {
-    border-radius: 10px !important;
-    background: #ffffff !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-}
-[data-testid="stTextInput"] input::placeholder, [data-testid="stTextArea"] textarea::placeholder {
-    color: #9aa3b2 !important;
-    opacity: 1 !important;
-}
-[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus {
-    border-color: var(--primary-light) !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
-}
-/* Password show/hide toggle button — blend into the input instead of floating as a mismatched box */
-[data-testid="stTextInput"] button, div[data-baseweb="input"] button {
-    background: #ffffff !important;
-    border: none !important;
-    color: var(--muted) !important;
-    box-shadow: none !important;
-}
-[data-testid="stTextInput"] button:hover, div[data-baseweb="input"] button:hover {
-    color: var(--primary) !important;
-    background: transparent !important;
-}
-div[data-baseweb="base-input"] {
-    background: #ffffff !important;
-    border-radius: 10px !important;
-}
-
-/* Expanders */
-[data-testid="stExpander"] {
-    border:1px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    box-shadow: var(--shadow-sm) !important;
-    overflow:hidden;
-    background: var(--surface) !important;
-}
-[data-testid="stExpander"] summary { color: var(--text) !important; }
-
-/* ===== Pinned chat input bar =====
-   Selectors are written defensively (width:100% at every level, not just
-   one assumed nesting depth) because the internal DOM structure of
-   st.chat_input has changed across Streamlit versions; deployed
-   environments can render an extra/fewer wrapper <div> than local dev,
-   which otherwise leaves the raw <textarea> at its browser-default
-   ~20-character width. */
-[data-testid="stChatInput"] {
-    background: transparent !important;
-    border-top: none !important;
-    padding-bottom: 10px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-[data-testid="stBottom"],
-[data-testid="stBottom"] > div,
-[data-testid="stBottomBlockContainer"] {
-    background: transparent !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-[data-testid="stChatInput"] > div,
-[data-testid="stChatInput"] div {
-    box-sizing: border-box !important;
-}
-[data-testid="stChatInput"] > div {
-    max-width: 820px !important;
-    width: 100% !important;
-    margin: 0 auto !important;
-    display: flex !important;
-}
-[data-testid="stChatInput"] section,
-[data-testid="stChatInput"] [data-baseweb="base-input"],
-[data-testid="stChatInput"] [data-baseweb="textarea"] {
-    flex: 1 1 auto !important;
-    width: 100% !important;
-}
-[data-testid="stChatInput"] textarea,
-textarea[data-testid="stChatInputTextArea"],
-[data-testid="stChatInput"] > div > div {
-    border-radius: 16px !important;
-    background: #ffffff !important;
-    color: var(--text) !important;
-    caret-color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--shadow-lg) !important;
-    width: 100% !important;
-    min-width: 0 !important;
-}
-[data-testid="stChatInput"] textarea::placeholder,
-textarea[data-testid="stChatInputTextArea"]::placeholder {
-    color: var(--muted) !important;
-    opacity: 1 !important;
-}
-[data-testid="stChatInput"] textarea,
-textarea[data-testid="stChatInputTextArea"],
-[data-testid="stChatInput"] textarea:focus,
-textarea[data-testid="stChatInputTextArea"]:focus {
-    -webkit-text-fill-color: var(--text) !important;
-}
-[data-testid="stChatInput"] textarea,
-textarea[data-testid="stChatInputTextArea"] {
-    font-size: 15px !important;
-    min-height: 52px !important;
-}
-/* leave room so messages don't hide behind the fixed bar */
-[data-testid="stAppViewBlockContainer"], .block-container { padding-bottom: 120px !important; }
-
-/* ===== Alerts (info / success / warning / error) ===== */
-[data-testid="stAlert"] {
-    border-radius: var(--radius-md) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--shadow-sm) !important;
-}
-
-/* ===== Plotly / native charts as cards ===== */
-[data-testid="stPlotlyChart"], [data-testid="stVegaLiteChart"], .stPlotlyChart {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 8px;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 8px;
-}
-
-/* ===== Dataframes ===== */
-[data-testid="stDataFrame"] {
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    overflow: hidden;
-    box-shadow: var(--shadow-sm) !important;
-    background: var(--surface) !important;
-}
-
-/* ===== Download buttons ===== */
-[data-testid="stDownloadButton"] > button {
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-}
-
-/* ===== Inner tabs (e.g. finance preview) ===== */
-.stTabs [data-baseweb="tab-list"] { border-radius: var(--radius-md) !important; }
-
-/* ===== Dividers / captions ===== */
-hr { border-color: var(--border) !important; opacity: 1; }
-[data-testid="stCaptionContainer"], .stCaption { color: var(--muted) !important; }
-
-/* ===== File uploader dropzone ===== */
-[data-testid="stFileUploaderDropzone"] {
-    border-radius: var(--radius-md) !important;
-    border: 1.5px dashed var(--border) !important;
-    background: var(--surface-2) !important;
-}
-</style>""", unsafe_allow_html=True)
+# Restore only from a server-validated, expiring HttpOnly session reference.
+from ui.auth_session import restore_authentication, begin_logout
+restore_authentication()
 
 # ── Session defaults ───────────────────────────────────────────────────────
 _defs = {
@@ -1055,6 +411,9 @@ if not st.session_state.logged_in:
         record_login_fn=_record_login_event,
     )
 
+
+# Shared dark theme applies to the actual widgets in every authorized module.
+inject_workspace_theme()
 
 def _extract_text_from_uploaded_file(f) -> str:
     """Return plain text from an uploaded Streamlit file (pdf / docx / txt)."""
@@ -1555,13 +914,13 @@ def _render_email_auto_monitor_panel(*, key_prefix: str = "mon"):
 
     if is_running():
         st.markdown(
-            '<div style="background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.35);color:#4ade80;padding:8px 14px;'
+            '<div style="background:var(--success-bg);border:1px solid var(--success-border);color:var(--success);padding:8px 14px;'
             'border-radius:8px;margin:8px 0"><b>Auto-reply ON</b> — checking inbox every 30s</div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div style="background:var(--surface-2);border:1px solid var(--border);color:var(--muted);padding:8px 14px;'
+            '<div style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;'
             'border-radius:8px;margin:8px 0"><b>Auto-reply OFF</b></div>',
             unsafe_allow_html=True,
         )
@@ -1610,15 +969,14 @@ with st.sidebar:
     _db_label = "PostgreSQL" if use_postgresql_database() else "SQLite"
     st.markdown(
         '<div class="side-brand">'
-        '<div class="side-logo">OA</div>'
         '<div class="side-brand-text">'
-        '<div class="side-title">Office Automation</div>'
-        '<div class="side-sub">Multi-Agent · A2A · MCP</div>'
+        + logo_html() +
+        '<div class="side-sub">Intelligence at work</div>'
         "</div></div>",
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="side-nav-label">KIET Workspace</div>', unsafe_allow_html=True)
+    st.markdown('<div class="side-nav-label">Your workspace</div>', unsafe_allow_html=True)
     for _lbl in tab_labels:
         _is_active = st.session_state.active_tab == _lbl
         if st.button(
@@ -1642,60 +1000,38 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # User card
-    _unm = _hesc(st.session_state.user_name or "")
-    _rol = _hesc(st.session_state.user_role or "")
-    _initial = (_unm[:1] or "U").upper()
-    st.markdown(
-        f'<div class="side-user">'
-        f'<div class="side-avatar">{_initial}</div>'
-        f'<div class="side-user-text"><div class="side-user-name">{_unm}</div>'
-        f'<div class="side-user-role">{_rol}</div></div>'
-        f"</div>"
-        f'<div class="side-stack">Stack · SQLite · LangGraph · OpenAI</div>',
-        unsafe_allow_html=True,
-    )
-
-    if st.button("Sign out", key="side_logout", use_container_width=True):
-        _record_login_event(
-            username=st.session_state.username,
-            display_name=st.session_state.user_name,
-            role=st.session_state.user_role,
-            event="logout",
+    with st.container(key="sidebar_profile"):
+        _pb = ROLE_PORTAL_BANNERS.get(st.session_state.user_role)
+        if _pb:
+            with st.expander("Access & permissions"):
+                st.markdown(_pb, unsafe_allow_html=True)
+        # User card
+        _unm = _hesc(st.session_state.user_name or "")
+        _rol = _hesc(st.session_state.user_role or "")
+        _initial = (_unm[:1] or "U").upper()
+        st.markdown(
+            f'<div class="side-user">'
+            f'<div class="side-avatar">{_initial}</div>'
+            f'<div class="side-user-text"><div class="side-user-name">{_unm}</div>'
+            f'<div class="side-user-role">{_rol}</div></div>'
+            f"</div>"
+            f'<div class="side-stack">Role-based workspace access</div>',
+            unsafe_allow_html=True,
         )
-        try:
-            from database.sqlite_db import deactivate_user_session
 
-            deactivate_user_session(st.session_state.auth_session_id or "")
-        except Exception:
-            pass
-        for k in ("username", "user_role", "user_name", "auth_session_id"):
-            st.session_state[k] = ""
-        st.session_state.logged_in = False
-        st.session_state.auth_screen = "login"
-        st.session_state.signup_step = 1
-        st.session_state.forgot_step = 1
-        for k in ("orch_conversation_id", "coord_conversation_id", "docs_conversation_id"):
-            st.session_state[k] = None
-        st.session_state.orch_chat = []
-        st.session_state.hr_ats_panel_dismissed_batch_id = None
-        st.session_state.active_tab = None
-        st.rerun()
+        if st.button("Sign out", key="side_logout", use_container_width=True):
+            begin_logout()
 
 # ── Main content area ───────────────────────────────────────────────────
 active_tab = st.session_state.active_tab
-_MAIN = st.container()
+_MAIN = st.container(key="app_main")
 
 with _MAIN:
-    # Page heading + role banner
-    st.markdown(
-        f'<div class="page-head">'
-        f'<span class="page-head-title">{_hesc(active_tab or "")}</span></div>',
-        unsafe_allow_html=True,
+    page_header(
+        active_tab or "Assistant", st.session_state.user_role,
+        mcp=_service_status_pill("MCP", _mcp_header_state()) if can_manage_background_services(st.session_state.user_role or "") else "",
+        monitor=_service_status_pill("Monitor", _monitor_header_state()) if can_manage_background_services(st.session_state.user_role or "") else "",
     )
-    _pb = ROLE_PORTAL_BANNERS.get(st.session_state.user_role)
-    if _pb:
-        st.markdown(_pb, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════
 # TAB 2 — DASHBOARD
@@ -1719,7 +1055,8 @@ if active_tab == "Dashboard":
             vdb, total_vecs = {}, 0
 
         # Metrics row
-        m = st.columns(5)
+        with st.container(key="dashboard_metrics"):
+            m = st.columns(5)
         labels = ["Tasks", "Emails", "Candidates", "IT tickets", "Vector rows"]
         vals = [
             stats.get("total_tasks", 0),
@@ -1732,10 +1069,11 @@ if active_tab == "Dashboard":
             with col:
                 st.metric(lab, val)
 
-        st.markdown("")
-        c1, c2, c3 = st.columns([1.2, 1.2, 1])
+        activity_overview(stats)
+        with st.container(key="dashboard_grid"):
+            c1, c2, c3 = st.columns([1.2, 1.2, 1])
 
-        with c1:
+        with c1, st.container(border=True):
             st.markdown('<div class="sec-hdr sec-blue">Agent status</div>', unsafe_allow_html=True)
             agents = [
                 ("IT Support Agent", "agent-it-001"),
@@ -1752,13 +1090,13 @@ if active_tab == "Dashboard":
                     f'<div class="agent-status-card" style="margin-bottom:6px">'
                     f'<div class="agent-dot"></div>'
                     f'<div style="flex:1"><b style="font-size:13px">{name}</b><br>'
-                    f'<span style="font-size:11px;color:var(--muted)">{aid}</span></div>'
-                    f'<span class="badge badge-green">{usage} calls</span>'
+                    f'<span style="font-size:12px;color:var(--muted)">{aid}</span></div>'
+                    f'<span class="badge">{usage} calls</span>'
                     f"</div>",
                     unsafe_allow_html=True,
                 )
 
-        with c2:
+        with c2, st.container(border=True):
             st.markdown('<div class="sec-hdr">A2A message queue</div>', unsafe_allow_html=True)
             try:
                 from message_queue import message_queue
@@ -1798,7 +1136,7 @@ if active_tab == "Dashboard":
             else:
                 st.caption("No collections yet. Load documents or run data loader.")
 
-        with c3:
+        with c3, st.container(border=True):
             st.markdown('<div class="sec-hdr sec-purple">Notifications</div>', unsafe_allow_html=True)
             if notifs:
                 for n in notifs[:6]:
@@ -1858,30 +1196,31 @@ if active_tab == "Dashboard":
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-        try:
-            from data_loader.loader import DATA_DIR
-            _dd = DATA_DIR
-            if os.path.isdir(_dd):
-                _files = sorted([f for f in os.listdir(_dd) if os.path.isfile(os.path.join(_dd, f))])
-            else:
-                _files = []
-        except Exception:
-            _dd, _files = "", []
+        with st.expander("Local datasets & storage", expanded=False):
+            try:
+                from data_loader.loader import DATA_DIR
+                _dd = DATA_DIR
+                if os.path.isdir(_dd):
+                    _files = sorted([f for f in os.listdir(_dd) if os.path.isfile(os.path.join(_dd, f))])
+                else:
+                    _files = []
+            except Exception:
+                _dd, _files = "", []
 
-        st.markdown('<div class="sec-hdr" style="margin-top:8px">Local dataset files (on this computer)</div>', unsafe_allow_html=True)
-        st.caption(f"Folder: `{_dd}`" if _dd else "Data folder not configured.")
-        if _files:
-            for fn in _files[:20]:
-                fp = os.path.join(_dd, fn)
-                try:
-                    sz = os.path.getsize(fp)
-                    st.text(f"{fn}  ({sz // 1024} KB)")
-                except Exception:
-                    st.text(fn)
-            if len(_files) > 20:
-                st.caption(f"... and {len(_files) - 20} more files")
-        else:
-            st.caption("No files in the data folder yet. Run the data loader above to generate sample datasets.")
+            st.markdown('<div class="sec-hdr" style="margin-top:8px">Local dataset files (on this computer)</div>', unsafe_allow_html=True)
+            st.caption(f"Folder: `{_dd}`" if _dd else "Data folder not configured.")
+            if _files:
+                for fn in _files[:20]:
+                    fp = os.path.join(_dd, fn)
+                    try:
+                        sz = os.path.getsize(fp)
+                        st.text(f"{fn}  ({sz // 1024} KB)")
+                    except Exception:
+                        st.text(fn)
+                if len(_files) > 20:
+                    st.caption(f"... and {len(_files) - 20} more files")
+            else:
+                st.caption("No files in the data folder yet. Run the data loader above to generate sample datasets.")
 
         # A2A Architecture
         st.markdown('<div class="sec-hdr" style="margin-top:4px">Live A2A flow</div>', unsafe_allow_html=True)
@@ -1890,7 +1229,7 @@ if active_tab == "Dashboard":
             all_msgs = message_queue.get_all_messages_for_display(limit=6)
             flow_lines = []
             for msg in reversed(all_msgs):
-                topic_color = {"task":"#fbbf24","result":"#22c55e","status":"#60a5fa","broadcast":"#a78bfa"}.get(msg["topic"],"#e2e8f0")
+                topic_color = {"task":"var(--text)","result":"var(--text)","status":"var(--muted)","broadcast":"var(--muted)"}.get(msg["topic"],"var(--muted)")
                 flow_lines.append(
                     f'<span class="a2a-agent">{msg["sender"]}</span> '
                     f'<span class="a2a-arrow">--[<span style="color:{topic_color}">{msg["topic"]}</span>]-- to </span> '
@@ -1915,36 +1254,20 @@ if active_tab == "Dashboard":
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Assistant":
     with _MAIN:
-        st.markdown(
-            '<div class="sec-hdr sec-blue">Unified Assistant <span class="badge badge-a2a">Orchestrator</span> '
-            '<span class="badge badge-mcp">MCP</span></div>',
-            unsafe_allow_html=True,
-        )
         try:
             from config import is_openai_configured, openai_missing_message
 
             if not is_openai_configured():
-                st.error(openai_missing_message("AI features (Assistant, Finance, email auto-reply)"))
+                configuration_notice(openai_missing_message("AI features (Assistant, Finance, email auto-reply)"))
         except Exception:
             pass
         _allow = get_role_orchestrator_allowlist(st.session_state.user_role)
-        if _allow is None:
-            st.info(
-                "**One assistant for everything** — IT, finance, documents, and **HR hiring** in plain language. "
-                "Examples: *Fetch the latest 10 candidate emails*, *fetch 20 and select two for python*, "
-                "*Show emails received on 15 May 2026*, *Send interview invitations for Monday at 3 PM*. "
-                "Ask *What can you do?* in chat for the full task list from the orchestrator. "
-                "Results appear as cards below your message (not raw reports)."
-            )
-        else:
-            st.warning(
-                "**Department-scoped (RBAC).** Allowed: "
-                f"**{', '.join(_allow)}** + general chat. "
-                "HR hiring runs here when your role includes Gmail shortlist (fetch, rank, invite, follow-up)."
-            )
+        if _allow is not None:
+            st.caption("Department scope · " + ", ".join(_allow) + " · General chat")
 
         _sync_orch_chat_from_db()
-        tc1, tc2, tc3 = st.columns([2, 1, 1])
+        with st.container(key="assistant_threads"):
+            tc1, tc2, tc3 = st.columns([2, 1, 1])
         with tc1:
             try:
                 from database.sqlite_db import list_user_conversations, get_conversation_for_user
@@ -1990,19 +1313,20 @@ if active_tab == "Assistant":
             unsafe_allow_html=True,
         )
 
-        with st.expander("Attachments & options", expanded=False):
-            orch_up = st.file_uploader(
-                "Attach files (optional, PDF / TXT / DOCX)",
-                accept_multiple_files=True,
-                type=["pdf", "txt", "docx"],
-                key="orch_files",
-            )
-            st.checkbox(
-                "Use LLM for intent routing",
-                value=st.session_state.get("orch_use_llm", True),
-                key="orch_use_llm",
-                help="When on, the orchestrator uses the LLM to understand and route your request.",
-            )
+        with st.container(key="assistant_attachments"):
+            with st.expander("Attachments & routing options", expanded=False):
+                orch_up = st.file_uploader(
+                    "Attach files (optional, PDF / TXT / DOCX)",
+                    accept_multiple_files=True,
+                    type=["pdf", "txt", "docx"],
+                    key="orch_files",
+                )
+                st.checkbox(
+                    "Use LLM for intent routing",
+                    value=st.session_state.get("orch_use_llm", True),
+                    key="orch_use_llm",
+                    help="When on, the orchestrator uses the LLM to understand and route your request.",
+                )
         orch_attachments = []
         if orch_up:
             for f in orch_up:
@@ -2018,9 +1342,9 @@ if active_tab == "Assistant":
             use_llm=st.session_state.get("orch_use_llm", True),
         )
 
-        st.markdown('<div class="chat-panel">', unsafe_allow_html=True)
         if not st.session_state.orch_chat:
-            st.caption("Start a conversation — messages are saved automatically and reload when you return or open a saved thread.")
+            assistant_empty_state(st.session_state.user_name)
+            suggested_prompts(_allow)
         for idx, entry in enumerate(st.session_state.orch_chat):
             if entry["role"] == "user":
                 body = _hesc_html(entry.get("content", ""))
@@ -2046,7 +1370,6 @@ if active_tab == "Assistant":
                 ui = entry.get("ui_payload")
                 if ui:
                     _render_assistant_ui_payload(ui, key_prefix=f"orch_{idx}")
-        st.markdown("</div>", unsafe_allow_html=True)
 
         _orch_fe = st.session_state.get("orch_finance_export_files")
         if _orch_fe:
@@ -2098,7 +1421,7 @@ if active_tab == "Assistant":
 # TAB — IT SUPPORT
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "IT Support":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_it_support"):
         _render_agent_quick_chat("IT Support")
         st.caption(
             "Tip: for most tasks, use **Assistant** — the orchestrator routes to IT (and other agents) automatically."
@@ -2161,7 +1484,7 @@ if active_tab == "IT Support":
 # TAB 5 — EMAIL
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Email":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_email"):
         st.caption(
             "Tip: use **Assistant** for email-related tasks routed with other domains; this tab is for drafts, inbox, and confirm-send flows."
         )
@@ -2241,7 +1564,7 @@ if active_tab == "Email":
 # TAB 6 — HR
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "HR":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_hr"):
         _render_agent_quick_chat("HR")
         st.info(
             "**Inbox fetch, CV shortlist, interview invites, and follow-ups** are handled in the **Assistant** tab "
@@ -2479,7 +1802,7 @@ if active_tab == "HR":
 # TAB 7 — FINANCE
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Finance":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_finance"):
         _render_agent_quick_chat("Finance")
         st.caption("Tip: use **Assistant** for mixed requests; this tab is for focused finance workflows.")
         st.markdown('<div class="sec-hdr sec-green">Finance</div>', unsafe_allow_html=True)
@@ -2749,6 +2072,8 @@ if active_tab == "Finance":
                             if fig is None:
                                 st.caption(f"**{ct}** — could not build (check columns and numeric values).")
                             else:
+                                from ui.theme import style_figure
+                                style_figure(fig)
                                 st.plotly_chart(fig, use_container_width=True)
                         if want_ai:
                             with st.spinner(f"AI summary for {dfile.name}…"):
@@ -2925,7 +2250,7 @@ if active_tab == "Finance":
 # TAB 8 — DOCUMENTS
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "Documents":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_documents"):
         _render_agent_quick_chat("Documents")
         st.caption("Tip: **Assistant** can route document Q&A; use this tab for Drive load, embeddings, and batch tools.")
         st.markdown('<div class="sec-hdr sec-teal">Documents Agent <span class="badge badge-mcp">MCP</span> <span class="badge badge-purple">ChromaDB</span></div>', unsafe_allow_html=True)
@@ -3101,7 +2426,7 @@ if active_tab == "Documents":
 # TAB — HISTORY
 # ══════════════════════════════════════════════════════════════════════════
 if active_tab == "History":
-    with _MAIN:
+    with _MAIN, st.container(border=True, key="tools_history"):
         st.markdown('<div class="sec-hdr sec-blue">Chat &amp; activity history</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="sec-hdr" style="margin-top:8px">Saved chat threads</div>', unsafe_allow_html=True)
@@ -3213,7 +2538,7 @@ if st.session_state.get("logged_in"):
     _act = st.session_state.get("active_tab")
     if _act == "Assistant":
         _prompt = st.chat_input(
-            "Message the assistant…  (e.g. fetch latest 10 candidate emails, then shortlist 2 for Python)"
+            "Ask your assistant anything…", key="workspace_composer"
         )
         if _prompt and _prompt.strip():
             st.session_state["_pending_orch_prompt"] = _prompt.strip()

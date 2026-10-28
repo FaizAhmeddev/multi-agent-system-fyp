@@ -13,6 +13,11 @@ python main.py
 
 Opens at **http://localhost:8501**
 
+The launcher mounts the UI and secure cookie routes together. For UI-only startup,
+run `python -m ui.server --port 8501` from `FYP_FINAL`; bare `streamlit run` does
+not mount authentication endpoints. See [browser authentication](auth/README.md)
+for HTTPS, proxy configuration and session verification.
+
 ---
 
 ## 🏗️ Architecture

@@ -1,0 +1,15 @@
+.oa-theme-switcher { position:fixed; top:11px; right:54px; z-index:1000001; }
+.oa-theme-switcher button { display:flex; align-items:center; gap:9px; height:34px; padding:0 11px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-sm); cursor:pointer; font:500 12px Inter,system-ui,sans-serif; transition:background-color .15s,border-color .15s; }
+.oa-theme-switcher button:hover { background:var(--hover); border-color:var(--border-hover); }
+.oa-theme-switcher button:focus-visible { outline:2px solid var(--text); outline-offset:3px; }
+.oa-theme-switcher svg { width:15px; height:15px; }
+.oa-theme-switcher [data-icon="sun"] { color:var(--muted); }
+.oa-theme-switcher button[aria-checked="true"] [data-icon="moon"] { color:var(--muted); }
+.oa-theme-switcher button[aria-checked="true"] [data-icon="sun"] { color:var(--text); }
+
+
+:host { display:contents; }
+.oa-theme-switcher { font-family:Inter,system-ui,sans-serif; }
+.oa-theme-switcher svg { flex:none; min-width:16px; max-width:16px; width:16px; height:16px; min-height:16px; max-height:16px; }
+@media(max-width:480px) { .oa-theme-switcher .theme-label { display:none; } .oa-theme-switcher button { gap:10px; padding:0 9px; } }
+@media(prefers-reduced-motion:reduce) { .oa-theme-switcher button { transition:none; } }

@@ -136,28 +136,13 @@ def run():
 
     threading.Thread(target=open_browser, daemon=True).start()
 
-    ui = os.path.join(_ROOT, "ui", "app.py")
     child_env = os.environ.copy()
     child_env.setdefault("TOKENIZERS_PARALLELISM", "false")
     child_env.setdefault("PYTHONWARNINGS", "ignore::DeprecationWarning")
     child_env.setdefault("PYTHONUTF8", "1")
 
     port = os.environ.get("FYP_PORT", "8501")
-    cmd = [
-        sys.executable,
-        "-m",
-        "streamlit",
-        "run",
-        ui,
-        "--server.port",
-        str(port),
-        "--server.headless",
-        "false",
-        "--browser.gatherUsageStats",
-        "false",
-        "--theme.base",
-        "light",
-    ]
+    cmd = [sys.executable, "-m", "ui.server", "--port", str(port)]
     _log(f"  Streamlit port: {port}")
     rc = subprocess.run(cmd, env=child_env, cwd=_ROOT).returncode
     if rc != 0 and str(port) == "8501":

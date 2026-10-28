@@ -5,8 +5,52 @@ fileWatcherType = "none"
 gatherUsageStats = false
 
 [theme]
-base = "light"
-primaryColor = "#4f46e5"
-backgroundColor = "#f1f5f9"
-secondaryBackgroundColor = "#ffffff"
-textColor = "#0f172a"
+base = "dark"
+primaryColor = "#1265FF"
+backgroundColor = "#090B12"
+secondaryBackgroundColor = "#141925"
+textColor = "#F8FAFF"
+borderColor = "#29334A"
+showWidgetBorder = true
+
+[theme.dark]
+primaryColor = "#1265FF"
+backgroundColor = "#090B12"
+secondaryBackgroundColor = "#141925"
+textColor = "#F8FAFF"
+borderColor = "#29334A"
+dataframeBorderColor = "#29334A"
+dataframeHeaderBackgroundColor = "#1B2232"
+dataframeHeaderTextColor = "#F8FAFF"
+blueColor = "#1265FF"
+violetColor = "#5125C8"
+chartCategoricalColors = ["#1265FF", "#22C7FF", "#8257E5", "#5125C8", "#5595FF"]
+chartSequentialColors = ["#090B12", "#181642", "#29216C", "#39269B", "#5125C8", "#1265FF", "#2284FF", "#22A5FF", "#22C7FF", "#A6E9FF"]
+
+[theme.dark.sidebar]
+backgroundColor = "#0D101A"
+secondaryBackgroundColor = "#141925"
+textColor = "#F8FAFF"
+primaryColor = "#1265FF"
+borderColor = "#29334A"
+
+[theme.light]
+primaryColor = "#1265FF"
+backgroundColor = "#F8FAFF"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#151C30"
+borderColor = "#DFE6F3"
+dataframeBorderColor = "#DFE6F3"
+dataframeHeaderBackgroundColor = "#EFF3FC"
+dataframeHeaderTextColor = "#151C30"
+blueColor = "#1265FF"
+violetColor = "#5125C8"
+chartCategoricalColors = ["#1265FF", "#22C7FF", "#8257E5", "#5125C8", "#5595FF"]
+chartSequentialColors = ["#090B12", "#181642", "#29216C", "#39269B", "#5125C8", "#1265FF", "#2284FF", "#22A5FF", "#22C7FF", "#A6E9FF"]
+
+[theme.light.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#151C30"
+primaryColor = "#1265FF"
+borderColor = "#DFE6F3"

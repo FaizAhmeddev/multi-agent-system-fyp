@@ -5,9 +5,11 @@ Login, sign-up, and forgot-password screens with email OTP verification.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 import streamlit as st
 
 from config import OPENAI_API_KEY, admin_contact_message, is_hosted_deploy
+from ui.branding import logo_html
 
 
 _AUTH_DEFAULTS = {
@@ -21,205 +23,10 @@ _AUTH_DEFAULTS = {
 }
 
 _AUTH_HEADINGS = {
-    "login": ("Welcome back", "Sign in to access your automation workspace."),
+    "login": ("Welcome back", "Sign in to your intelligent workspace."),
     "signup": ("Create account", "Register with email verification to get started."),
     "forgot": ("Reset password", "Verify your identity, then choose a new password."),
 }
-
-_AUTH_CSS = """
-<style>
-/* Login screen only — injected before st.stop() on the auth gate */
-section[data-testid="stSidebar"] { display: none !important; }
-section[data-testid="stSidebar"] ~ div { margin-left: 0 !important; }
-[data-testid="stHeader"] { display: none !important; }
-footer { visibility: hidden !important; height: 0 !important; }
-
-.stApp {
-    background-color: #f4f6fb !important;
-    background-image:
-        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(79, 70, 229, 0.07), transparent 55%),
-        radial-gradient(ellipse 70% 55% at 85% 80%, rgba(13, 148, 136, 0.06), transparent 50%) !important;
-}
-.main .block-container {
-    max-width: 1100px !important;
-    padding-top: 2rem !important;
-    padding-bottom: 2rem !important;
-}
-.auth-hero-panel {
-    border-radius: 20px;
-    padding: 2.25rem 2rem;
-    margin-top: 0.5rem;
-    background: linear-gradient(155deg, #4338ca 0%, #4f46e5 45%, #0f766e 100%);
-    color: #f8fafc;
-    min-height: 460px;
-    box-shadow: 0 20px 40px -16px rgba(67, 56, 202, 0.32);
-}
-.auth-hero-badge {
-    display: inline-block;
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.24);
-    color: #e0e7ff;
-    margin-bottom: 1.25rem;
-}
-.auth-hero-logo {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    background: rgba(255,255,255,0.16);
-    border: 1px solid rgba(255,255,255,0.28);
-    margin-bottom: 1.25rem;
-}
-.auth-hero-panel h1 {
-    font-size: 1.85rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    margin: 0 0 0.5rem;
-    line-height: 1.15;
-    color: #ffffff !important;
-}
-.auth-hero-panel p {
-    font-size: 15px;
-    color: #e6e9f5 !important;
-    margin: 0 0 1.5rem;
-    line-height: 1.6;
-}
-.auth-feature-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.auth-feature-list li {
-    font-size: 14px;
-    font-weight: 500;
-    color: #f1f5f9 !important;
-    margin-bottom: 10px;
-    padding-left: 20px;
-    position: relative;
-}
-.auth-feature-list li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 7px;
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.55);
-}
-.auth-card-header h2 {
-    font-size: 1.45rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: #111827 !important;
-    margin: 0 0 0.35rem;
-}
-.auth-card-header p {
-    font-size: 13.5px;
-    color: #6b7280 !important;
-    margin: 0 0 1rem;
-    line-height: 1.5;
-}
-.auth-demo-pill {
-    margin-top: 0.85rem;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-size: 12px;
-    color: #0f766e !important;
-    background: #e6f7f5;
-    border: 1px solid #a6e5dd;
-}
-.auth-footer-note {
-    text-align: center;
-    font-size: 11.5px;
-    color: #94a3b8 !important;
-    margin-top: 0.75rem;
-}
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    background: #ffffff !important;
-    border: 1px solid #e2e6ef !important;
-    border-radius: 20px !important;
-    padding: 1.5rem 1.25rem !important;
-    box-shadow: 0 20px 40px -18px rgba(30, 36, 51, 0.18) !important;
-}
-.stTextInput label, [data-testid="stWidgetLabel"] p {
-    color: #374151 !important;
-    font-weight: 600 !important;
-}
-.stTextInput input {
-    background: #ffffff !important;
-    border: 1px solid #e2e6ef !important;
-    border-radius: 12px !important;
-    color: #111827 !important;
-}
-.stTextInput input::placeholder {
-    color: #9aa3b2 !important;
-    opacity: 1 !important;
-}
-.stTextInput input:focus {
-    border-color: #a5b4fc !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14) !important;
-}
-/* Password show/hide toggle — blend it into the same white field instead of a mismatched grey box */
-[data-testid="stTextInput"] button, div[data-baseweb="input"] button {
-    background: #ffffff !important;
-    border: none !important;
-    color: #9aa3b2 !important;
-    box-shadow: none !important;
-}
-[data-testid="stTextInput"] button:hover, div[data-baseweb="input"] button:hover {
-    color: #4f46e5 !important;
-    background: transparent !important;
-}
-div[data-baseweb="base-input"] {
-    background: #ffffff !important;
-    border-radius: 12px !important;
-}
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #4f46e5, #0d9488) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 8px 18px -6px rgba(79, 70, 229, 0.32) !important;
-}
-.stButton > button[kind="primary"]:hover {
-    box-shadow: 0 10px 22px -6px rgba(79, 70, 229, 0.40) !important;
-    transform: translateY(-1px) !important;
-}
-.stButton > button:not([kind="primary"]) {
-    background: #f6f7fb !important;
-    border: 1px solid #e2e6ef !important;
-    color: #374151 !important;
-    border-radius: 12px !important;
-}
-.stButton > button:not([kind="primary"]):hover {
-    background: #eef0fd !important;
-    border-color: #c7cbf7 !important;
-    color: #4338ca !important;
-}
-.stCaption, [data-testid="stCaptionContainer"] {
-    color: #6b7280 !important;
-}
-hr { border-color: #e2e6ef !important; }
-[data-testid="stAlert"] {
-    border-radius: 12px !important;
-    border: 1px solid #e2e6ef !important;
-}
-</style>
-"""
-
 
 def _init_auth_session() -> None:
     for k, v in _AUTH_DEFAULTS.items():
@@ -228,23 +35,45 @@ def _init_auth_session() -> None:
 
 
 def _inject_auth_styles() -> None:
-    st.markdown(_AUTH_CSS, unsafe_allow_html=True)
+    css = Path(__file__).with_name("auth.css").read_text(encoding="utf-8")
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+def _icon(name: str) -> str:
+    """Small decorative icons share one accessible, dependency-free SVG system."""
+    paths = {
+        "route": '<rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M6 9v9h9M9 6h9v9"/>',
+        "shield": '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>',
+        "chart": '<path d="M4 3v17h17M9 15v-4m5 4V7m5 8v-6"/>',
+        "spark": '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>',
+        "check": '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+        "lock": '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 4v3"/>',
+        "mail": '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3 7 9 6 9-6"/>',
+    }
+    return f'<svg width="18" height="18" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{paths[name]}</svg>'
 
 
 def _auth_hero_panel() -> None:
     st.markdown(
-        """
-        <div class="auth-hero-panel">
-            <div class="auth-hero-badge">Secure enterprise portal</div>
-            <div class="auth-hero-logo">OA</div>
-            <h1>Office Automation Pro</h1>
-            <p>Multi-agent AI workspace for HR, Finance, IT, and email — powered by orchestrated automation.</p>
-            <ul class="auth-feature-list">
-                <li>Intelligent agent routing</li>
-                <li>Role-based secure access</li>
-                <li>Real-time dashboards &amp; history</li>
-            </ul>
-        </div>
+        f"""
+<div class="auth-hero-panel">
+<div class="auth-orb"></div><div class="auth-orb teal"></div>
+<div class="auth-brand">{logo_html()}</div>
+<div class="auth-eyebrow"><span class="auth-status-dot"></span> Your workspace, reimagined</div>
+<h1>Work Smarter.<br> <span class="auth-gradient">Automate Everything.</span></h1>
+<p class="auth-description">Less busywork. More possibility. Bring HR, Finance, IT, and Email together with intelligent AI-powered automation.</p>
+<ul class="auth-feature-list">
+<li>{_icon("route")} Intelligent AI Agent Routing</li>
+<li>{_icon("shield")} Enterprise-Grade Security</li>
+<li>{_icon("chart")} Real-Time Analytics &amp; Automation</li>
+</ul>
+<div class="auth-workflow" role="img" aria-label="Illustrative workflow: incoming request is routed by an AI agent to a completed task. This is a product preview, not live data.">
+<div class="auth-workflow-head"><span>Intelligence in motion</span><span><span class="auth-status-dot"></span> Workflow preview</span></div>
+<div class="auth-flow"><div class="auth-flow-node">{_icon("mail")} Request</div><div class="auth-connector"></div><div class="auth-flow-node core">{_icon("spark")} AI orchestrator</div><div class="auth-connector"></div><div class="auth-flow-node">{_icon("check")} Complete</div></div>
+<div class="auth-flow-foot">{_icon("check")} The right agent. The right action.<span>HR · Finance · IT · Email</span></div>
+</div>
+<div class="auth-hero-footer">{_icon("shield")} Purpose-built for a more productive workday.</div>
+</div>
         """,
         unsafe_allow_html=True,
     )
@@ -258,6 +87,8 @@ def _auth_card_header() -> None:
     st.markdown(
         f"""
         <div class="auth-card-header">
+            <div class="auth-form-mark">{_icon("spark")}</div>
+            <div class="auth-kicker">Your intelligent workspace</div>
             <h2>{title}</h2>
             <p>{subtitle}</p>
         </div>
@@ -268,7 +99,6 @@ def _auth_card_header() -> None:
 
 def _auth_secondary_links() -> None:
     screen = st.session_state.auth_screen
-    st.divider()
     if screen == "login":
         c1, c2 = st.columns(2)
         with c1:
@@ -315,42 +145,9 @@ def _send_otp(username: str, channel: str, destination: str, purpose: str) -> bo
     return True
 
 
-def _complete_login(user: dict, *, new_session_id_fn, record_login_fn) -> None:
-    from database.sqlite_db import (
-        create_new_conversation,
-        touch_user_session,
-    )
-
-    st.session_state.logged_in = True
-    st.session_state.username = user["username"]
-    st.session_state.user_role = user["role"]
-    st.session_state.user_name = user["name"]
-    st.session_state.auth_session_id = new_session_id_fn()
-    touch_user_session(
-        st.session_state.auth_session_id,
-        user["username"],
-        user["name"],
-        user["role"],
-    )
-    st.session_state.orch_conversation_id = create_new_conversation(
-        st.session_state.auth_session_id,
-        user["username"],
-        "orchestrator",
-    )
-    st.session_state.orch_chat = []
-    st.session_state["_orch_active_cid"] = st.session_state.orch_conversation_id
-    st.session_state.pending_hr_gmail_batch_id = None
-    st.session_state.hr_ats_batch_id = None
-    st.session_state.hr_ats_candidates = []
-    st.session_state.hr_ats_filters = {}
-    st.session_state.hr_ats_selected = []
-    record_login_fn(
-        username=user["username"],
-        display_name=user["name"],
-        role=user["role"],
-        event="login",
-    )
-    st.rerun()
+def _complete_login(user: dict, *, new_session_id_fn, record_login_fn, verified_password: str) -> None:
+    from ui.auth_session import begin_login
+    begin_login(user["username"], verified_password)
 
 
 def _validate_username(username: str) -> str | None:
@@ -368,36 +165,43 @@ def _validate_password(password: str) -> str | None:
     return None
 
 
-def _render_login(*, new_session_id_fn, record_login_fn) -> None:
-    username = st.text_input(
-        "Username",
-        placeholder="Enter your username",
-        autocomplete="username",
-        key="login_username",
-    )
-    password = st.text_input(
-        "Password",
-        type="password",
-        placeholder="Enter your password",
-        autocomplete="current-password",
-        key="login_password",
-    )
-    if st.button("Sign in", use_container_width=True, type="primary", key="login_submit"):
-        from database.sqlite_db import authenticate_user
+def _select_demo_account(username: str) -> None:
+    # Choose a role without exposing environment-configured credentials or bypassing auth.
+    st.session_state.login_username = username
+    st.session_state.login_password = ""
 
-        user = authenticate_user(username, password)
-        if user:
-            _complete_login(user, new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
+
+def _render_login(*, new_session_id_fn, record_login_fn) -> None:
+    with st.form("login_form", border=False):
+        username = st.text_input(
+            "Username", placeholder="Enter your username", autocomplete="username",
+            key="login_username",
+        )
+        password = st.text_input(
+            "Password", type="password", placeholder="Enter your password",
+            autocomplete="current-password", key="login_password",
+        )
+        submitted = st.form_submit_button("Sign in to workspace  →", use_container_width=True, type="primary")
+    if submitted:
+        if not username.strip() or not password:
+            st.error("Enter your username and password to continue.")
         else:
-            st.error("Invalid username or password.")
-    st.markdown(
-        """
-        <div class="auth-demo-pill">
-            Demo accounts: <strong>admin</strong> · <strong>hr</strong> · <strong>finance</strong> · <strong>it</strong>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            from database.sqlite_db import authenticate_user
+
+            with st.spinner("Signing in securely…"):
+                user = authenticate_user(username, password)
+                if user:
+                    _complete_login(user, new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn, verified_password=password)
+                else:
+                    st.error("We couldn't sign you in. Check your username and password and try again.")
+    st.markdown('<div class="auth-demo-label">Explore a demo workspace</div>', unsafe_allow_html=True)
+    for col, label, account in zip(st.columns(4), ("Admin", "HR", "Finance", "IT"), ("admin", "hr", "finance", "it")):
+        with col:
+            st.button(label, key=f"demo_{account}", use_container_width=True,
+                      type="primary" if st.session_state.get("login_username") == account else "secondary",
+                      on_click=_select_demo_account, args=(account,),
+                      help=f"Select the {label} account, then enter its password")
+    st.markdown('<p class="auth-demo-note">Select a role, then use its demo account password.</p>', unsafe_allow_html=True)
 
 
 def _render_signup() -> None:
@@ -570,31 +374,34 @@ def render_auth_gate(*, new_session_id_fn, record_login_fn) -> None:
     _init_auth_session()
     _inject_auth_styles()
 
-    hero_col, form_col = st.columns([1, 1], gap="large")
+    with st.container(key="auth_root"):
+        hero_col, form_col = st.columns([1.08, 1], gap="large")
 
-    with hero_col:
-        _auth_hero_panel()
+        with hero_col:
+            _auth_hero_panel()
 
-    with form_col:
-        with st.container(border=True):
-            _auth_card_header()
-            screen = st.session_state.auth_screen
-            if screen == "login":
-                _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
-            elif screen == "signup":
-                _render_signup()
-            elif screen == "forgot":
-                _render_forgot()
-            _auth_secondary_links()
-            st.markdown(
-                '<p class="auth-footer-note">Protected by role-based access · KIET Automation Suite</p>',
-                unsafe_allow_html=True,
-            )
+        with form_col:
+            with st.container(key="auth_form_panel"):
+                _auth_card_header()
+                screen = st.session_state.auth_screen
+                if screen == "login":
+                    _render_login(new_session_id_fn=new_session_id_fn, record_login_fn=record_login_fn)
+                elif screen == "signup":
+                    _render_signup()
+                elif screen == "forgot":
+                    _render_forgot()
+                _auth_secondary_links()
+                setup_note = ""
+                if is_hosted_deploy() and not (OPENAI_API_KEY or "").strip():
+                    setup_note = (
+                        '<details class="auth-configuration"><summary>AI configuration pending</summary>'
+                        '<p>An administrator must add OPENAI_API_KEY to Streamlit Secrets to enable AI tools. '
+                        'Sign-in remains available.</p></details>'
+                    )
+                st.markdown(
+                    f'<p class="auth-footer-note">{_icon("lock")} Protected by role-based access</p>' + setup_note,
+                    unsafe_allow_html=True,
+                )
 
-    if is_hosted_deploy() and not (OPENAI_API_KEY or "").strip():
-        st.warning(
-            "Hosted deploy: add **OPENAI_API_KEY** to Streamlit **Secrets** "
-            "(same names as `.env.example`)."
-        )
 
     st.stop()
