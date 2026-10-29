@@ -23,6 +23,7 @@ from .assistant.router import router as assistant_router
 from .auth.router import router as auth_router
 from .auth.service import AuthError, bootstrap_first_admin
 from .db.session import SessionLocal, get_engine
+from .departments.comms_docs import router as comms_docs_router
 from .departments.router import router as departments_router
 from .departments.workspaces import router as workspaces_router
 from .internal.router import router as internal_router
@@ -77,6 +78,12 @@ def create_app() -> FastAPI:
         response.headers["X-Request-ID"] = rid
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Frame-Options"] = "DENY"
+        if not request.url.path.startswith("/api/docs"):  # Swagger UI loads its own scripts
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
+                "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
         log.info("request", extra={"method": request.method, "path": request.url.path,
                                    "status": response.status_code, "latency_ms": ms, "request_id": rid})
         return response
@@ -99,7 +106,34 @@ def create_app() -> FastAPI:
     app.include_router(workspaces_router)
     app.include_router(internal_router)
     app.include_router(assistant_router)
+    app.include_router(comms_docs_router)
+    _mount_frontend(app)
     return app
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve the built React app (frontend/dist) from the same origin, if it has been built."""
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    index = dist / "index.html"
+    if not index.is_file():
+        return
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith(("api/", "health")):
+            from fastapi import HTTPException
+
+            raise HTTPException(404, detail={"code": "not_found", "message": "Not found."})
+        f = (dist / path).resolve()
+        if path and f.is_file() and dist in f.parents:
+            return FileResponse(f)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 app = create_app()

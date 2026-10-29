@@ -9,7 +9,7 @@ from ..auth import service
 from ..auth.deps import client_ip, require_roles
 from ..auth.router import user_out
 from ..auth.schemas import CreateUserIn, MessageOut, UserOut
-from ..db.models import OutboundEmail, ToolCall, User
+from ..db.models import AuditLog, OutboundEmail, ToolCall, User
 from ..db.session import get_db
 from ..queue.core import STATUSES, get_queue
 
@@ -123,3 +123,21 @@ def mcp_health(_: User = Depends(require_roles("admin"))) -> dict:
             row.update(reachable=False, error="Not configured. Set the URL and token in .env.")
         out.append(row)
     return {"servers": out}
+
+
+@router.get("/audit")
+def audit_log(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
+              action: str | None = Query(None, max_length=64), outcome: str | None = Query(None, max_length=16),
+              _: User = Depends(require_roles("admin")), db: Session = Depends(get_db)) -> dict:
+    """Append-only audit log, newest first. Details are stored redacted."""
+    q = select(AuditLog)
+    if action:
+        q = q.where(AuditLog.action.like(f"{action}%"))
+    if outcome:
+        q = q.where(AuditLog.outcome == outcome)
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    rows = db.scalars(q.order_by(AuditLog.id.desc()).offset((page - 1) * page_size).limit(page_size))
+    return {"items": [{"id": a.id, "at": a.at.isoformat(), "actor": a.actor_email, "action": a.action,
+                       "target": f"{a.target_type}:{a.target_id}" if a.target_type else "", "outcome": a.outcome,
+                       "ip": a.ip, "detail": a.detail} for a in rows], "total": total, "page": page,
+            "page_size": page_size}
