@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { Pencil, Plus, Trash2 } from "../../components/icons";
 import { Dialog, TabPanel, Tabs } from "../../components/ui/overlays";
 import { Badge, Button, ErrorBox, Field, IconButton, Input, Notice, PageHeader, Panel, Select, Spinner, Stat, Table, Textarea } from "../../components/ui/primitives";
@@ -60,7 +60,7 @@ function PersonDialog({ person, onClose }: { person: Person | "new"; onClose: ()
     setErrors(errs);
     if (!Object.keys(errs).length) m.mutate();
   };
-  const text = (k: keyof Form, label: string, props: Record<string, unknown> = {}) => (
+  const text = (k: keyof Form, label: string, props: InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Field label={label} required error={errors[k]}>
       {(id, d, inv) => <Input id={id} aria-describedby={d} aria-invalid={inv} value={String(f[k])} onChange={(e) => set(k, e.target.value)} {...props} />}
     </Field>
