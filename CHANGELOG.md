@@ -21,6 +21,16 @@ and is merged into `main` by the project owner after the phase gate.
   - `scripts/brand/make_brand_assets.py` turns the background into transparency.
   - It writes the mark and the full lock-up, inked for each theme, to `frontend/public/brand/`.
 
+### Security updates (from the first pip-audit run on Windows)
+- pip-audit reported 74 known vulnerabilities in 6 packages. Pins were raised to the fixed versions:
+  - fastapi 0.143.1 and starlette 1.7.0;
+  - PyJWT 2.15.0;
+  - python-multipart 0.0.32;
+  - langgraph 1.2.12 with langgraph-sdk 0.4.4;
+  - pypdf 6.21.2 (released 8 days ago, accepted because it is a security fix).
+- `setup.ps1` replaces the venv's old setuptools with 84.1.0.
+- The same starlette, PyJWT, python-multipart and mcp 2.3.0 combination already passes the MCP server tests in the cloud workspace.
+
 ### Changed
 - `setup.ps1` installs the full runtime set (`requirements/servers.txt`) and builds the web app when Node.js is present.
 - `FYP_FINAL/logs/orchestrator.log` is no longer tracked. Its old copies, and `fyp_data.db`, stay in history until the owner runs the purge.

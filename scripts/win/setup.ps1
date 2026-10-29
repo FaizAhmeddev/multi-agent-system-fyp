@@ -36,6 +36,8 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 }
 $vpy = ".venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip --quiet
+# The venv ships an old setuptools with known vulnerabilities (pip-audit); replace it.
+& $vpy -m pip install "setuptools==84.1.0" --quiet
 # Runtime: core API, worker, portals and MCP servers. -Dev adds tests, lint and quality tools.
 $req = if ($Dev) { "requirements\dev.txt" } else { "requirements\servers.txt" }
 & $vpy -m pip install -r $req

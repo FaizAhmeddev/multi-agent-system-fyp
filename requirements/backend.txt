@@ -1,7 +1,9 @@
 # AgentsMind core backend - exact pins (Python 3.11).
 # Installed and verified in a clean venv; see docs/API_VERIFICATION.md.
-fastapi==0.118.2
-starlette==0.48.0
+# Security bumps after the first pip-audit run on Windows (2026-10-29): fastapi, starlette, PyJWT,
+# python-multipart, langgraph(-sdk), pypdf, setuptools.
+fastapi==0.143.1
+starlette==1.7.0
 uvicorn==0.34.0
 pydantic==2.12.0
 pydantic-settings==2.7.1
@@ -9,13 +11,15 @@ email-validator==2.2.0
 SQLAlchemy==2.0.36
 alembic==1.14.0
 argon2-cffi==23.1.0
-PyJWT==2.10.1
-python-multipart==0.0.20
+PyJWT==2.15.0
+python-multipart==0.0.32
 # Windows has no system IANA time zone database; zoneinfo needs this package there.
 tzdata==2024.2
 # MCP client (core) and servers. 2.x: FastMCP is renamed MCPServer. Requires pydantic>=2.12.
 mcp==2.3.0
 httpx2==2.13.1
 # Agents: explicit graphs (LangGraph) and the OpenAI client (live mode only; sandbox without a key).
-langgraph==1.1.0
+langgraph==1.2.12
+# pip-audit: langgraph-sdk < 0.4.4 has a known vulnerability (pulled in by langgraph; not used directly).
+langgraph-sdk==0.4.4
 openai==2.35.1

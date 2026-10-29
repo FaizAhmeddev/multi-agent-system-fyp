@@ -26,3 +26,22 @@ package, not a tutorial.
 
 Installation verified means pip resolved and installed the exact pins on Windows. Behaviour
 is verified by the backend test suite in the same gate run.
+
+## Security updates, 2026-10-29
+
+pip-audit on the Windows gate (74 findings in 6 packages) led to these pins:
+
+| Package | Pin |
+|---|---|
+| fastapi | 0.143.1 (released 2026-10-14; `starlette>=0.46.0`, `pydantic>=2.9.0`, per its pyproject at the tag) |
+| starlette | 1.7.0 (2026-09-23) |
+| PyJWT | 2.15.0 (2026-09-23) |
+| python-multipart | 0.0.32 (2026-06-04) |
+| langgraph | 1.2.12 (2026-09-21; needs `langgraph-sdk>=0.4.2,<0.5`) |
+| langgraph-sdk | 0.4.4 (2026-08-27) |
+| pypdf | 6.21.2 (2026-10-21, the release that fixes the reported CVEs; accepted under two weeks old because it is a security fix) |
+| setuptools | 84.1.0 (in the venv) |
+
+mcp 2.3.0 declares `starlette>=0.27`, `pyjwt[crypto]>=2.10.1` and `python-multipart>=0.0.9`. The cloud workspace already runs mcp 2.3.0 with starlette 1.7.0, PyJWT 2.15.0 and python-multipart 0.0.32, and the MCP server tests pass there.
+
+Release dates come from the PyPI release feeds and project pages. The next gate run re-checks the full set with pip-audit.
