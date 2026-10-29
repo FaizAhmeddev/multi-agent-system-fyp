@@ -37,6 +37,10 @@ def _intent(text: str) -> str:
     return "create"
 
 
+GENERIC_TITLES = {"meeting", "call", "event", "appointment", "slot", "time", "a meeting", "new meeting", "quick call",
+                  "quick meeting", "meeting invite", "invite"}
+
+
 def _title(text: str) -> str:
     q = quoted(text)
     if q:
@@ -45,6 +49,13 @@ def _title(text: str) -> str:
                   r"next|this|from|in)\b|[.,;]|$)", text, re.I)
     if m and len(m.group(1).strip()) > 1:
         return m.group(1).strip()[:200].capitalize()
+    m = re.search(r"\b(?:schedule|book|set up|arrange|organi[sz]e|plan|add|create|put)\s+(?:(?:an|a|the|my|our)\s+)?(.+?)"
+                  r"(?=\s+(?:tomorrow|today|tonight|on|at|for|with|next|this|from|in|between|before|after|monday|tuesday|"
+                  r"wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening)\b|[.,;]|$)", text, re.I)
+    if m:
+        phrase = re.sub(r"\s+", " ", m.group(1)).strip()
+        if phrase and phrase.lower() not in GENERIC_TITLES and len(phrase) <= 80:
+            return phrase[0].upper() + phrase[1:]
     m = re.search(r"\bwith\s+((?:[A-Z][a-z]+\s?){1,3}|the [a-z]+ team|[a-z]+ team)", text)
     if m:
         return f"Meeting with {m.group(1).strip()}"[:200]

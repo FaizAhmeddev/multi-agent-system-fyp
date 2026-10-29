@@ -115,3 +115,13 @@ def test_graph_steps_emitted(tmp_path):
     ctx = FakeCtx(tmp_path)
     run_agent(A, ctx, "Schedule a sync tomorrow at 11 am")
     assert [e["node"] for e in ctx.events] == ["understand", "gather", "propose"]
+
+
+def test_titles():
+    from agentsmind.assistant.agents.calendar import _title
+    assert _title("Schedule a design review tomorrow at 3 pm for 45 minutes with a Google Meet link") == "Design review"
+    assert _title("Book a meeting with Usman tomorrow at 3:30 pm") == "Meeting with Usman"
+    assert _title('Schedule "Quarterly planning" on Friday at 10') == "Quarterly planning"
+    assert _title("Set up a meeting Friday afternoon") == "Meeting"
+    assert _title("Schedule a call with the finance team") == "Meeting with the finance team"
+    assert _title("Book an interview tomorrow at 11") == "Interview"

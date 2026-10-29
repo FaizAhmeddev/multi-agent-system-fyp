@@ -79,12 +79,12 @@ Run "ruff" $vpy @("-m", "ruff", "check", "backend", "db", "scripts", "mcp_server
 Step "Tests"
 Remove-Item -ErrorAction SilentlyContinue (Join-Path $Repo ".coverage")
 $cov = @("--cov", "--cov-append", "--cov-report=")
-Run "pytest backend" $vpy (@("-m", "pytest", "tests/backend", "-q", "-rfE") + $cov) | Out-Null
-Run "pytest portals" $vpy (@("-m", "pytest", "tests/portals", "-q", "-rfE") + $cov) | Out-Null
-Run "pytest MCP servers" $vpy (@("-m", "pytest", "tests/mcp_servers_tests", "-q", "-rfE") + $cov) | Out-Null
-Run "pytest assistant (real langgraph)" $vpy (@("-m", "pytest", "tests/assistant", "-q", "-rfE") + $cov) | Out-Null
+Run "pytest backend" $vpy (@("-m", "pytest", "tests/backend", "-v", "-rfE") + $cov) | Out-Null
+Run "pytest portals" $vpy (@("-m", "pytest", "tests/portals", "-v", "-rfE") + $cov) | Out-Null
+Run "pytest MCP servers" $vpy (@("-m", "pytest", "tests/mcp_servers_tests", "-v", "-rfE") + $cov) | Out-Null
+Run "pytest assistant (real langgraph)" $vpy (@("-m", "pytest", "tests/assistant", "-v", "-rfE") + $cov) | Out-Null
 Run "langgraph and openai installed" $vpy @("-c", "import importlib.metadata as m; print('langgraph', m.version('langgraph'), 'openai', m.version('openai'), 'google-api-python-client', m.version('google-api-python-client'))") | Out-Null
-Run "pytest characterization" $vpy @("-m", "pytest", "tests/characterization", "-q", "-rfE") | Out-Null
+Run "pytest characterization" $vpy @("-m", "pytest", "tests/characterization", "-v", "-rfE") | Out-Null
 
 Step "Quality: coverage, bandit, secrets scan, pip-audit"
 Run "quality" $vpy @("scripts\quality.py") | Out-Null

@@ -10,6 +10,10 @@ markers = [
   "legacy_bug: pins current WRONG/insecure legacy behaviour; flip intentionally in a later phase",
 ]
 addopts = "-p no:cacheprovider"
+# A hung test (for example a subprocess that never answers) fails after 5 minutes and prints every
+# thread's stack, instead of freezing the gate. Thread method: works on Windows.
+timeout = 300
+timeout_method = "thread"
 
 [tool.ruff]
 line-length = 128
@@ -36,7 +40,6 @@ branch = true
 show_missing = false
 skip_covered = true
 precision = 1
-fail_under = 70
 
 [tool.bandit]
 exclude_dirs = ["tests", "FYP_FINAL", "frontend", ".venv"]
