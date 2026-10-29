@@ -11,15 +11,30 @@ import {
 import { Dialog, Menu } from "../ui/overlays";
 import { cx } from "../ui/primitives";
 
+/* The AgentsMind mark (from assets/brand/logo.png via scripts/brand/make_brand_assets.py), inked per theme. */
 export function Brand({ compact }: { compact?: boolean }) {
-  // assets/brand/logo.png is copied in at build time when provided; the built-in mark is the fallback.
-  const [src, setSrc] = useState("/brand/logo.png");
+  const { theme } = useTheme();
   return (
     <span className="flex items-center gap-2">
-      <img src={src} alt="" width={28} height={28} className="size-7 object-contain" onError={() => setSrc("/brand/mark.svg")} />
-      {!compact && <span className="text-base font-semibold tracking-tight">AgentsMind</span>}
+      <img src={`/brand/mark-${theme}.png`} alt="" width={30} height={30} className="size-[30px]" />
+      {!compact && (
+        <span className="text-base tracking-tight">
+          <span aria-hidden>
+            <span className="font-medium">AGENTS</span>
+            <span className="mx-1 text-border-strong">|</span>
+            <span className="font-semibold">MIND</span>
+          </span>
+          <span className="sr-only">AgentsMind</span>
+        </span>
+      )}
     </span>
   );
+}
+
+/* The full lock-up: mark, wordmark and tagline. Used on the sign-in pages. */
+export function Logo({ width = 220 }: { width?: number }) {
+  const { theme } = useTheme();
+  return <img src={`/brand/logo-${theme}.png`} alt="AgentsMind. One workspace. Every department. Handled." width={width} className="h-auto" />;
 }
 
 interface NavItem {

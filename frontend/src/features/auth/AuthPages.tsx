@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Brand } from "../../components/layout/AppShell";
+import { Logo } from "../../components/layout/AppShell";
 import { Button, Field, Input, Notice } from "../../components/ui/primitives";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -9,15 +9,14 @@ function AuthFrame({ title, subtitle, children }: { title: string; subtitle?: st
   return (
     <div className="flex min-h-full items-center justify-center bg-bg px-4 py-10">
       <main className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-start gap-6">
-          <Brand />
+        <div className="mb-8 flex flex-col items-center gap-6 text-center">
+          <Logo width={240} />
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
             {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-6 shadow-[var(--shadow)]">{children}</div>
-        <p className="mt-6 text-xs text-muted">One workspace. Every department. Handled.</p>
       </main>
     </div>
   );

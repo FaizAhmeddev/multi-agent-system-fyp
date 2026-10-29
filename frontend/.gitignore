@@ -2,4 +2,3 @@ node_modules/
 dist/
 test-results/
 playwright-report/
-public/brand/logo.png

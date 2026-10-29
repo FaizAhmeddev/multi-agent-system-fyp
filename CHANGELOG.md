@@ -17,7 +17,9 @@ and is merged into `main` by the project owner after the phase gate.
 - Documentation:
   - `README.md` (rewritten): quick start, checks, layout, status.
   - New docs: `ARCHITECTURE.md` (diagrams), `SECURITY.md` (threat model, controls, honest limits), `USER_MANUAL.md` (by role), `DEPLOYMENT.md` (install, configure, Google and OpenAI, backups, upgrade), `DEMO_SCRIPT.md` (the 10 acceptance scenarios, each with its test) and `HISTORY_PURGE.md`.
-- The product logo is used automatically when `assets/brand/logo.png` exists; the built-in mark is the fallback.
+- The AgentsMind logo (`assets/brand/logo.png`, converted from the supplied artwork) appears in the app shell, on the sign-in pages and as the favicon.
+  - `scripts/brand/make_brand_assets.py` turns the background into transparency.
+  - It writes the mark and the full lock-up, inked for each theme, to `frontend/public/brand/`.
 
 ### Changed
 - `setup.ps1` installs the full runtime set (`requirements/servers.txt`) and builds the web app when Node.js is present.
