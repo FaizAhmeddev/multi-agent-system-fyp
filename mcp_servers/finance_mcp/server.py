@@ -254,5 +254,81 @@ def finance_list_payments(
     return PaymentsPage(**{k: d[k] for k in ("items", "total", "page", "page_size", "pages")})
 
 
+# ---------------------------------------------------------------------------- payroll (used by HR automation)
+
+class PayrollEnrolled(BaseModel):
+    created: bool
+    person: Person
+
+
+@server.tool(annotations=WRITE)
+def payroll_enroll_employee(
+    full_name: Annotated[str, Field(min_length=2, max_length=200)],
+    email: EmailStr,
+    department: Department,
+    job_title: Annotated[str, Field(min_length=2, max_length=150)],
+    monthly_salary: Money,
+    start_date: Annotated[date, Field(description="Joining date, ISO")],
+    idempotency_key: IdemKey,
+    employment_type: EmploymentType = "full_time",
+    currency: Currency = "PKR",
+    notes: Annotated[str, Field(max_length=2000)] = "",
+    actor: Annotated[str, Field(max_length=120)] = "",
+) -> PayrollEnrolled:
+    """Add a new joiner to payroll (a person record in the Finance Portal). Only after HR approved it.
+    A repeated idempotency key returns the original record instead of creating a second one."""
+    body = {"full_name": full_name, "email": str(email), "department": department, "job_title": job_title,
+            "employment_type": employment_type, "monthly_salary": monthly_salary, "currency": currency,
+            "status": "active", "start_date": start_date.isoformat(), "notes": notes or "Added by AgentsMind HR"}
+    d = portal.write("POST", "/api/v1/people", body, idempotency_key=idempotency_key, actor=actor or None)
+    return PayrollEnrolled(created=d["created"], person=Person(**d["person"]))
+
+
+@server.tool(annotations=WRITE)
+def payroll_end_employment(
+    person_id: Annotated[int, Field(ge=1)],
+    idempotency_key: IdemKey,
+    note: Annotated[str, Field(max_length=500)] = "",
+    actor: Annotated[str, Field(max_length=120)] = "",
+) -> Person:
+    """Mark a leaver inactive in payroll (the record and its payments are kept). Only after HR approved it."""
+    body: dict = {"status": "inactive"}
+    if note:
+        body["notes"] = note[:2000]
+    return Person(**portal.write("PATCH", f"/api/v1/people/{person_id}", body, idempotency_key=idempotency_key,
+                                 actor=actor or None))
+
+
+class PaymentRecorded(BaseModel):
+    recorded: bool = Field(description="False when this person already had a payment for the month")
+    payment: Payment | None = None
+    message: str = ""
+
+
+@server.tool(annotations=WRITE)
+def payroll_record_payment(
+    person_id: Annotated[int, Field(ge=1)],
+    month: Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")],
+    amount: Money,
+    idempotency_key: IdemKey,
+    status: Literal["pending", "paid"] = "pending",
+    note: Annotated[str, Field(max_length=300)] = "",
+    actor: Annotated[str, Field(max_length=120)] = "",
+) -> PaymentRecorded:
+    """Record one employee's net pay for a month (from an approved AgentsMind payroll run).
+    Safe to repeat: a second call for the same person and month records nothing."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    try:
+        d = portal.write("POST", f"/api/v1/people/{person_id}/payments",
+                         {"month": month, "amount": amount, "status": status, "note": note or "AgentsMind payroll"},
+                         idempotency_key=idempotency_key, actor=actor or None)
+    except ToolError as exc:
+        if "already has a payment" in str(exc):
+            return PaymentRecorded(recorded=False, message=str(exc))
+        raise
+    return PaymentRecorded(recorded=True, payment=Payment(**d))
+
+
 if __name__ == "__main__":
     run(server, CFG)

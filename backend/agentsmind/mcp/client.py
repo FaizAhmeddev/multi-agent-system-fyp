@@ -163,7 +163,7 @@ def register_mcp_executors() -> list[str]:
     configured = server_configs()
     names = []
     for name, spec in TOOLS.items():
-        if spec.server in configured:
+        if spec.server in configured and spec.server != "core":
             def _exec(args: dict[str, Any], key: str, _tool: str = name) -> dict[str, Any]:
                 a = dict(args)
                 if key and "idempotency_key" in _WRITE_WITH_KEY.get(_tool, ()):
@@ -184,4 +184,10 @@ _WRITE_WITH_KEY = {
     "calendar_update_event": ("idempotency_key",),
     "calendar_cancel_event": ("idempotency_key",),
     "gmail_send_email": ("idempotency_key",),
+    "sheets_append": ("idempotency_key",),
+    "drive_upload_file": ("idempotency_key",),
+    "whatsapp_send": ("idempotency_key",),
+    "payroll_enroll_employee": ("idempotency_key",),
+    "payroll_end_employment": ("idempotency_key",),
+    "payroll_record_payment": ("idempotency_key",),
 }

@@ -166,7 +166,7 @@ class SandboxCalendar:
             existing = c.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()
             if existing:
                 return self._row(existing), False
-            meet = f"https://meet.example.invalid/sim-{eid[:10]}" if add_meet else None
+            meet = f"https://meet.example.invalid/sim-{eid[:10]}" if add_meet and self.mode == "sandbox" else None
             c.execute("INSERT INTO events (id, summary, description, location, start_utc, end_utc, timezone, "
                       "attendees, meet_link, created, updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                       (eid, summary, description, location, _utc(start), _utc(end), tz, json.dumps(attendees), meet,
@@ -226,6 +226,19 @@ class SandboxCalendar:
                                      location="", attendees=[], add_meet=False, notify=False)
             n += int(created)
         return n
+
+
+class LocalCalendar(SandboxCalendar):
+    """AgentsMind's own calendar on this computer, used until Google is signed in.
+
+    Events are real records (not sample data), but nobody is invited: attendees get no email
+    and no Meet link is created. Signing in to Google switches to Google Calendar.
+    """
+
+    mode = "local"
+
+    def __init__(self, path: str | Path | None = None):
+        super().__init__(path or os.environ.get("CALENDAR_LOCAL_DB") or REPO_ROOT / "data" / "calendar_local.db")
 
 
 # ---------------------------------------------------------------------------- google
@@ -382,5 +395,8 @@ def choose_backend() -> Backend:
             return GoogleCalendar(creds)
         if mode == "google":
             raise SystemExit("CALENDAR_MODE=google but no Google token. Run scripts/google_oauth.py first.")
-    log.info("calendar backend: SANDBOX (simulated, data/calendar_sandbox.db)")
-    return SandboxCalendar()
+    if mode == "sandbox" or (os.environ.get("DEMO_MODE") or "").strip().lower() in ("1", "true", "yes"):
+        log.info("calendar backend: SANDBOX (simulated, data/calendar_sandbox.db)")
+        return SandboxCalendar()
+    log.warning("calendar backend: LOCAL (data/calendar_local.db). Sign in to Google to use Google Calendar.")
+    return LocalCalendar()

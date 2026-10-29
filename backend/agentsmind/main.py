@@ -26,6 +26,7 @@ from .db.session import SessionLocal, get_engine
 from .departments.comms_docs import router as comms_docs_router
 from .departments.router import router as departments_router
 from .departments.workspaces import router as workspaces_router
+from .hr.router import router as hr_router
 from .internal.router import router as internal_router
 from .log_config import configure_logging, request_id_var
 from .settings import get_settings
@@ -46,9 +47,11 @@ async def lifespan(app: FastAPI):
     _check_schema()
     with SessionLocal() as db:
         bootstrap_first_admin(db)
+    from .hr.tools import register_core_executors
     from .mcp.client import register_mcp_executors
 
     tools = register_mcp_executors()
+    register_core_executors()
     log.info("mcp tools connected", extra={"count": len(tools)})
     log.info("startup complete", extra={"env": s.app_env, "db": s.database_url.split("://", 1)[0]})
     yield
@@ -107,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(internal_router)
     app.include_router(assistant_router)
     app.include_router(comms_docs_router)
+    app.include_router(hr_router)
     _mount_frontend(app)
     return app
 

@@ -26,52 +26,56 @@ marked **Simulated**, and nothing reaches real people.
 | `docs/ASSISTANT.md`, `docs/MCP_TOOLS.md`, `docs/FRONTEND.md` | Assistant, MCP tools and web app in detail |
 | `CHANGELOG.md` | What changed in each phase, including the legacy-bug ledger |
 
-## Quick start (Windows, no Docker)
+## Start it (Windows, no PowerShell needed)
 
-You need:
+You need Python 3.11 or 3.12, Node.js 22 LTS and git. Then, in the AgentsMind folder:
 
-- Python 3.11 or 3.12
-- Node.js 22 LTS
-- git
+1. Double-click **Start-AgentsMind.bat** (or run `python main.py`). The first start takes a few minutes. It:
+   - creates `.venv` and installs the pinned packages;
+   - creates `.env` with random secrets (your own values are never overwritten);
+   - creates the database and builds the web app;
+   - opens the Google sign-in once if a Google OAuth client file is configured.
 
-```powershell
-git clone https://github.com/FaizAhmeddev/multi-agent-system-fyp.git
-cd multi-agent-system-fyp
-powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1
-powershell -ExecutionPolicy Bypass -File scripts\win\run_all.ps1
-.venv\Scripts\python scripts\seed.py
-.venv\Scripts\python external_systems\finance_portal\seed.py
-.venv\Scripts\python external_systems\it_portal\seed.py
-.venv\Scripts\python -m mcp_servers.calendar_mcp.seed
-```
+   Every start then runs the MCP servers, the core API and the worker in that one window, opens
+   **http://127.0.0.1:8000**, restarts any part that crashes, and stops everything when you close the
+   window or press Ctrl+C.
+2. Double-click **Start-External-Systems.bat** to run the separate external systems: the Finance Portal
+   (payroll records, port 8201) and the IT Helpdesk (port 8202).
+3. If something is left running after a crash, double-click **Stop-AgentsMind.bat**.
 
-What these do:
+Sign in with the admin account in `.env` (`AGENTSMIND_ADMIN_EMAIL`, `AGENTSMIND_ADMIN_PASSWORD`; also in
+`data\local_credentials.txt`). To change it later: `.venv\Scripts\python scripts\set_admin.py --email ... --password ...`.
 
-1. `setup.ps1` creates `.venv` and installs the pinned packages.
-2. It also creates `.env` with random secrets. There are no default passwords.
-3. It applies the database migrations and builds the web app.
-4. `run_all.ps1` starts each part in its own window:
-   - the two portals
-   - the four MCP servers
-   - the core API, which also serves the web app
-   - the queue worker
-5. The seed scripts add synthetic demo data only.
+## Configure (`.env`)
 
-Open **http://127.0.0.1:8000** and sign in:
-
-- **Admin:** the sign-in details are in `data\local_credentials.txt`.
-- **Demo users** (HR, IT, Finance, Employee): `seed.py` prints them once and saves them in `data\seed_credentials.txt`.
-
-Both files are gitignored. Stop everything with `scripts\win\stop_all.ps1`.
-
-| Part | Address |
+| Setting | What it connects |
 |---|---|
-| AgentsMind (web app and API docs at /api/docs) | http://127.0.0.1:8000 |
-| AgentsMind Finance Portal | http://127.0.0.1:8201 |
-| AgentsMind IT Helpdesk (public complaint form at /) | http://127.0.0.1:8202 |
-| finance-mcp, it-mcp, calendar-mcp, workspace-mcp | http://127.0.0.1:8101 to 8104, path /mcp (bearer token) |
+| `OPENAI_API_KEY` | The model: routing of unclear requests, understanding HR requests, CV rubrics, drafts. Without it answers are labeled Simulated. |
+| `GMAIL_EMAIL`, `GMAIL_APP_PASSWORD` | Your Gmail through an app password (IMAP/SMTP): inbox, CV attachments, sending letters. |
+| `GOOGLE_OAUTH_CLIENT_FILE` | Your Google OAuth client (`credentials.json`). One sign-in gives Calendar, Drive and Sheets. |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `TWILIO_WHATSAPP_TO`, `TWILIO_CONTENT_SID` | WhatsApp messages (welcome messages, notices). |
+| `HR_EXCEL_DIRS`, `HR_CV_DIRS` | Folders with your HR Excel sheets and with CVs (plus `data\hr_sheets` and `data\cvs`). |
+| `DEMO_MODE` | `false` (default): only your real data. `true`: sample users, inbox, CVs and calendar for a demo. |
 
-macOS and Linux run the same pieces; see `docs/DEPLOYMENT.md`.
+Settings > Connections in the web app shows what is connected and has the Google sign-in button.
+
+## HR
+
+Everything is in **HR** in the web app, and in the **Assistant** in plain language:
+
+- **Recruitment:** gather CVs from Gmail attachments, the CV folders and Drive; only candidates in Karachi
+  (configurable) are screened against the job opening; rubric plus keyword check, protected details removed.
+- **Offer letters, contracts and ready-made letters** (welcome/onboarding, conduct, resignation acceptance,
+  final settlement, experience): Word and PDF, your own Word templates in `data\hr_templates`, emailed after approval.
+- **Onboarding in one approval:** record, checklists, contract, welcome letter and email, IT ticket, payroll in the
+  Finance Portal, induction invites, probation review, WhatsApp, and a row in your new-joiners sheet.
+- **Induction, compliance (EOBI, SESSI, tax, NDA...) and separation checklists** with due dates; failed steps can be retried.
+- **Attendance and leave:** check in/out, leave requests and balances (pro-rated), approvals, import from your sheet.
+- **Payroll:** monthly run from salaries, attendance and unpaid leave; posting to the Finance Portal after approval.
+- **Separation and final settlement** with every line shown.
+- **Reports** (new joiners, induction, onboarding, separations, attendance, leave, compliance, payroll, headcount) with Excel export.
+- **Your sheets:** register your Google Sheets and Excel files with what they hold; ask "Where do I keep the
+  leave records?" or "Show Ahmed's leaves from my leave sheet".
 
 ## Check it
 
@@ -91,10 +95,15 @@ cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e n
 
 `scripts\win\agentsmind-gate.ps1` does all of this on a separate clone and writes one log.
 
-## Connect real services (optional)
+## Connect real services
 
-- **OpenAI:** put `OPENAI_API_KEY` in `.env` and restart. Answers are no longer labeled Simulated.
-- **Google Calendar, Gmail and Drive:** follow the steps in `docs/DEPLOYMENT.md`. You create a Desktop OAuth client, save it as `secrets\google_oauth_client.json`, then run `scripts\google_oauth.py` once. It requests the narrowest scopes, and the token is stored encrypted.
+- **OpenAI:** put `OPENAI_API_KEY` in `.env` and start again.
+- **Gmail:** Google Account > Security > 2-Step Verification > App passwords; put the address and the 16-letter
+  app password in `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD`.
+- **Google Calendar, Drive and Sheets:** set `GOOGLE_OAUTH_CLIENT_FILE` to your OAuth client JSON (Desktop app),
+  enable the Calendar, Drive and Sheets APIs in its Google Cloud project, then start AgentsMind: the sign-in opens
+  once (or use Settings > Connections). The token is stored encrypted in `data\google_token.enc`.
+- **WhatsApp:** the Twilio settings above.
 
 ## Repository layout
 
@@ -113,14 +122,6 @@ FYP_FINAL/            the original prototype, kept only for characterization tes
 
 ## Status
 
-| Phase | Content | Verified on the Windows laptop |
-|---|---|---|
-| 0 | Audit and characterization tests | yes |
-| 1a, 1b | Foundation, auth, queue, RBAC, gateway | yes |
-| 2 | Portals and MCP servers | yes |
-| 3 | Agents, calendar, Gmail, Drive, CV screening | yes |
-| 4 | Web app, Playwright, Streamlit removed | build, typecheck and contrast yes; e2e re-run pending |
-| 5 | Quality tools and documentation | coverage and bandit yes; pip-audit re-run pending; secrets scan waits for the history purge |
-
-Before publishing: run `scripts\win\finish-agentsmind.ps1` (history purge, see `docs/HISTORY_PURGE.md`).
-Credentials still needed for live mode: an OpenAI key and a Google OAuth client.
+Phases 0 to 5 were verified on the Windows laptop with the phase gate. The HR ecosystem, the real Gmail,
+Sheets, Excel and WhatsApp connections, the launchers and DEMO_MODE (version 0.6) are covered by new tests
+(`tests/assistant/test_hr_logic.py`, `tests/backend/test_hr.py`); see CHANGELOG.md for what was verified where.

@@ -114,7 +114,8 @@ def _cand_out(c: Candidate, rec: CVRecord | None, full: bool = False) -> dict:
            "keyword_score": rec.keyword_score if rec else None,
            "needs_human_review": rec.needs_human_review if rec else False,
            "recommendation": (rec.details or {}).get("recommendation") if rec else None,
-           "simulated": bool((rec.details or {}).get("simulated")) if rec else False}
+           "simulated": bool((rec.details or {}).get("simulated")) if rec else False,
+           "email": c.email, "phone": c.phone, "location": c.location, "source": c.source}
     if full and rec is not None:
         out.update(matched=rec.matched_skills, missing=rec.missing_skills, details=rec.details)
     return out

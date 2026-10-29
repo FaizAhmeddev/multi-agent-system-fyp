@@ -19,9 +19,9 @@ def test_seed_is_synthetic_idempotent_and_has_no_fixed_passwords(db_url, tmp_pat
 
     seed = _load_seed()
     seed.ROOT = tmp_path
-    assert seed.main() == 0
+    assert seed.main(["--demo"]) == 0
     first = capsys.readouterr().out
-    assert seed.main() == 0  # re-run is safe
+    assert seed.main(["--demo"]) == 0  # re-run is safe
     db.expire_all()
     users = db.scalars(select(User)).all()
     assert len(users) == 5  # admin + 4 demo
@@ -39,6 +39,6 @@ def test_seed_credentials_file_can_be_redirected(db_url, tmp_path, monkeypatch):
     seed.ROOT = tmp_path
     other = tmp_path / "gate-live-credentials.txt"
     monkeypatch.setenv("AGENTSMIND_SEED_CREDENTIALS", str(other))
-    assert seed.main() == 0
+    assert seed.main(["--demo"]) == 0
     assert len(other.read_text().splitlines()) == 4
     assert not (tmp_path / "data" / "seed_credentials.txt").exists()

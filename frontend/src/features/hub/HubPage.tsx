@@ -7,6 +7,7 @@ import { useAuth } from "../../lib/auth";
 import { fmtDateTime } from "../../lib/format";
 import { Link } from "../../lib/router";
 import type { Approval, Department, Page } from "../../lib/types";
+import { MyHRPanel } from "../hr/MyHR";
 
 const DEPT_LINK: Record<string, { to: string; icon: ReactNode }> = {
   hr: { to: "/hr", icon: <Briefcase aria-hidden className="size-5" /> },
@@ -153,11 +154,12 @@ export function HubPage() {
               ))}
             </ul>
           </Panel>
+          <MyHRPanel />
           {has("admin") && <SystemPanel />}
-          <Panel title="About sandbox data">
+          <Panel title="Connected services">
             <p className="text-sm text-muted">
-              Until Google and OpenAI are connected, calendar, mail, files and model answers come from a sandbox and are marked{" "}
-              <SimulatedBadge />. Nothing in the sandbox reaches real people.
+              Anything produced without a connected service (for example a model answer before OpenAI is set up) is marked{" "}
+              <SimulatedBadge />. See <Link to="/settings" className="text-primary hover:underline">Settings, Connections</Link>.
             </p>
           </Panel>
         </div>

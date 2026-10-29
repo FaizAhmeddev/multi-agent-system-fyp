@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CircleCheck, CircleX, ExternalLink, TriangleAlert } from "../../components/icons";
+import { CircleCheck, CircleX, ExternalLink, Download, TriangleAlert } from "../../components/icons";
 import { Badge, Button, Input, Notice, SimulatedBadge, Table, cx } from "../../components/ui/primitives";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, openFile } from "../../lib/api";
+import { Link } from "../../lib/router";
+import { useToast } from "../../lib/toast";
 import { humanize } from "../../lib/format";
 import type { ApproveResponse, Card } from "../../lib/types";
 
@@ -39,16 +41,32 @@ function Warnings({ items }: { items: string[] }) {
   );
 }
 
-function Links({ links }: { links: { label: string; url: string }[] }) {
+export function Links({ links }: { links: { label: string; url: string }[] }) {
+  const toast = useToast();
   if (!links.length) return null;
+  const cls = "inline-flex items-center gap-1 text-sm text-primary hover:underline";
   return (
     <div className="mt-2 flex flex-wrap gap-3">
-      {links.map((l) => (
-        <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
-          {l.label}
-          <ExternalLink aria-hidden className="size-3.5" />
-        </a>
-      ))}
+      {links.filter((l) => l.url).map((l) => {
+        if (l.url.startsWith("/api/")) {
+          // files behind sign-in (letters, reports): fetched with the token, then opened
+          return (
+            <button key={l.url} type="button" className={cls} onClick={() => void openFile(l.url).catch((e: unknown) => toast(e instanceof Error ? e.message : String(e), "error"))}>
+              {l.label}
+              <Download aria-hidden className="size-3.5" />
+            </button>
+          );
+        }
+        if (l.url.startsWith("/")) {
+          return <Link key={l.url} to={l.url} className={cls}>{l.label}</Link>;
+        }
+        return (
+          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className={cls}>
+            {l.label}
+            <ExternalLink aria-hidden className="size-3.5" />
+          </a>
+        );
+      })}
     </div>
   );
 }

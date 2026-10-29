@@ -24,7 +24,8 @@ from mcp_servers.common import make_server, run
 INSTRUCTIONS = (
     "Calendar tools for the signed-in user's own calendar. Always check availability before creating an event "
     "and tell the user about conflicts. Times are ISO 8601 with an offset. When mode is 'sandbox' the calendar "
-    "is simulated and nothing reaches Google."
+    "is simulated and nothing reaches Google. When mode is 'local' events are kept on this computer and "
+    "attendees are not invited."
 )
 
 server, CFG = make_server(name="calendar-mcp", title="AgentsMind Calendar tools", instructions=INSTRUCTIONS,
@@ -39,13 +40,21 @@ DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempote
 
 Key = Annotated[str, Field(min_length=8, max_length=100, description="Unique key; re-sending it never repeats the change.")]
 EventId = Annotated[str, Field(min_length=5, max_length=1024, pattern=r"^[A-Za-z0-9_\-]+$")]
-Mode = Literal["sandbox", "google"]
+Mode = Literal["sandbox", "google", "local"]
+
+
+_token_seen: list[float | None] = []
 
 
 def backend() -> Backend:
+    """Picked once; picked again when a Google sign-in appears while the local calendar is in use."""
     global _backend
-    if _backend is None:
+    from mcp_servers.google_common import TOKEN_PATH
+
+    m = TOKEN_PATH.stat().st_mtime if TOKEN_PATH.is_file() else None
+    if _backend is None or (_backend.mode == "local" and _token_seen and _token_seen[0] != m):
         _backend = choose_backend()
+    _token_seen[:] = [m]
     return _backend
 
 

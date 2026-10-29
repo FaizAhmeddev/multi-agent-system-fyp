@@ -29,6 +29,7 @@ const ROUTES: Route[] = [
   { path: "/assistant/:id", page: (p) => <AssistantPage conversationId={Number(p.id)} />, title: "Assistant" },
   { path: "/approvals", page: () => <ApprovalsPage />, title: "Approvals" },
   { path: "/hr", page: () => <HRPage />, roles: ["hr"], title: "HR" },
+  { path: "/hr/employees/:id", page: (p) => <HRPage employeeId={Number(p.id)} />, roles: ["hr"], title: "HR" },
   { path: "/it", page: () => <ITPage />, title: "IT" },
   { path: "/finance", page: () => <FinancePage />, roles: ["finance"], title: "Finance" },
   { path: "/documents", page: () => <DocumentsPage />, roles: ["hr", "it", "finance"], title: "Documents" },

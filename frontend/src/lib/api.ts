@@ -234,3 +234,39 @@ export async function streamEvents(
     }
   }
 }
+
+/* Open or download a file from an authenticated API endpoint (a plain link cannot send the token). */
+export async function openFile(path: string): Promise<void> {
+  const r = await rawFetch(path);
+  if (!r.ok) throw await parseError(r);
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const disp = r.headers.get("Content-Disposition") ?? "";
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disp);
+  if (blob.type === "application/pdf") {
+    window.open(url, "_blank", "noopener");
+  } else {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = m ? decodeURIComponent(m[1]) : path.split("/").pop() ?? "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/* Upload one file (multipart). */
+export async function uploadFile<T = unknown>(path: string, file: File): Promise<T> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  let r = await fetch(path, { method: "POST", headers, body: fd });
+  if (r.status === 401 && (await refreshSession())) {
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+    r = await fetch(path, { method: "POST", headers, body: fd });
+  }
+  if (!r.ok) throw await parseError(r);
+  return (await r.json()) as T;
+}

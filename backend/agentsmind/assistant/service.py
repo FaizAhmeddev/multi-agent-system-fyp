@@ -88,22 +88,30 @@ class DBCtx:
     def record_screening(self, *, role: str, jd_text: str, jd_file: dict, rows: list[dict]) -> None:
         db = self.db
         for r in rows:
-            doc = db.scalar(select(Document).where(Document.source == "drive", Document.external_id == r["file_id"]))
+            src = r.get("source", "drive")
+            doc_source = "drive" if src == "drive" else src[:20]
+            doc = db.scalar(select(Document).where(Document.source == doc_source, Document.external_id == r["file_id"]))
             if doc is None:
-                doc = Document(owner_user_id=self.user.id, source="drive", external_id=r["file_id"],
+                doc = Document(owner_user_id=self.user.id, source=doc_source, external_id=r["file_id"][:200],
                                filename=r["file"][:255], mime_type="", size_bytes=0, sha256="", storage_path="",
                                text_excerpt="")
                 db.add(doc)
                 db.flush()
-            cand = db.scalar(select(Candidate).where(Candidate.source_ref == r["file_id"],
+            cand = db.scalar(select(Candidate).where(Candidate.source_ref == r["file_id"][:200],
                                                      Candidate.job_title == role[:200]))
             if cand is None:
-                cand = Candidate(full_name=r["candidate"][:200], email="", job_title=role[:200], stage="screened",
-                                 notes="", source_ref=r["file_id"])
+                cand = Candidate(full_name=r["candidate"][:200], email=r.get("email", "")[:254], job_title=role[:200],
+                                 stage="screened", notes="", source_ref=r["file_id"][:200])
                 db.add(cand)
                 db.flush()
             elif cand.stage == "new":
                 cand.stage = "screened"
+            cand.source = src[:20]
+            cand.location = (r.get("location") or "")[:100]
+            if r.get("email") and not cand.email:
+                cand.email = r["email"][:254]
+            if r.get("phone") and not cand.phone:
+                cand.phone = r["phone"][:40]
             rec = db.scalar(select(CVRecord).where(CVRecord.candidate_id == cand.id, CVRecord.document_id == doc.id))
             if rec is None:
                 rec = CVRecord(candidate_id=cand.id, document_id=doc.id)

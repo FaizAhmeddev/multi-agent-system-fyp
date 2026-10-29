@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.0: HR ecosystem, real connections, launchers (2026-10-30)
+
+Added
+- **Launchers:** `main.py` / `Start-AgentsMind.bat` set up and run everything in one window (venv, packages,
+  .env, migrations, web build, Google sign-in once, supervision, Ctrl+C stops all); `external_systems/main.py` /
+  `Start-External-Systems.bat` run the Finance Portal and IT Helpdesk separately; `Stop-AgentsMind.bat`.
+- **Gmail by app password** (IMAP/SMTP) with attachments, CV attachment search and text extraction (PDF, Word).
+- **Google Sheets** (Sheets API v4) and **Excel** (openpyxl) read/append/update tools; **Drive upload**
+  (drive.file); **WhatsApp** through Twilio; local **CV folders**; `connections_status`.
+- **Finance Portal payroll tools** for HR: `payroll_enroll_employee`, `payroll_end_employment`, `payroll_record_payment`.
+- **HR system of record** (migration 0004): employees, onboarding/induction/compliance/separation checklists,
+  letters, attendance, leave, separations with final settlement, payroll runs, job openings, HR settings, sheet registry.
+- **Letters** in Word and PDF: offer, contract, welcome, conduct, resignation acceptance, final settlement,
+  experience; custom Word templates with placeholders.
+- **HR workflows:** one approval card runs a whole bundle of steps through the gateway, each idempotent and
+  logged; failed steps can be retried from the checklist.
+- **HR agent** rewritten: recruitment (Gmail/folders/Drive, Karachi filter), offers, onboarding, induction,
+  separation, settlement, attendance (incl. self check-in), leave (self-service), payroll, compliance,
+  reports with Excel export, the HR's own sheets; HR-only actions checked in code.
+- **Orchestrator:** the model plans multi-part or ambiguous requests (validated), rules keep clear-cut ones.
+- **Web app:** HR workspace with nine tabs, Settings > Connections with Google sign-in, My attendance and leave.
+
+Changed
+- `DEMO_MODE=false` by default: no sample users, inbox, Drive or calendar; existing sample records are removed
+  once (`scripts/demo_data.py`, `external_systems/demo_cleanup.py`). Without Google the calendar is a local
+  calendar (no invitations) instead of the sandbox.
+- `scripts/seed.py` adds demo users only with `--demo`.
+
+Not verified in this session
+- The Twilio, Google Sheets and Gmail IMAP/SMTP endpoints could not be re-read from their documentation pages
+  here; they follow the stable published APIs (see docs/API_VERIFICATION.md) and are exercised live on the laptop.
+
+
 All notable changes, by phase. Each phase lives on its own `phase/<n>-<name>` branch
 and is merged into `main` by the project owner after the phase gate.
 

@@ -93,7 +93,7 @@ class MailBackend(Protocol):
               ) -> tuple[list[Mail], str | None]: ...
 
     def send(self, *, key: str, to: list[str], subject: str, body: str, cc: list[str], thread_id: str | None,
-             in_reply_to: str | None) -> SentMail: ...
+             in_reply_to: str | None, attachments: tuple[str, ...] = ()) -> SentMail: ...
 
 
 class DriveBackend(Protocol):
@@ -190,19 +190,29 @@ class SandboxMail:
                             body_truncated=cut))
         return out, nxt
 
-    def send(self, *, key, to, subject, body, cc, thread_id, in_reply_to):
+    def send(self, *, key, to, subject, body, cc, thread_id, in_reply_to, attachments=()):
+        from .imap_mail import safe_attachment
+
         prior = self.ledger.get(key)
         if prior:
             return prior
+        names = [safe_attachment(a).name for a in attachments]
         mid = "sim-sent-" + hashlib.sha256(key.encode()).hexdigest()[:16]
         s = SentMail(message_id=mid, thread_id=thread_id, to=to, subject=subject, sent=True, already_sent=False,
-                     at=datetime.now(UTC).isoformat(timespec="seconds"), extra={"cc": cc})
+                     at=datetime.now(UTC).isoformat(timespec="seconds"), extra={"cc": cc, "attachments": names})
         self.outbox.parent.mkdir(parents=True, exist_ok=True)
         with self.outbox.open("a", encoding="utf-8") as f:
             f.write(json.dumps({"id": mid, "to": to, "cc": cc, "subject": subject, "body": body, "at": s.at,
-                                "simulated": True}) + "\n")
+                                "attachments": names, "simulated": True}) + "\n")
         self.ledger.put(key, s)
         return s
+
+    def find_attachments(self, query, max_messages):
+        return []
+
+    def read_attachment(self, message_id, attachment):
+        raise WorkspaceError("Reading email attachments needs Gmail connected with an app password "
+                             "(GMAIL_EMAIL and GMAIL_APP_PASSWORD in .env).")
 
 
 class SandboxDrive:
@@ -330,7 +340,9 @@ class GoogleMail:
                             body=body, unread="UNREAD" in m.get("labelIds", []), body_truncated=cut))
         return out, d.get("nextPageToken")
 
-    def send(self, *, key, to, subject, body, cc, thread_id, in_reply_to):
+    def send(self, *, key, to, subject, body, cc, thread_id, in_reply_to, attachments=()):
+        from .imap_mail import safe_attachment
+
         prior = self.ledger.get(key)
         if prior:
             return prior
@@ -344,6 +356,10 @@ class GoogleMail:
             msg["In-Reply-To"] = in_reply_to
             msg["References"] = in_reply_to
         msg.set_content(body)
+        for a in attachments:
+            ap = safe_attachment(a)
+            main, sub = (mimetypes.guess_type(ap.name)[0] or "application/octet-stream").split("/", 1)
+            msg.add_attachment(ap.read_bytes(), maintype=main, subtype=sub, filename=ap.name)
         payload: dict[str, Any] = {"raw": base64.urlsafe_b64encode(msg.as_bytes()).decode()}
         if thread_id:
             payload["threadId"] = thread_id
@@ -352,6 +368,13 @@ class GoogleMail:
                      already_sent=False, at=datetime.now(UTC).isoformat(timespec="seconds"), extra={"cc": cc})
         self.ledger.put(key, s)
         return s
+
+    def find_attachments(self, query, max_messages):
+        return []
+
+    def read_attachment(self, message_id, attachment):
+        raise WorkspaceError("Reading email attachments needs Gmail connected with an app password "
+                             "(GMAIL_EMAIL and GMAIL_APP_PASSWORD in .env).")
 
 
 DRIVE_FIELDS = "nextPageToken, files(id, name, mimeType, modifiedTime, size, webViewLink)"
@@ -413,26 +436,72 @@ class GoogleDrive:
         return FileText(file=f, text=text, truncated=cut, extracted_from=how)
 
 
+def demo_mode() -> bool:
+    return (os.environ.get("DEMO_MODE") or "false").strip().lower() in ("1", "true", "yes")
+
+
+class NotConnected:
+    """Stands in for a service that is not set up: every call explains how to connect it."""
+
+    mode = "not_connected"
+
+    def __init__(self, what: str, hint: str):
+        self.what, self.hint = what, hint
+
+    def _fail(self, *a, **kw):
+        raise WorkspaceError(f"{self.what} is not connected. {self.hint}")
+
+    inbox = send = list = search = read = find_attachments = read_attachment = _fail
+
+
+def imap_settings() -> tuple[str, str] | None:
+    addr = (os.environ.get("GMAIL_EMAIL") or "").strip()
+    pw = (os.environ.get("GMAIL_APP_PASSWORD") or "").replace(" ", "").strip()
+    return (addr, pw) if addr and pw else None
+
+
 def choose(kind: str):
-    """WORKSPACE_MODE = auto (default) | sandbox | google. kind is 'mail' or 'drive'."""
+    """Pick the backend for 'mail' or 'drive'.
+
+    WORKSPACE_MODE = auto (default) | sandbox | google.
+    mail   auto: Gmail by app password (GMAIL_EMAIL + GMAIL_APP_PASSWORD) when set, otherwise the
+           Gmail API with the Google sign-in, otherwise sample data when DEMO_MODE=true,
+           otherwise "not connected".
+    drive  auto: Google Drive with the Google sign-in, otherwise sample data when DEMO_MODE=true,
+           otherwise "not connected".
+    """
     mode = (os.environ.get("WORKSPACE_MODE") or "auto").strip().lower()
     if mode not in {"auto", "sandbox", "google"}:
         raise SystemExit("WORKSPACE_MODE must be auto, sandbox or google.")
+    if mode == "sandbox":
+        log.info("%s backend: SANDBOX (simulated, sandbox_data/)", kind)
+        return SandboxMail() if kind == "mail" else SandboxDrive()
+    if kind == "mail" and mode == "auto" and imap_settings():
+        from .imap_mail import GmailIMAP
+
+        log.info("mail backend: Gmail by app password (IMAP/SMTP) for %s", imap_settings()[0])
+        return GmailIMAP(*imap_settings())
     scopes = SCOPES_GMAIL if kind == "mail" else SCOPES_DRIVE
-    if mode != "sandbox":
-        from mcp_servers.google_common import credentials
+    from mcp_servers.google_common import credentials
 
-        try:
-            creds = credentials(scopes)
-        except (ImportError, RuntimeError) as exc:
-            if mode == "google":
-                raise SystemExit(f"WORKSPACE_MODE=google but Google is not set up: {exc}") from exc
-            creds = None
-        if creds is not None:
-            log.info("%s backend: Google", kind)
-            return GoogleMail(creds) if kind == "mail" else GoogleDrive(creds)
+    try:
+        creds = credentials(scopes)
+    except (ImportError, RuntimeError) as exc:
         if mode == "google":
-            raise SystemExit("WORKSPACE_MODE=google but no Google token. Run scripts/google_oauth.py first.")
-    log.info("%s backend: SANDBOX (simulated, sandbox_data/)", kind)
-    return SandboxMail() if kind == "mail" else SandboxDrive()
-
+            raise SystemExit(f"WORKSPACE_MODE=google but Google is not set up: {exc}") from exc
+        creds = None
+    if creds is not None:
+        log.info("%s backend: Google", kind)
+        return GoogleMail(creds) if kind == "mail" else GoogleDrive(creds)
+    if mode == "google":
+        raise SystemExit("WORKSPACE_MODE=google but no Google token. Sign in to Google from AgentsMind first.")
+    if demo_mode():
+        log.info("%s backend: SANDBOX (DEMO_MODE=true, simulated)", kind)
+        return SandboxMail() if kind == "mail" else SandboxDrive()
+    if kind == "mail":
+        log.warning("mail backend: NOT CONNECTED (set GMAIL_EMAIL and GMAIL_APP_PASSWORD in .env)")
+        return NotConnected("Gmail", "Set GMAIL_EMAIL and GMAIL_APP_PASSWORD (a Google app password) in .env, then "
+                                     "restart AgentsMind.")
+    log.warning("drive backend: NOT CONNECTED (sign in to Google from AgentsMind)")
+    return NotConnected("Google Drive", "Open AgentsMind > Settings > Connections and sign in to Google, or start "
+                                        "AgentsMind with main.py, which opens the Google sign-in once.")

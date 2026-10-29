@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     agentsmind_admin_password: SecretStr | None = None
 
     timezone: str = "Asia/Karachi"
+    demo_mode: bool = False  # sample data and the sandbox inbox/Drive; false = real data only
 
     queue_backend: Literal["db", "memory"] = "db"
     queue_lease_seconds: int = Field(default=60, ge=2, le=3600)

@@ -45,3 +45,16 @@ pip-audit on the Windows gate (74 findings in 6 packages) led to these pins:
 mcp 2.3.0 declares `starlette>=0.27`, `pyjwt[crypto]>=2.10.1` and `python-multipart>=0.0.9`. The cloud workspace already runs mcp 2.3.0 with starlette 1.7.0, PyJWT 2.15.0 and python-multipart 0.0.32, and the MCP server tests pass there.
 
 Release dates come from the PyPI release feeds and project pages. The next gate run re-checks the full set with pip-audit.
+
+
+## Added in 0.6.0 (2026-10-30), not re-read this session
+
+The documentation pages below could not be opened from the build workspace (fetch permission timed out), so
+these calls follow the long-stable published APIs and are checked by live use on the laptop:
+
+| API | Call used |
+|---|---|
+| Twilio Messages | `POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json`, basic auth (SID, token), form fields `From`, `To` (`whatsapp:+...`), `Body` or `ContentSid` + `ContentVariables` (JSON) |
+| Google Sheets v4 | `spreadsheets.get` (tabs), `spreadsheets.values.get`, `values.append` (`valueInputOption=USER_ENTERED`, `insertDataOption=INSERT_ROWS`), `values.update`; scope `spreadsheets` |
+| Google Drive v3 | `files.create` multipart upload; scope `drive.file` |
+| Gmail IMAP/SMTP | `imap.gmail.com:993` SSL (read-only mailbox, `BODY.PEEK[]`, `X-GM-RAW`, `X-GM-MSGID`), `smtp.gmail.com:465` SSL, app password |

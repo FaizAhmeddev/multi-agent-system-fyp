@@ -44,6 +44,37 @@ def describe(tool: str, r: dict[str, Any]) -> dict[str, Any]:
         body = f"{r.get('number')} is now {str(r.get('status', '')).replace('_', ' ')}."
     elif tool == "it_add_comment":
         body = f"Comment added to {r.get('number')}."
+    elif tool == "hr_run_workflow":
+        steps = r.get("steps", [])
+        failed = [s for s in steps if s.get("status") != "ok"]
+        body = (f"{r.get('title') or 'HR workflow'}: {r.get('ok', 0)} of {len(steps)} step(s) done."
+                + (" Failed: " + "; ".join(f"{s['title']} ({s.get('error', '')})" for s in failed) if failed else ""))
+        if r.get("employee_id"):
+            links.append({"label": f"Open {r.get('employee_code') or 'the employee'} in HR",
+                          "url": f"/hr/employees/{r['employee_id']}"})
+        for lt in (r.get("letters") or {}).values():
+            links.append({"label": f"{lt['title']} (PDF)", "url": f"/api/hr/letters/{lt['id']}/pdf"})
+    elif tool == "payroll_enroll_employee":
+        p = r.get("person", {})
+        body = f"{p.get('full_name')} was {'added to' if r.get('created') else 'already on'} payroll (record {p.get('id')})."
+    elif tool == "payroll_end_employment":
+        body = f"{r.get('full_name')} is now inactive in payroll."
+    elif tool == "payroll_record_payment":
+        pm = r.get("payment") or {}
+        body = (f"Payment of {pm.get('currency', '')} {pm.get('amount', '')} for {pm.get('month', '')} recorded."
+                if r.get("recorded") else r.get("message") or "Payment was already recorded.")
+    elif tool == "whatsapp_send":
+        body = ("WhatsApp message was already sent earlier." if r.get("already_sent")
+                else f"WhatsApp message to {r.get('to', '')} {r.get('status', 'queued')}.")
+    elif tool == "sheets_append":
+        body = ("Those rows were already added earlier." if r.get("already_done")
+                else f"{r.get('appended', 0)} row(s) added to {r.get('tab', 'the sheet')}.")
+    elif tool == "sheets_update_row":
+        body = f"Row {r.get('updated_row')} updated."
+    elif tool == "drive_upload_file":
+        body = f"{r.get('name')} uploaded to Google Drive."
+        if r.get("web_link"):
+            links.append({"label": "Open in Drive", "url": r["web_link"]})
     else:
         body = "Done."
     return {"body": body, "links": links, "simulated": sim}

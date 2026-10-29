@@ -10,6 +10,9 @@ Scopes (narrowest that work, see docs/API_VERIFICATION.md):
     gmail.readonly         read the inbox
     gmail.send             send a message (only after an approval in AgentsMind)
     drive.readonly         list, search and read files
+    drive.file             upload letters and reports (only files AgentsMind created)
+    spreadsheets           read and update the HR sheets you register
+Gmail scopes are skipped when mail uses an app password (GMAIL_EMAIL, GMAIL_APP_PASSWORD).
 """
 from __future__ import annotations
 
@@ -25,13 +28,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TOKEN_PATH = Path(os.environ.get("GOOGLE_TOKEN_FILE", str(REPO_ROOT / "data" / "google_token.enc")))
 CLIENT_PATH = Path(os.environ.get("GOOGLE_OAUTH_CLIENT_FILE", str(REPO_ROOT / "secrets" / "google_oauth_client.json")))
 
-SCOPES = [
+BASE_SCOPES = [
     "https://www.googleapis.com/auth/calendar.events.owned",
     "https://www.googleapis.com/auth/calendar.freebusy",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/spreadsheets",
 ]
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"]
+
+
+def consent_scopes() -> list[str]:
+    """Gmail scopes are only requested when mail does not go through an app password (IMAP/SMTP)."""
+    app_pw = (os.environ.get("GMAIL_EMAIL") or "").strip() and (os.environ.get("GMAIL_APP_PASSWORD") or "").strip()
+    return BASE_SCOPES + ([] if app_pw else GMAIL_SCOPES)
+
+
+SCOPES = BASE_SCOPES + GMAIL_SCOPES  # everything any tool may ask for
 log = logging.getLogger("google")
 
 
@@ -67,10 +80,11 @@ def credentials(required_scopes: list[str]):
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
 
-    creds = Credentials.from_authorized_user_info(info, SCOPES)
-    missing = set(required_scopes) - set(creds.scopes or [])
+    creds = Credentials.from_authorized_user_info(info)  # the scopes the user actually granted
+    missing = set(required_scopes) - set(creds.scopes or info.get("scopes") or [])
     if missing:
-        log.error("Google token lacks scopes %s. Re-run scripts/google_oauth.py.", sorted(missing))
+        log.warning("Google sign-in lacks %s; sign in to Google again from AgentsMind to add it.",
+                    ", ".join(sorted(m.rsplit("/", 1)[1] for m in missing)))
         return None
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
@@ -84,7 +98,25 @@ def run_consent_flow() -> None:
 
     if not CLIENT_PATH.is_file():
         raise SystemExit(f"Put your OAuth client file (Desktop app) at {CLIENT_PATH} first.")
-    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_PATH), SCOPES)
-    creds = flow.run_local_server(port=0, prompt="consent", access_type="offline")
+    scopes = consent_scopes()
+    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_PATH), scopes)
+    creds = flow.run_local_server(port=0, prompt="consent", access_type="offline",
+                                  success_message="AgentsMind is connected to Google. You can close this tab.")
     save_token(json.loads(creds.to_json()))
-    print(f"Google access saved (encrypted) to {TOKEN_PATH}. Scopes: {', '.join(s.rsplit('/', 1)[1] for s in SCOPES)}")
+    granted = creds.scopes or scopes
+    print(f"Google access saved (encrypted) to {TOKEN_PATH}. Scopes: {', '.join(s.rsplit('/', 1)[1] for s in granted)}")
+
+
+def status() -> dict[str, Any]:
+    """What the Google sign-in covers, for the UI and the launcher (no secrets)."""
+    info = None
+    try:
+        info = load_token()
+    except RuntimeError:
+        info = None
+    granted = set((info or {}).get("scopes") or [])
+    names = {"calendar": BASE_SCOPES[0], "drive": BASE_SCOPES[2], "drive_upload": BASE_SCOPES[3],
+             "sheets": BASE_SCOPES[4], "gmail_api": GMAIL_SCOPES[0]}
+    return {"client_file": CLIENT_PATH.is_file(), "signed_in": bool(info),
+            "scopes": {k: v in granted for k, v in names.items()},
+            "missing": [k for k, v in names.items() if v not in granted and v in consent_scopes()]}

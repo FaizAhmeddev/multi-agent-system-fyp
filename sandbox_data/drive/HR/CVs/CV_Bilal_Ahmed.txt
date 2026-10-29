@@ -1,5 +1,6 @@
 Bilal Ahmed (synthetic candidate)
 Email: bilal.ahmed@example.com
+Location: North Nazimabad, Karachi
 
 Summary: Front-end developer moving towards backend work.
 

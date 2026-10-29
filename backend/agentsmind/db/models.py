@@ -208,6 +208,9 @@ class Candidate(TimestampMixin, Base):
     # new | screened | shortlisted | interview | rejected
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     source_ref: Mapped[str] = mapped_column(String(200), default="", index=True, nullable=False)  # Drive file id
+    phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    location: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    source: Mapped[str] = mapped_column(String(20), default="", nullable=False)  # gmail | drive | folder
 
 
 class CVRecord(Base):
@@ -255,3 +258,6 @@ class QueueTask(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow,
                                                  nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+from . import hr_models  # noqa: E402,F401  (HR tables share this metadata)

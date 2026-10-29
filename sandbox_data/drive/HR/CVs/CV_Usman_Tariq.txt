@@ -1,0 +1,10 @@
+Usman Tariq (synthetic candidate)
+Email: usman.tariq@example.com
+Location: Lahore, Pakistan
+
+Summary: Python developer with 5 years of experience.
+
+Experience
+- 2021-2026  Python Developer, Sample Tech, Lahore. FastAPI, PostgreSQL, Docker, pytest.
+
+Skills: Python, FastAPI, SQL, Git, Docker

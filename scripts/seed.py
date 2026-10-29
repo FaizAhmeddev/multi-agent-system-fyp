@@ -1,6 +1,7 @@
 """Seed the core database with SYNTHETIC demo data.
 
-    python scripts/seed.py
+    python scripts/seed.py --demo      demo users and candidates (also when DEMO_MODE=true)
+    python scripts/seed.py             only creates the first admin (when no users exist)
 
 - Requires a migrated database (alembic upgrade head) and a configured .env.
 - Creates the first admin from AGENTSMIND_ADMIN_* if no users exist.
@@ -47,12 +48,17 @@ def _password() -> str:
     return "-".join("".join(secrets.choice(alphabet) for _ in range(5)) for _ in range(4))
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    demo = "--demo" in args or (os.environ.get("DEMO_MODE") or "").strip().lower() in ("1", "true", "yes")
     created: list[tuple[str, str, str]] = []
     with SessionLocal() as db:
         admin = bootstrap_first_admin(db)
         if admin:
             print(f"Created first admin {admin.email} (password from AGENTSMIND_ADMIN_PASSWORD).")
+        if not demo:
+            print("Sample data is off (DEMO_MODE=false): only the admin account is set up. Use --demo for samples.")
+            return 0
         for email, name, roles in DEMO_USERS:
             if db.scalar(select(User).where(User.email == email)):
                 print(f"skip user {email} (exists)")

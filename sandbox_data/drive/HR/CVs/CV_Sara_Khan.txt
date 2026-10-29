@@ -1,5 +1,6 @@
 Sara Khan (synthetic candidate)
 Email: sara.khan@example.com
+Location: Gulshan-e-Iqbal, Karachi
 
 Summary: Backend developer with 4 years of Python experience.
 
