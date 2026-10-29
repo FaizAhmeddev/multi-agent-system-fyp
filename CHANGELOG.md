@@ -3,6 +3,53 @@
 All notable changes, by phase. Each phase lives on its own `phase/<n>-<name>` branch
 and is merged into `main` by the project owner after the phase gate.
 
+## Phase 3: Agents, calendar, Gmail and Drive, branch `phase/3-agents-calendar`
+
+### Added
+- **calendar-mcp** (`mcp_servers/calendar_mcp`, port 8103): `calendar_list_events`, `calendar_check_availability`, `calendar_create_event`, `calendar_update_event`, `calendar_cancel_event`, with typed inputs and outputs, annotations, idempotency keys and pagination.
+  - Google backend: Calendar API v3, primary calendar. Free/busy uses freebusy.query. Created events are read back (`verified`). An optional Meet link uses `conferenceDataVersion=1`. The event id comes from the idempotency key, so a replay never creates a duplicate.
+  - Sandbox backend: a local SQLite calendar, labeled Simulated, with a synthetic seed (`python -m mcp_servers.calendar_mcp.seed`).
+- **workspace-mcp** (`mcp_servers/workspace_mcp`, port 8104): the hardened replacement for the legacy tool server.
+  - Tools: `gmail_read_inbox`, `gmail_send_email`, `drive_list_files`, `drive_search`, `drive_read_file`, `queue_stats`, `agent_status`.
+  - Gmail API v1 and Drive API v3 with one shared OAuth consent. Results with email and file text are marked untrusted.
+  - `gmail_send_email` refuses multi-line headers and is idempotent through a send ledger.
+  - Sandbox: a synthetic inbox (with one hostile email) and a synthetic Drive (policies, a job description and three CVs, one of them hostile) in `sandbox_data/`. Sending writes to a local outbox and is never delivered.
+- **Google OAuth** (`mcp_servers/google_common.py`, `scripts/google_oauth.py`):
+  - Narrowest scopes: `calendar.events.owned`, `calendar.freebusy`, `gmail.readonly`, `gmail.send`, `drive.readonly`.
+  - The token is stored only encrypted (Fernet) in `data/google_token.enc`.
+  - `CALENDAR_MODE` and `WORKSPACE_MODE` are `auto`, `sandbox` or `google`.
+- **Assistant** (`backend/agentsmind/assistant/`, see `docs/ASSISTANT.md`):
+  - Orchestrator: deterministic multi-step planning, clarifying questions carried across messages, optional LLM routing limited to a fixed agent list, a fallback card, and role checks in code before each step.
+  - Six agents (Calendar, IT, Finance, Email, Documents, HR), each an explicit LangGraph graph: understand, gather (read tools only), propose (approval node), respond, clarify, and an error edge to `fail`.
+  - Calendar by prompt: time zone-aware parsing in code, free/busy check, conflict warnings, free-slot suggestions, Meet links, and move and cancel by description.
+  - Cards (`text`, `result`, `clarify`, `approval`, `error`, `denied`, `fallback`) with `simulated` and `untrusted` flags. Approval responses include a plain-language result and links.
+  - API: `POST /api/assistant/messages` (JSON), `POST /api/assistant/messages/stream` (Server-Sent Events), conversations. Every step is stored in `agent_runs` and linked to its approvals.
+- **CV screening** (`assistant/screening.py`):
+  - A rubric score (model, or a labeled deterministic stand-in) and an independent keyword check, weighted in code.
+  - "Needs human review" on disagreement (25 points or more), suspected injection, invented evidence, or a model failure.
+  - Protected attributes are removed before the rubric step.
+  - HR candidates board API: `/api/hr/candidates`. Moving a candidate between stages is a human action and is audited.
+- **Untrusted input handling** (`agents/untrusted.py`): random-id delimiting, marker neutralisation, and injection detection.
+- **OpenAI client** (`agents/llm.py`): used when `OPENAI_API_KEY` is set. JSON mode with Pydantic validation and one repair retry; clear `LLMError` messages. Models never do arithmetic: totals, scores and dates are computed in code.
+- `GET /api/internal/status`: queue and agent counts for workspace-mcp, protected by `WORKSPACE_MCP_TOKEN`.
+- Migration `0003_cv_details` (`cv_records.details`, `candidates.source_ref`).
+- Tests:
+  - `tests/mcp_servers_tests` (both new servers as real processes; Google backends with a fake client).
+  - `tests/assistant` (agents, orchestrator, screening; 50 tests).
+  - `tests/backend/test_assistant_api.py` (prompt to approval to read-back, hostile email, screening to board, SSE, RBAC denial audit, LLM failure).
+- Docs: `docs/ASSISTANT.md`, plus updated `docs/MCP_TOOLS.md` and `docs/API_VERIFICATION.md`.
+
+### Changed
+- Pins: `langgraph==1.1.0` and `openai==2.35.1` (backend); `google-api-python-client==2.196.0`, `google-auth==2.53.0`, `google-auth-oauthlib==1.3.1`, `cryptography==50.0.1` and `pypdf==6.17.0` (`requirements/servers.txt`).
+- `run_all.ps1`, `.env.example`, `env_setup.py` and the MCP smoke script now cover the four MCP servers.
+- The phase gate runs the new test suites and live assistant checks. It always forces sandbox calendar and mail.
+
+### Legacy fixes, each flipping a pinned test (see ledger)
+- The legacy orchestrator no longer sends email by itself. It returns a draft and points to the approval flow.
+- The legacy auto-reply no longer tells every "MERN" applicant they are shortlisted, and no longer mails provider errors to senders.
+- Legacy SMTP falls back to the second port only when the first never connected, so a message is never sent twice.
+- Legacy CV screening: CV text is delimited, model JSON is validated, and errors or injection give "Needs human review" instead of a silent 0 or 100.
+
 ## Phase 2: External systems and MCP, branch `phase/2-portals-mcp`
 
 ### Added
@@ -126,13 +173,13 @@ Every `legacy_bug` characterization test is flipped on purpose in the phase that
 | test_no_auth_and_wildcard_cors | open tool server | authenticated MCP servers | 2 | flipped in 2 -> test_token_required_and_no_cors, test_server_refuses_to_start_without_token |
 | test_gmail_send_reports_success_even_when_send_failed | false success | typed MCP results | 2 | flipped in 2 -> test_gmail_send_reports_failure_when_send_failed |
 | test_gmail_read_inbox_ignores_its_parameters | ignored params | typed MCP inputs | 2 | flipped in 2 -> test_gmail_read_inbox_passes_its_parameters |
-| test_email_is_sent_without_approval_when_address_in_prompt | no approval gate | approval gate | 3 | open |
-| test_auto_reply_hardcodes_shortlist_for_any_mern_email | hard-coded auto reply | "Suggest reply" with approval | 3 | open |
-| test_smtp_fallback_can_send_twice | duplicate send | Gmail API plus idempotency | 3 | open |
-| test_hostile_cv_text_is_inlined_undelimited | prompt injection | delimited input plus schema validation | 3 | open |
-| test_llm_error_silently_rejects_candidate | silent rejection | "needs human review" | 3 | open |
-| test_payroll_question_routes_to_hr_not_finance | misrouting | new orchestrator | 3 | open |
-| test_no_calendar_agent_exists | no calendar | Calendar agent | 3 | open |
+| test_email_is_sent_without_approval_when_address_in_prompt | no approval gate | approval gate | 3 | flipped in 3 -> test_email_is_not_sent_without_approval_even_with_address (new path: tests/backend/test_assistant_api.py::test_send_email_after_approval_is_idempotent) |
+| test_auto_reply_hardcodes_shortlist_for_any_mern_email | hard-coded auto reply | "Suggest reply" with approval | 3 | flipped in 3 -> test_auto_reply_never_claims_shortlisting (new path: Email agent "draft replies", one approval card each) |
+| test_smtp_fallback_can_send_twice | duplicate send | Gmail API plus idempotency | 3 | flipped in 3 -> test_smtp_does_not_retry_after_possible_delivery, test_smtp_falls_back_only_when_never_connected (new path: workspace-mcp send ledger, test_send_is_idempotent_and_never_delivered) |
+| test_hostile_cv_text_is_inlined_undelimited | prompt injection | delimited input plus schema validation | 3 | flipped in 3 -> test_hostile_cv_is_delimited_and_flagged, test_malformed_model_json_needs_review (new path: tests/assistant/test_screening.py) |
+| test_llm_error_silently_rejects_candidate | silent rejection | "needs human review" | 3 | flipped in 3 -> test_llm_error_needs_human_review (new path: test_llm_failure_falls_back_and_flags) |
+| test_payroll_question_routes_to_hr_not_finance | misrouting | new orchestrator | 3 | retired in 3: the legacy keyword router is replaced, not patched; pinned instead by tests/assistant/test_orchestrator_and_agents.py::test_routing (payroll -> finance). The legacy router is deleted with Streamlit in Phase 4 |
+| test_no_calendar_agent_exists | no calendar | Calendar agent | 3 | retired in 3: replaced by the Calendar agent; pinned by test_routing (scheduling -> calendar) and tests/assistant/test_calendar_agent.py |
 
 ## Phase 0: Audit, branch `phase/0-audit`
 - `docs/AUDIT_REPORT.md` and 51 characterization tests in `tests/characterization/`. No application code changed.

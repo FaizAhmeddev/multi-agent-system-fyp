@@ -19,6 +19,7 @@ from sqlalchemy import inspect
 from .admin.router import router as admin_router
 from .agents.router import router as agents_router
 from .api.health import router as health_router
+from .assistant.router import router as assistant_router
 from .auth.router import router as auth_router
 from .auth.service import AuthError, bootstrap_first_admin
 from .db.session import SessionLocal, get_engine
@@ -97,6 +98,7 @@ def create_app() -> FastAPI:
     app.include_router(agents_router)
     app.include_router(workspaces_router)
     app.include_router(internal_router)
+    app.include_router(assistant_router)
     return app
 
 

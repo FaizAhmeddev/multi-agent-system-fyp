@@ -2305,7 +2305,7 @@ if active_tab == "HR":
                                     log_candidate(
                                         r.get("name", ""),
                                         jd[:100],
-                                        r.get("score", 0),
+                                        r.get("score") or 0,
                                         r.get("recommendation", ""),
                                         r.get("strengths", []),
                                         r.get("weaknesses", []),
@@ -2319,7 +2319,7 @@ if active_tab == "HR":
             if st.session_state.hr_results:
                 st.markdown('<div class="sec-hdr sec-purple" style="font-size:13px">Screening results</div>', unsafe_allow_html=True)
                 for i, r in enumerate(st.session_state.hr_results, 1):
-                    score = r.get("score", 0)
+                    score = r.get("score") or 0  # None means "Needs human review"
                     rec = r.get("recommendation", "")
                     color = "var(--success)" if score >= 70 else ("var(--warning)" if score >= 50 else "var(--danger)")
                     rb = {"Highly Recommended": "badge-green", "Recommended": "badge-blue", "Maybe": "badge-yellow", "Not Recommended": "badge-red"}.get(

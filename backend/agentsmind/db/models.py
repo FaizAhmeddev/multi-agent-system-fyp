@@ -207,6 +207,7 @@ class Candidate(TimestampMixin, Base):
     stage: Mapped[str] = mapped_column(String(20), default="new", index=True, nullable=False)
     # new | screened | shortlisted | interview | rejected
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    source_ref: Mapped[str] = mapped_column(String(200), default="", index=True, nullable=False)  # Drive file id
 
 
 class CVRecord(Base):
@@ -221,6 +222,7 @@ class CVRecord(Base):
     matched_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     missing_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     needs_human_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 

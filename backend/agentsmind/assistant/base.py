@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol, TypedDict
 
+from ..agents.llm import LLMError
 from .cards import ApprovalInfo, Card, Detail
 
 log = logging.getLogger("agentsmind.assistant")
@@ -129,7 +130,7 @@ def _safe(fn: Callable[[State], State], name: str, agent: str) -> Callable[[Stat
     def node(state: State) -> State:
         try:
             return fn(state) or {}
-        except AgentError as exc:
+        except (AgentError, LLMError) as exc:
             return {"error": str(exc)}
         except Exception as exc:  # noqa: BLE001 - every failure becomes an error card, never a crash
             log.exception("agent node failed", extra={"agent": agent, "node": name})

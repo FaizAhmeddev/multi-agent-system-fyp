@@ -74,9 +74,8 @@ def generate_reply(state: dict) -> dict:
     sender_name = state.get("sender_name", "Sir/Madam")
     subject = state.get("subject", "")
 
-    if _looks_like_mern_developer_application(subject, email_content):
-        state["body"] = _mern_interview_selection_reply(sender_name)
-        return state
+    # Phase 3: no canned "you have been shortlisted" reply. Shortlisting is a human decision.
+    _ = subject
 
     try:
         llm = _get_llm()
@@ -105,6 +104,7 @@ Your reply:"""
                 + openai_missing_message("Email auto-reply")
             )
         else:
-            state["body"] = f"Thank you for your email. We will get back to you shortly.\n\n[Auto-reply error: {e}]"
+            state["body"] = "Thank you for your email. We will get back to you shortly."
+            state["error"] = f"auto-reply draft failed: {type(e).__name__}"
 
     return state

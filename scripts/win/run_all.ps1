@@ -2,6 +2,7 @@
   Start the whole AgentsMind system on this computer, each part in its own window:
     Finance Portal  http://127.0.0.1:8201      IT Helpdesk  http://127.0.0.1:8202
     finance-mcp     http://127.0.0.1:8101/mcp  it-mcp       http://127.0.0.1:8102/mcp
+    calendar-mcp    http://127.0.0.1:8103/mcp  workspace-mcp http://127.0.0.1:8104/mcp
     Core API        http://127.0.0.1:8000      Queue worker
   Run:  powershell -ExecutionPolicy Bypass -File scripts\win\run_all.ps1
   Stop: close the windows, or run scripts\win\stop_all.ps1
@@ -19,6 +20,8 @@ $parts = @(
   @{ Name = "IT Helpdesk";    Args = "-m uvicorn it_portal.app:create_app --factory --app-dir `"$es`" --host 127.0.0.1 --port 8202" },
   @{ Name = "finance-mcp";    Args = "-m mcp_servers.finance_mcp.server" },
   @{ Name = "it-mcp";         Args = "-m mcp_servers.it_mcp.server" },
+  @{ Name = "calendar-mcp";   Args = "-m mcp_servers.calendar_mcp.server" },
+  @{ Name = "workspace-mcp";  Args = "-m mcp_servers.workspace_mcp.server" },
   @{ Name = "Core API";       Args = "-m uvicorn agentsmind.main:app --app-dir backend --host 127.0.0.1 --port 8000" },
   @{ Name = "Queue worker";   Args = "-m agentsmind.queue.worker"; Env = "backend" }
 )

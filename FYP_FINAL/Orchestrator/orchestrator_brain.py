@@ -2725,14 +2725,11 @@ class Orchestrator:
                         facts = _extract_onboarding_facts(raw_task, conversation_history)
                         recipient = facts.get("email") or ""
                     if recipient:
-                        status = _smtp_send_office_email(
-                            recipient,
-                            parsed.get("subject") or "Welcome to the Team",
-                            parsed.get("body") or drafted,
-                        )
+                        # Phase 3: the legacy app never sends on its own. Sending needs an
+                        # approval card in AgentsMind (Assistant), which uses the Gmail API.
                         drafted = (
-                            f"{drafted}\n\n---\nEmail delivery (Gmail SMTP)\n{status}\n"
-                            f"Recipient: {recipient}"
+                            f"{drafted}\n\n---\nDraft only, not sent. To send it, ask the AgentsMind "
+                            f"Assistant and approve the email card.\nRecipient: {recipient}"
                         )
                     else:
                         drafted += (

@@ -15,8 +15,10 @@ All servers are built on the MCP Python SDK `mcp==2.3.0` (`MCPServer`, Streamabl
 |---|---|---|---|
 | finance-mcp | http://127.0.0.1:8101/mcp | Finance Portal REST API (`/api/v1`, X-API-Key) | `FINANCE_MCP_TOKEN` |
 | it-mcp | http://127.0.0.1:8102/mcp | IT Helpdesk REST API (`/api/v1`, X-API-Key) | `IT_MCP_TOKEN` |
-| calendar-mcp | Phase 3 | Google Calendar API, or a labeled sandbox | `CALENDAR_MCP_TOKEN` |
-| workspace-mcp | Phase 3 | Gmail and Drive APIs, plus system tools | `WORKSPACE_MCP_TOKEN` |
+| calendar-mcp | http://127.0.0.1:8103/mcp | Google Calendar API v3, or the labeled sandbox (data/calendar_sandbox.db) | `CALENDAR_MCP_TOKEN` |
+| workspace-mcp | http://127.0.0.1:8104/mcp | Gmail API v1 and Drive API v3, or the labeled sandbox (sandbox_data/); system tools read the core's `/api/internal/status` | `WORKSPACE_MCP_TOKEN` |
+
+**Sandbox or Google.** `CALENDAR_MODE` and `WORKSPACE_MODE` are `auto` (default), `sandbox` or `google`. In `auto`, a server uses Google only when `scripts/google_oauth.py` has stored an encrypted token with the scopes it needs; otherwise it runs the sandbox. Every result carries `mode` and `simulated`, and the UI shows "Simulated" whenever `simulated` is true. The phase gate always forces sandbox mode.
 
 Security, verified by tests in `tests/backend/test_mcp_integration.py` and a cloud run against the SDK:
 
@@ -45,8 +47,12 @@ The **Roles** column is enforced by the gateway. Admins pass every role check, b
 | it_list_tickets | it-mcp | read | all staff (own tickets only, outside IT) | it |
 | it_update_ticket_status | it-mcp | write (approval) | it | it |
 | it_add_comment | it-mcp | write (approval) | all staff (own tickets only, outside IT) | it |
-| calendar_* | calendar-mcp | Phase 3 | all staff | calendar, hr (check availability and create only) |
-| drive_* | workspace-mcp | read | hr, it, finance | documents, hr |
+| calendar_list_events | calendar-mcp | read | all staff | calendar |
+| calendar_check_availability | calendar-mcp | read | all staff | calendar, hr |
+| calendar_create_event | calendar-mcp | write (approval) | all staff | calendar, hr |
+| calendar_update_event | calendar-mcp | write (approval) | all staff | calendar |
+| calendar_cancel_event | calendar-mcp | destructive (approval and confirm) | all staff | calendar |
+| drive_list_files, drive_search, drive_read_file | workspace-mcp | read | hr, it, finance | documents, hr |
 | gmail_read_inbox | workspace-mcp | read | all staff | email, hr |
 | gmail_send_email | workspace-mcp | write (approval) | all staff | email, hr |
 | queue_stats, agent_status | workspace-mcp | read | admin | orchestrator |
@@ -81,6 +87,22 @@ it-mcp:
 - `it_update_ticket_status(number, status, comment="", actor="")` returns a `Ticket`. Invalid moves are refused (409), and the error lists the allowed next statuses.
 - `it_add_comment(number, body, actor="")` returns a `Ticket`.
 
+calendar-mcp (all times ISO 8601 with an offset; every result has `mode` and `simulated`):
+
+- `calendar_list_events(time_min, time_max, query?, max_results=25, page_token?)` returns `{items[], next_page_token}`. Windows are capped at 62 days.
+- `calendar_check_availability(start, end)` returns `{is_free, busy[], conflicts[]}`. Google mode uses freebusy.query; `conflicts` names the overlapping events.
+- `calendar_create_event(summary, start, end, idempotency_key, timezone=Asia/Karachi, description, location, attendees[], add_meet=false, notify_attendees=false)` returns `{created, verified, event}`. The event is read back after creating it (`verified`). The event id is derived from the idempotency key, so a replay returns the first event with `created=false`.
+- `calendar_update_event(event_id, idempotency_key, summary?, start?, end?, timezone?, description?, location?, notify_attendees=false)` returns `{event}`. Moving needs both start and end.
+- `calendar_cancel_event(event_id, idempotency_key, notify_attendees=false)` returns `{cancelled, already_cancelled}`.
+
+workspace-mcp:
+
+- `gmail_read_inbox(max_results=10, unread_only=false, query?, page_token?)` returns `{items[], next_page_token, untrusted: true}`. Email text is untrusted content.
+- `gmail_send_email(to[], subject, body, idempotency_key, cc[], thread_id?, in_reply_to?)` returns `{message_id, sent, already_sent}`. Single-line headers only (no header injection). In sandbox mode the message goes to data/workspace_sandbox_outbox.jsonl and is never delivered.
+- `drive_list_files(folder?, page_size, page_token?)`, `drive_search(query, page_size)` return `{items[], next_page_token}`.
+- `drive_read_file(file_id)` returns `{file, text, truncated, extracted_from, untrusted: true}`; reads text, Markdown, CSV, PDF and Google Docs/Sheets/Slides (as text).
+- `queue_stats()` and `agent_status()` return queue counts and per-agent run counts from the core.
+
 ## Testing
 
 Smoke test. With the system running (`scripts\win\run_all.ps1`):
@@ -89,7 +111,7 @@ Smoke test. With the system running (`scripts\win\run_all.ps1`):
 .venv\Scripts\python scripts\smoke\mcp_smoke.py
 ```
 
-It lists every tool with its risk level, calls each read tool once, and prints `MCP SMOKE: PASS` or `FAIL`.
+It lists every tool on all four servers with its risk level, calls each read tool once, and prints `MCP SMOKE: PASS` or `FAIL`. Automated tests: `tests/mcp_servers_tests/` starts calendar-mcp and workspace-mcp as real processes in sandbox mode and calls them over Streamable HTTP with a bearer token.
 
 MCP Inspector (needs Node.js):
 
@@ -101,6 +123,6 @@ In the Inspector:
 
 1. Choose transport "Streamable HTTP" and URL `http://127.0.0.1:8101/mcp`.
 2. Under Authentication, add the header `Authorization: Bearer <FINANCE_MCP_TOKEN from .env>`.
-3. Connect, open Tools, and run `finance_summary`.
+3. Connect, open Tools, and run `finance_summary`. The same works for calendar-mcp (port 8103, `CALENDAR_MCP_TOKEN`) and workspace-mcp (port 8104, `WORKSPACE_MCP_TOKEN`).
 
 Without the header the server answers 401, which is expected.

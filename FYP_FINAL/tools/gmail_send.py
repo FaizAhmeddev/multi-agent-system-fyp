@@ -53,6 +53,17 @@ def _send_starttls(msg: EmailMessage, mail_user: str, mail_pass: str) -> None:
         server.send_message(msg)
 
 
+def _connect_errors() -> tuple:
+    import smtplib
+    import socket
+    import ssl
+
+    return (ConnectionRefusedError, socket.gaierror, smtplib.SMTPConnectError, ssl.SSLError)
+
+
+_CONNECT_ERRORS = _connect_errors()
+
+
 def send_email(state: dict) -> dict:
     """
     Send an email.
@@ -83,10 +94,15 @@ def send_email(state: dict) -> dict:
     ):
         try:
             sender(msg, mail_user, mail_pass)
-            state["send_status"] = f"✅ Email sent to {recipient} via {label.split()[0]}"
+            state["send_status"] = f"Email sent to {recipient} via {label.split()[0]}"
             return state
+        except _CONNECT_ERRORS as e:
+            attempts.append(f"{label}: {e}")  # never connected: safe to try the other port
         except Exception as e:
-            attempts.append(f"{label}: {e}")
+            # The server may already have accepted the message: do not send a second copy.
+            state["send_status"] = (f"Failed to send email. {label}: {e}. Not retried, to avoid sending twice; "
+                                    "check the Sent folder before trying again.")
+            return state
 
     state["send_status"] = "❌ Failed to send email. " + " | ".join(attempts)
     return state

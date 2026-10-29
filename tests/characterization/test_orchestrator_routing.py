@@ -29,18 +29,10 @@ def test_keyword_routing(prompt, expected):
     assert ob.detect_intent(prompt) == expected
 
 
-@pytest.mark.legacy_bug
-def test_payroll_question_routes_to_hr_not_finance():
-    assert ob.detect_intent("What is the total monthly payroll?") == ["hr"]
-
-
-@pytest.mark.legacy_bug
-@pytest.mark.parametrize("prompt", [
-    "Schedule a meeting with the HR team tomorrow at 3 pm for 45 minutes",
-])
-def test_no_calendar_agent_exists(prompt):
-    # There is no calendar agent; scheduling prompts fall into HR.
-    assert ob.detect_intent(prompt) == ["hr"]
+# Retired in Phase 3: test_payroll_question_routes_to_hr_not_finance and test_no_calendar_agent_exists.
+# The legacy keyword router is replaced by the AgentsMind orchestrator; the same prompts are
+# now pinned in tests/assistant/test_orchestrator_and_agents.py::test_routing (payroll -> finance,
+# scheduling -> calendar). The legacy router is deleted with the Streamlit UI in Phase 4.
 
 
 def test_unmatched_requests_fall_back_to_general():

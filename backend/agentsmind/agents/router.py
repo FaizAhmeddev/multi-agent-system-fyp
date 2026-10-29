@@ -129,8 +129,11 @@ def approve(approval_id: int, body: DecisionIn, request: Request, user: User = D
     outcome = call_tool(db, agent=a.agent, tool=a.tool, args=a.arguments, user=requester, approval_id=a.id,
                         ip=client_ip(request))
     db.refresh(a)
+    from ..assistant.results import describe
+
+    shown = describe(a.tool, outcome.result) if outcome.status == "ok" else None
     return {"approval": _appr_out(a), "outcome": {"status": outcome.status, "error": outcome.error,
-                                                   "code": outcome.code}}
+                                                   "code": outcome.code, "result": shown}}
 
 
 @router.post("/approvals/{approval_id}/reject")

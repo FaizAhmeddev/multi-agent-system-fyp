@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +37,23 @@ READ_CALLS = {
     "finance_get_person": {"person_id": 1},
     "it_list_tickets": {"page_size": 3},
     "it_get_ticket": {"number": "ITK-000001"},
+    "gmail_read_inbox": {"max_results": 3},
+    "drive_list_files": {"page_size": 3},
+    "drive_search": {"query": "policy"},
+    "queue_stats": {},
+    "agent_status": {},
 }
+
+
+def _window() -> dict:
+    from datetime import datetime, timedelta
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    return {"start": now.isoformat(), "end": (now + timedelta(hours=8)).isoformat()}
+
+
+READ_CALLS["calendar_check_availability"] = _window()
+READ_CALLS["calendar_list_events"] = {"time_min": _window()["start"], "time_max": _window()["end"]}
 
 
 async def check(name: str, url: str, token: str) -> bool:
@@ -69,7 +86,10 @@ async def check(name: str, url: str, token: str) -> bool:
 def main() -> int:
     env = _env()
     servers = [("finance-mcp", env.get("FINANCE_MCP_URL", "http://127.0.0.1:8101/mcp"), env.get("FINANCE_MCP_TOKEN")),
-               ("it-mcp", env.get("IT_MCP_URL", "http://127.0.0.1:8102/mcp"), env.get("IT_MCP_TOKEN"))]
+               ("it-mcp", env.get("IT_MCP_URL", "http://127.0.0.1:8102/mcp"), env.get("IT_MCP_TOKEN")),
+               ("calendar-mcp", env.get("CALENDAR_MCP_URL", "http://127.0.0.1:8103/mcp"), env.get("CALENDAR_MCP_TOKEN")),
+               ("workspace-mcp", env.get("WORKSPACE_MCP_URL", "http://127.0.0.1:8104/mcp"),
+                env.get("WORKSPACE_MCP_TOKEN"))]
     all_ok = True
     for name, url, tok in servers:
         if not tok:
