@@ -11,3 +11,9 @@ foreach ($p in @(8000, 8101, 8102, 8103, 8104, 8201, 8202, 18000)) {
     if ($_.OwningProcess -gt 0) { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue; Write-Host "freed port $p" }
   }
 }
+
+# The queue worker listens on no port, so also stop any AgentsMind Python process still running
+# (for example one left behind by an interrupted run). It would otherwise keep data\agentsmind.db locked.
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match 'agentsmind|mcp_servers|external_systems' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host "stopped process $($_.ProcessId)" }
