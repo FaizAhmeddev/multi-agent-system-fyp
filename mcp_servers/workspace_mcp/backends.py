@@ -19,6 +19,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import sqlite3
 import threading
 from dataclasses import dataclass, field
@@ -169,9 +170,15 @@ class SandboxMail:
         msgs.sort(key=lambda m: m["date"], reverse=True)
         if unread_only:
             msgs = [m for m in msgs if m.get("unread")]
-        if query:
+        if query:  # a small subset of Gmail search: from:"name" / from:word, is:unread, plain words
             q = query.lower()
-            msgs = [m for m in msgs if q in (m["subject"] + m["body"] + m["from"]).lower()]
+            for who in re.findall(r'from:(?:"([^"]+)"|(\S+))', q):
+                w = who[0] or who[1]
+                msgs = [m for m in msgs if w in m["from"].lower()]
+            if "is:unread" in q:
+                msgs = [m for m in msgs if m.get("unread")]
+            rest = re.sub(r'from:(?:"[^"]+"|\S+)|is:unread', " ", q).split()
+            msgs = [m for m in msgs if all(w in (m["subject"] + m["body"] + m["from"]).lower() for w in rest)]
         off = int(page_token or 0)
         page = msgs[off:off + max_results]
         nxt = str(off + max_results) if off + max_results < len(msgs) else None

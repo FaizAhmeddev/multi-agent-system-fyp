@@ -13,7 +13,7 @@ from ..db.models import AgentRun, User
 from ..db.session import SessionLocal
 from ..queue.core import get_queue
 from ..rbac import has_any
-from .llm import get_llm
+from .llm import LLMError, get_llm
 from .registry import AGENTS
 
 log = logging.getLogger("agentsmind.agents")
@@ -80,7 +80,7 @@ def execute_run(run_id: int) -> dict[str, Any]:
             check_agent_access(user, run.agent, run.action)  # roles may have changed since enqueue
             inputs = action.schema.model_validate(json.loads(run.input_text))
             out = action.run(inputs, user.full_name, get_llm())
-        except (AgentAccessError, ValidationError) as exc:
+        except (AgentAccessError, ValidationError, LLMError) as exc:
             run.status, run.error, run.finished_at = "failed", str(exc), utcnow()
             db.commit()
             return {"run_id": run.id, "status": run.status}
