@@ -10,6 +10,7 @@ import type { Employee, EmployeeDetail, HRTask } from "../../lib/types";
 import { DEPARTMENTS, money, ProgressBar, StatusBadge, useAsk } from "./common";
 
 const STATUSES = ["", "offered", "onboarding", "active", "notice", "separated"];
+const OWNER: Record<string, string> = { hr: "HR", it: "IT", finance: "Finance", manager: "Manager", employee: "Employee" };
 const EDITABLE = ["full_name", "email", "phone", "job_title", "department", "manager", "location", "employment_type", "status",
   "joining_date", "probation_end", "last_working_day", "monthly_salary", "allowances", "bank_account_on_file", "notes"];
 
@@ -130,7 +131,7 @@ function TaskList({ tasks, process }: { tasks: HRTask[]; process: string }) {
             {t.result?.summary && <span className="block text-xs text-muted">{String(t.result.summary)}</span>}
             {t.status === "failed" && t.result?.error && <span className="block text-xs text-danger">{String(t.result.error)}</span>}
           </span>
-          <span className="text-xs text-muted">{humanize(t.owner)}{t.due_date ? `, due ${fmtDate(t.due_date)}` : ""}</span>
+          <span className="text-xs text-muted">{OWNER[t.owner] ?? humanize(t.owner)}{t.due_date ? `, due ${fmtDate(t.due_date)}` : ""}</span>
           <StatusBadge status={t.status} />
           {t.status === "failed" && !!t.result?.step && (
             <Button size="sm" busy={retry.isPending} icon={<RefreshCw aria-hidden className="size-3.5" />} onClick={() => retry.mutate(t.id)}>Retry</Button>

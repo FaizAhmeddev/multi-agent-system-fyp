@@ -107,16 +107,29 @@ export function ApprovalCard({ card }: { card: Card }) {
     <div data-testid="approval-card" className={cx("rounded-lg border bg-surface p-4", destructive ? "border-danger" : "border-border-strong")}>
       <Header card={card} />
       <p className="text-sm text-muted">
-        {destructive ? "This permanently changes data. Nothing happens until you approve." : "Nothing happens until you approve."}
+        {destructive ? "This permanently changes data. Nothing happens until you approve."
+          : a.tool === "hr_run_workflow" ? `Nothing happens until you approve. Then these ${a.details.length} steps run in order; a failed step can be retried from the checklist.`
+          : "Nothing happens until you approve."}
       </p>
-      <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[10rem_1fr]">
-        {a.details.map((d) => (
-          <div key={d.label} className="contents">
-            <dt className="text-muted">{d.label}</dt>
-            <dd className="whitespace-pre-wrap break-words">{d.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {a.tool === "hr_run_workflow" ? (
+        <ol className="mt-3 flex flex-col gap-2 text-sm" aria-label="Steps that run after approval">
+          {a.details.map((d) => (
+            <li key={d.label} className="rounded-md border border-border px-3 py-2">
+              <span className="font-medium">{d.label}</span>
+              {d.value && <span className="block whitespace-pre-wrap break-words text-muted">{d.value}</span>}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[10rem_1fr]">
+          {a.details.map((d) => (
+            <div key={d.label} className="contents">
+              <dt className="text-muted">{d.label}</dt>
+              <dd className="whitespace-pre-wrap break-words">{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <Warnings items={card.warnings} />
       {state === "pending" && (
         <div className="mt-4 flex flex-col gap-3">
