@@ -41,14 +41,37 @@ Helpdesk confirmation and tracking pages. You see only your own tickets.
 
 ## HR (role: hr)
 
-- **Screen CVs.** Type the role, for example Python Developer. AgentsMind reads the job description and the CVs in Drive and scores each candidate twice:
-  - a rubric score, based on quoted evidence from the CV;
-  - an independent keyword check.
+Open **HR** or ask the Assistant. Anything that reaches people or other systems (emails, IT tickets, payroll,
+calendar invites, WhatsApp, rows in your sheets) is shown on one approval card first; after you approve, every
+step runs in order and ticks off its checklist item. A failed step shows the reason and a **Retry** button.
 
-  When the two disagree, when a CV contains instructions aimed at the AI, or when evidence was invented, the candidate is marked **Needs human review**.
-- **Candidates board.** Open a candidate to see the rubric and the evidence. Use **Move** to change the stage. Only people move candidates; screening never shortlists or rejects anyone.
-- **Fair screening.** Names, contact details, age, gender, nationality, religion and similar details are removed before scoring.
-- **Ask the assistant** for interview questions, a job description or an onboarding checklist.
+| Tab | What you do there | Ask the Assistant, for example |
+|---|---|---|
+| Overview | Headcount, joiners, leave to decide, overdue items, quick reports | "New joiners report for this month" |
+| Employees | Records, checklists (onboarding, induction, compliance, separation), letters, leave, attendance | "Onboard Sara Khan as Python Developer in Engineering joining 1 December, salary 150,000, email sara@company.pk, phone 03001234567" |
+| Recruitment | Gather CVs from Gmail, the CV folders and Drive; only Karachi candidates are screened; job openings; candidates board | "Screen CVs from Gmail for the Python Developer role", "Issue an offer letter to Sara Khan" |
+| Attendance and leave | Pending leave (approve/reject), attendance summary, mark attendance, import from your sheet | "Mark Bilal absent today", "Approve Ahmed's leave", "Import attendance from my attendance sheet" |
+| Payroll | Monthly payroll from salaries, attendance and unpaid leave; post to the Finance Portal | "Run payroll for October" |
+| Letters | Offer, contract, welcome, conduct, resignation acceptance, final settlement, experience: Word and PDF; email them | "Warning letter for Bilal for repeated late arrival" |
+| Reports | New joiners, induction, onboarding, separations, attendance, leave, compliance, payroll, headcount; Excel download | "Who resigned this month?", "Induction report for October" |
+| Sheets | Register your Google Sheets and Excel files and what each holds | "Where do I keep the leave records?", "Show Ahmed's leaves from my leave sheet" |
+| HR settings | Company details for letters, candidate city, office hours, leave entitlements, payroll rules | "How many casual leaves do we get per year?" |
+
+Separation: "Ahmed Raza resigned, last working day 30 November" starts the checklist, the acceptance letter, the IT
+asset ticket and the exit interview. "Final settlement for Ahmed Raza" shows every line of the settlement and, after
+approval, issues the final settlement letter and experience certificate and closes payroll.
+
+Your own letter formats: put `offer.docx`, `contract.docx` and so on in `data\hr_templates` with placeholders such
+as `{{name}}`, `{{job_title}}`, `{{joining_date}}`, `{{salary}}`.
+
+Statutory rates (income tax, EOBI, SESSI) change every year, so AgentsMind never invents them: set them in HR
+settings, or leave them at 0 and the payroll card says they were not applied.
+
+## Everyone: attendance and leave
+
+On the Hub, **My attendance and leave** has Check in / Check out, your leave balance and a leave form. You can also
+say "Check in", "I want casual leave on 5 November" or "How many leaves do I have left?". Your sign-in email must
+match your employee record.
 
 ## IT staff (role: it)
 
