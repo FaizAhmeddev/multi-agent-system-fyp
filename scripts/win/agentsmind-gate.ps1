@@ -60,7 +60,10 @@ if (-not $Branch) {
     $Branch = "phase/" + ($Branch -replace '^phase/', '')
 }
 Say "Branch: $Branch"
-Run "checkout" "git" @("checkout", "-B", $Branch, "bundle/$Branch") | Out-Null
+# .\agentsmind is the gate's own test copy: local edits to tracked files there are discarded.
+Run "checkout" "git" @("checkout", "-f", "-B", $Branch, "bundle/$Branch") | Out-Null
+$head = (git rev-parse HEAD).Trim(); $want = (git rev-parse "bundle/$Branch").Trim()
+if ($head -ne $want) { Say "ERROR: checkout of $Branch failed (HEAD is $head). Stopping so the wrong code is not tested."; exit 1 }
 Run "log" "git" @("log", "--oneline", "-8") | Out-Null
 Run "status" "git" @("status", "--short") | Out-Null
 
