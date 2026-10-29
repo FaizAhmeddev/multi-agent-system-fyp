@@ -38,7 +38,7 @@ pip-audit on the Windows gate (74 findings in 6 packages) led to these pins:
 | PyJWT | 2.15.0 (2026-09-23) |
 | python-multipart | 0.0.32 (2026-06-04) |
 | langgraph | 1.2.12 (2026-09-21; needs `langgraph-sdk>=0.4.2,<0.5`) |
-| langgraph-sdk | 0.4.4 (2026-08-27) |
+| langgraph-sdk | 0.4.6 (2026-10-06; fixes CVE-2026-118667, reported by pip-audit on the laptop) |
 | pypdf | 6.21.2 (2026-10-21, the release that fixes the reported CVEs; accepted under two weeks old because it is a security fix) |
 | setuptools | 84.1.0 (in the venv) |
 

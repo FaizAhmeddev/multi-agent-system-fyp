@@ -56,8 +56,9 @@ server; the UI never decides access.
 
 `npm run e2e` runs Playwright (Chromium) against a running system. `AGENTSMIND_URL` picks the
 server (default http://127.0.0.1:8000). Sign-in details come from `data\local_credentials.txt`
-(`scripts\env_setup.py`) and `data\seed_credentials.txt` (`scripts\seed.py`). The phase gate
-runs the whole suite against the live sandbox system.
+(`scripts\env_setup.py`) and `data\seed_credentials.txt` (`scripts\seed.py`), or the file named by
+`AGENTSMIND_SEED_CREDENTIALS`. The phase gate runs the whole suite against the live sandbox system,
+on its own fresh database (`data\gate-live.db`) with its own demo users (`data\gate-live-credentials.txt`).
 
 | Spec | Covers |
 |---|---|

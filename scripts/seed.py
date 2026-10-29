@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import os
 import secrets
 import string
 import sys
@@ -69,12 +70,14 @@ def main() -> int:
         n_cands = len(db.scalars(select(Candidate)).all())
 
     if created:
-        out = ROOT / "data" / "seed_credentials.txt"
+        # AGENTSMIND_SEED_CREDENTIALS lets the phase gate keep a throwaway database's
+        # passwords out of the real data/seed_credentials.txt.
+        out = Path(os.environ.get("AGENTSMIND_SEED_CREDENTIALS") or ROOT / "data" / "seed_credentials.txt")
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("a", encoding="utf-8") as f:
             for email, roles, pw in created:
                 f.write(f"{email}\t{roles}\t{pw}\n")
-        print("\nDemo users (shown once; also appended to data/seed_credentials.txt):")
+        print(f"\nDemo users (shown once; also appended to {out}):")
         for email, roles, pw in created:
             print(f"  {email:32} {roles:10} {pw}")
     print(f"\nSeed complete: {n_users} users, {n_cands} candidates.")

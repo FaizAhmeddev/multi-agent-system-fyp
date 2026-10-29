@@ -97,10 +97,16 @@ $env:DATABASE_URL = "sqlite:///" + ((Join-Path $Repo "data\gate-clean.db") -repl
 Remove-Item -ErrorAction SilentlyContinue (Join-Path $Repo "data\gate-clean.db")
 Run "alembic upgrade (clean)" $vpy @("-m", "alembic", "upgrade", "head") | Out-Null
 Run "alembic current" $vpy @("-m", "alembic", "current") | Out-Null
+$env:AGENTSMIND_SEED_CREDENTIALS = Join-Path $Repo "data\gate-clean-credentials.txt"
 Run "seed (clean db)" $vpy @("scripts\seed.py") | Out-Null
 Run "seed again (idempotent)" $vpy @("scripts\seed.py") | Out-Null
-Remove-Item Env:\DATABASE_URL
-Run "seed core" $vpy @("scripts\seed.py") | Out-Null
+# The live checks and Playwright use their own fresh database and demo users, so leftovers from
+# earlier runs (or from your own use of data\agentsmind.db) can never mismatch the passwords.
+$env:DATABASE_URL = "sqlite:///" + ((Join-Path $Repo "data\gate-live.db") -replace '\\', '/')
+$env:AGENTSMIND_SEED_CREDENTIALS = Join-Path $Repo "data\gate-live-credentials.txt"
+Remove-Item -ErrorAction SilentlyContinue (Join-Path $Repo "data\gate-live.db"), $env:AGENTSMIND_SEED_CREDENTIALS
+Run "alembic upgrade (live db)" $vpy @("-m", "alembic", "upgrade", "head") | Out-Null
+Run "seed core (live db)" $vpy @("scripts\seed.py") | Out-Null
 Run "seed Finance Portal" $vpy @("external_systems\finance_portal\seed.py") | Out-Null
 Run "seed IT Helpdesk" $vpy @("external_systems\it_portal\seed.py") | Out-Null
 # The gate always uses the sandbox calendar and mailbox, even if Google is set up, so it never touches real data.
@@ -244,6 +250,7 @@ if ($FrontendBuilt) {
     # Runs on success, on error and on Ctrl+C, so no server is left holding a port.
     foreach ($k in $procs.Keys) { if ($procs[$k] -and -not $procs[$k].HasExited) { Stop-Process -Id $procs[$k].Id -Force -ErrorAction SilentlyContinue } }
     Remove-Item Env:\AGENTSMIND_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:\DATABASE_URL, Env:\AGENTSMIND_SEED_CREDENTIALS -ErrorAction SilentlyContinue
 }
 foreach ($k in $parts.Keys) {
     $errf = Join-Path $LogDir "$k.err.log"

@@ -26,7 +26,7 @@ and is merged into `main` by the project owner after the phase gate.
   - fastapi 0.143.1 and starlette 1.7.0;
   - PyJWT 2.15.0;
   - python-multipart 0.0.32;
-  - langgraph 1.2.12 with langgraph-sdk 0.4.4;
+  - langgraph 1.2.12 with langgraph-sdk 0.4.6 (CVE-2026-118667);
   - pypdf 6.21.2 (released 8 days ago, accepted because it is a security fix).
 - `setup.ps1` replaces the venv's old setuptools with 84.1.0.
 - The same starlette, PyJWT, python-multipart and mcp 2.3.0 combination already passes the MCP server tests in the cloud workspace.

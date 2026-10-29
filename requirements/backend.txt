@@ -20,6 +20,6 @@ mcp==2.3.0
 httpx2==2.13.1
 # Agents: explicit graphs (LangGraph) and the OpenAI client (live mode only; sandbox without a key).
 langgraph==1.2.12
-# pip-audit: langgraph-sdk < 0.4.4 has a known vulnerability (pulled in by langgraph; not used directly).
-langgraph-sdk==0.4.4
+# pip-audit: langgraph-sdk < 0.4.6 has CVE-2026-118667 (pulled in by langgraph; not used directly).
+langgraph-sdk==0.4.6
 openai==2.35.1
