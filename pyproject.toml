@@ -1,11 +1,11 @@
 [project]
 name = "agentsmind"
-version = "0.1.0"
+version = "0.5.0"
 description = "AgentsMind: one workspace, every department."
 requires-python = ">=3.11,<3.13"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/backend", "tests/characterization"]
+testpaths = ["tests/backend", "tests/portals", "tests/mcp_servers_tests", "tests/assistant", "tests/characterization"]
 markers = [
   "legacy_bug: pins current WRONG/insecure legacy behaviour; flip intentionally in a later phase",
 ]
@@ -26,3 +26,17 @@ known-first-party = ["agentsmind", "portal_common", "finance_portal", "it_portal
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106", "S108", "S311", "S603", "E501"]
 "db/migrations/**" = ["E501"]
+
+[tool.coverage.run]
+source = ["backend/agentsmind", "mcp_servers", "external_systems"]
+omit = ["*/migrations/*", "*/seed.py", "mcp_servers/*/server.py"]  # servers run as subprocesses in tests
+branch = true
+
+[tool.coverage.report]
+show_missing = false
+skip_covered = true
+precision = 1
+fail_under = 70
+
+[tool.bandit]
+exclude_dirs = ["tests", "FYP_FINAL", "frontend", ".venv"]

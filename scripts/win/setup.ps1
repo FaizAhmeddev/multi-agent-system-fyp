@@ -36,7 +36,8 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 }
 $vpy = ".venv\Scripts\python.exe"
 & $vpy -m pip install --upgrade pip --quiet
-$req = if ($Dev) { "requirements\dev.txt" } else { "requirements\backend.txt" }
+# Runtime: core API, worker, portals and MCP servers. -Dev adds tests, lint and quality tools.
+$req = if ($Dev) { "requirements\dev.txt" } else { "requirements\servers.txt" }
 & $vpy -m pip install -r $req
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
@@ -46,4 +47,14 @@ if ($LASTEXITCODE -ne 0) { throw "env setup failed" }
 
 & $vpy -m alembic upgrade head
 if ($LASTEXITCODE -ne 0) { throw "alembic upgrade failed" }
-Write-Host "Setup complete. Start the API with: scripts\win\run_backend.ps1"
+# Web app: built into frontend\dist and served by the core API (needs Node.js 22).
+if (Get-Command npm.cmd -ErrorAction SilentlyContinue) {
+    Push-Location frontend
+    & npm.cmd install --no-audit --no-fund
+    if ($LASTEXITCODE -eq 0) { & npm.cmd run build }
+    Pop-Location
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Web app build failed; the API still works. See docs\FRONTEND.md." }
+} else {
+    Write-Warning "Node.js not found: install Node.js 22 LTS, then run: cd frontend; npm install; npm run build"
+}
+Write-Host "Setup complete. Start everything with: scripts\win\run_all.ps1"

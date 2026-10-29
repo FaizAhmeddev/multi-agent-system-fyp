@@ -193,7 +193,8 @@ class SandboxCalendar:
             cols.append("updated = ?")
             args.append(datetime.now(UTC).isoformat(timespec="seconds"))
             with self._conn() as c:
-                c.execute(f"UPDATE events SET {', '.join(cols)} WHERE id = ?", [*args, event_id])  # noqa: S608
+                # Column names come from the fixed list above, never from input.
+                c.execute(f"UPDATE events SET {', '.join(cols)} WHERE id = ?", [*args, event_id])  # noqa: S608  # nosec B608
         return self.get(event_id)
 
     def cancel(self, event_id, notify):

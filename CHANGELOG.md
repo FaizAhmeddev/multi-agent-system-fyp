@@ -3,6 +3,27 @@
 All notable changes, by phase. Each phase lives on its own `phase/<n>-<name>` branch
 and is merged into `main` by the project owner after the phase gate.
 
+## Phase 5: Quality and documentation, branch `phase/5-quality`
+
+### Added
+- `scripts/quality.py` runs four checks:
+  - coverage report, with `fail_under = 70` over the core, MCP servers and portals;
+  - bandit, medium and high severity;
+  - `scripts/secrets_scan.py`, over the working tree and the full git history;
+  - pip-audit on the installed packages.
+
+  The tools are pinned in `requirements/quality.txt`: bandit 1.9.4, pip-audit 2.10.1, coverage 7.16.2, pytest-cov 7.1.0.
+- The gate runs every Python suite with coverage, then the quality checks.
+- Documentation:
+  - `README.md` (rewritten): quick start, checks, layout, status.
+  - New docs: `ARCHITECTURE.md` (diagrams), `SECURITY.md` (threat model, controls, honest limits), `USER_MANUAL.md` (by role), `DEPLOYMENT.md` (install, configure, Google and OpenAI, backups, upgrade), `DEMO_SCRIPT.md` (the 10 acceptance scenarios, each with its test) and `HISTORY_PURGE.md`.
+- The product logo is used automatically when `assets/brand/logo.png` exists; the built-in mark is the fallback.
+
+### Changed
+- `setup.ps1` installs the full runtime set (`requirements/servers.txt`) and builds the web app when Node.js is present.
+- `FYP_FINAL/logs/orchestrator.log` is no longer tracked. Its old copies, and `fyp_data.db`, stay in history until the owner runs the purge.
+- `pyproject.toml`: version 0.5.0; pytest testpaths cover every suite; coverage and bandit configuration added.
+
 ## Phase 4: Web app, branch `phase/4-ui`
 
 ### Added

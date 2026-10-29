@@ -12,9 +12,11 @@ import { Dialog, Menu } from "../ui/overlays";
 import { cx } from "../ui/primitives";
 
 export function Brand({ compact }: { compact?: boolean }) {
+  // assets/brand/logo.png is copied in at build time when provided; the built-in mark is the fallback.
+  const [src, setSrc] = useState("/brand/logo.png");
   return (
     <span className="flex items-center gap-2">
-      <img src="/brand/mark.svg" alt="" width={28} height={28} className="size-7" />
+      <img src={src} alt="" width={28} height={28} className="size-7 object-contain" onError={() => setSrc("/brand/mark.svg")} />
       {!compact && <span className="text-base font-semibold tracking-tight">AgentsMind</span>}
     </span>
   );

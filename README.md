@@ -2,99 +2,123 @@
 
 One workspace. Every department. Handled.
 
-AgentsMind is a multi-agent office system for HR, IT, Finance, Documents and Communications.
-This repository is mid-upgrade: the new core lives in `backend/`. The legacy Streamlit
-prototype is still in `FYP_FINAL/` until Phase 4 replaces it.
+AgentsMind is a multi-agent office system for HR, IT, Finance, Documents and Communications
+(email and calendar). You ask in plain language. Specialised agents look things up through
+MCP servers. Anything that would change data, send an email or book time first appears as an
+approval card. Nothing happens until a person approves it.
 
-## Status
+- **Web app** (React) with light and dark themes and role-based screens.
+- **Core API** (FastAPI), with an orchestrator and six LangGraph agents.
+- **Persistent work queue.**
+- **Two external systems**, each with its own app and database: the AgentsMind Finance Portal and the AgentsMind IT Helpdesk.
+- **Four MCP servers:** finance-mcp, it-mcp, calendar-mcp and workspace-mcp (Gmail, Drive).
 
-| Part | State |
+Without an OpenAI key or a Google account, everything runs in a labeled sandbox. Results are
+marked **Simulated**, and nothing reaches real people.
+
+| Read | For |
 |---|---|
-| Core API: settings, database, migrations, auth | Phase 1a |
-| Persistent queue, department RBAC, tool gateway, wrapped legacy agents | Phase 1b |
-| Finance Portal, IT Helpdesk, MCP servers (finance-mcp, it-mcp) | Phase 2 |
-| Agents through MCP, Google Calendar | Phase 3 |
-| React UI (replaces Streamlit) | Phase 4 |
+| `docs/USER_MANUAL.md` | Using AgentsMind, by role |
+| `docs/DEMO_SCRIPT.md` | A 12-minute presentation walkthrough of the acceptance scenarios |
+| `docs/ARCHITECTURE.md` | How the parts fit, with diagrams |
+| `docs/SECURITY.md` | Threat model, controls and known limits |
+| `docs/DEPLOYMENT.md` | Install, configure, connect Google and OpenAI, back up, upgrade |
+| `docs/ASSISTANT.md`, `docs/MCP_TOOLS.md`, `docs/FRONTEND.md` | Assistant, MCP tools and web app in detail |
+| `CHANGELOG.md` | What changed in each phase, including the legacy-bug ledger |
 
-See `CHANGELOG.md`, `docs/AUDIT_REPORT.md` and `docs/MCP_TOOLS.md`.
+## Quick start (Windows, no Docker)
 
-## Run the core API on Windows (no Docker)
+You need:
 
-Requires Python 3.11 or 3.12 and git.
+- Python 3.11 or 3.12
+- Node.js 22 LTS
+- git
 
 ```powershell
 git clone https://github.com/FaizAhmeddev/multi-agent-system-fyp.git
 cd multi-agent-system-fyp
-powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1 -Dev
-powershell -ExecutionPolicy Bypass -File scripts\win\run_backend.ps1
-```
-
-`setup.ps1` creates `.venv`, installs the pinned packages and creates `.env` from
-`.env.example`. The `.env` gets a random `JWT_SECRET` and a random first-admin password; the
-password is printed once and saved in `data\first_admin.txt`. The script then runs the migrations.
-
-Start everything (two portals, two MCP servers, the core API and the queue worker,
-each in its own window):
-
-```powershell
+powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1
 powershell -ExecutionPolicy Bypass -File scripts\win\run_all.ps1
-.venv\Scripts\python scripts\seed.py                              # synthetic core users
-.venv\Scripts\python external_systems\finance_portal\seed.py      # synthetic people and payments
-.venv\Scripts\python external_systems\it_portal\seed.py           # synthetic tickets
-.venv\Scripts\python scripts\smoke\mcp_smoke.py                   # MCP check: prints MCP SMOKE: PASS
+.venv\Scripts\python scripts\seed.py
+.venv\Scripts\python external_systems\finance_portal\seed.py
+.venv\Scripts\python external_systems\it_portal\seed.py
+.venv\Scripts\python -m mcp_servers.calendar_mcp.seed
 ```
 
-| Part | URL |
+What these do:
+
+1. `setup.ps1` creates `.venv` and installs the pinned packages.
+2. It also creates `.env` with random secrets. There are no default passwords.
+3. It applies the database migrations and builds the web app.
+4. `run_all.ps1` starts each part in its own window:
+   - the two portals
+   - the four MCP servers
+   - the core API, which also serves the web app
+   - the queue worker
+5. The seed scripts add synthetic demo data only.
+
+Open **http://127.0.0.1:8000** and sign in:
+
+- **Admin:** the sign-in details are in `data\local_credentials.txt`.
+- **Demo users** (HR, IT, Finance, Employee): `seed.py` prints them once and saves them in `data\seed_credentials.txt`.
+
+Both files are gitignored. Stop everything with `scripts\win\stop_all.ps1`.
+
+| Part | Address |
 |---|---|
-| Core API (docs) | http://127.0.0.1:8000/api/docs |
+| AgentsMind (web app and API docs at /api/docs) | http://127.0.0.1:8000 |
 | AgentsMind Finance Portal | http://127.0.0.1:8201 |
-| AgentsMind IT Helpdesk (public complaint form) | http://127.0.0.1:8202 |
-| finance-mcp / it-mcp | http://127.0.0.1:8101/mcp, http://127.0.0.1:8102/mcp (bearer token) |
+| AgentsMind IT Helpdesk (public complaint form at /) | http://127.0.0.1:8202 |
+| finance-mcp, it-mcp, calendar-mcp, workspace-mcp | http://127.0.0.1:8101 to 8104, path /mcp (bearer token) |
 
-Sign-in details for the core and both portals are generated into `data\local_credentials.txt`.
-Stop everything with `scripts\win\stop_all.ps1`. Only the core API and worker, without
-the external systems: `run_backend.ps1` and `run_worker.ps1`.
+macOS and Linux run the same pieces; see `docs/DEPLOYMENT.md`.
 
-Then open http://127.0.0.1:8000/health or the API docs at http://127.0.0.1:8000/api/docs.
-
-Optional synthetic demo data:
+## Check it
 
 ```powershell
-.venv\Scripts\python scripts\seed.py
+.venv\Scripts\python scripts\smoke\mcp_smoke.py     # every MCP server and read tool: MCP SMOKE: PASS
 ```
 
-## Run on macOS or Linux
+Full test run (what the phase gate does):
 
-```bash
-python3.11 -m venv .venv && . .venv/bin/activate
-pip install -r requirements/dev.txt
-python scripts/env_setup.py   # creates .env with random secrets
-alembic upgrade head
-uvicorn agentsmind.main:app --app-dir backend --host 127.0.0.1 --port 8000
-PYTHONPATH=backend python -m agentsmind.queue.worker     # second terminal
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1 -Dev
+.venv\Scripts\python -m pytest tests\backend tests\portals tests\mcp_servers_tests tests\assistant -q
+.venv\Scripts\python -m pytest tests\characterization -q
+.venv\Scripts\python scripts\quality.py             # coverage, bandit, secrets scan, pip-audit
+cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e needs run_all.ps1 running
 ```
 
-## Tests
+`scripts\win\agentsmind-gate.ps1` does all of this on a separate clone and writes one log.
 
-```bash
-python -m pytest tests/backend -q          # includes real portal + MCP processes
-python -m pytest tests/portals -q
-python -m pytest tests/characterization -q
-ruff check backend db scripts mcp_servers external_systems tests/backend tests/portals
+## Connect real services (optional)
+
+- **OpenAI:** put `OPENAI_API_KEY` in `.env` and restart. Answers are no longer labeled Simulated.
+- **Google Calendar, Gmail and Drive:** follow the steps in `docs/DEPLOYMENT.md`. You create a Desktop OAuth client, save it as `secrets\google_oauth_client.json`, then run `scripts\google_oauth.py` once. It requests the narrowest scopes, and the token is stored encrypted.
+
+## Repository layout
+
+```
+backend/agentsmind/   core API: auth, RBAC, queue, tool gateway, MCP client, assistant and agents
+external_systems/     Finance Portal and IT Helpdesk (separate apps and databases)
+mcp_servers/          finance-mcp, it-mcp, calendar-mcp, workspace-mcp
+frontend/             React web app and Playwright tests
+db/migrations/        Alembic migrations for the core database
+sandbox_data/         synthetic inbox and Drive used in sandbox mode
+scripts/              setup, run, seed, smoke, quality, secrets scan, Google sign-in
+tests/                backend, portals, MCP servers, assistant, characterization
+FYP_FINAL/            the original prototype, kept only for characterization tests
 ```
 
-## Configuration
+## Status
 
-All settings come from environment variables or `.env` (see `.env.example`).
-Secrets are never committed: `.env`, `credentials.json`, token files, `data/` and databases
-are all gitignored. There are no default passwords. The first admin is created from
-`AGENTSMIND_ADMIN_EMAIL` and `AGENTSMIND_ADMIN_PASSWORD` when the users table is empty.
+| Phase | Content | Verified on the Windows laptop |
+|---|---|---|
+| 0 | Audit and characterization tests | yes |
+| 1a, 1b | Foundation, auth, queue, RBAC, gateway | yes (74 backend and 64 characterization tests) |
+| 2 | Portals and MCP servers | pending the next gate run |
+| 3 | Agents, calendar, Gmail, Drive, CV screening | pending the next gate run |
+| 4 | Web app, Playwright, Streamlit removed | pending the next gate run |
+| 5 | Quality tools and documentation | pending the next gate run |
 
-PostgreSQL: `pip install -r requirements/postgres.txt`, then set
-`DATABASE_URL=postgresql+psycopg://user:pass@host:5432/agentsmind`.
-
-## Legacy prototype
-
-The original Streamlit app is in `FYP_FINAL/` (see `FYP_FINAL/README.md`). It is kept for
-reference and characterization tests only, and has the known security issues listed in
-`docs/AUDIT_REPORT.md`. Do not expose it on a network.
+Credentials still needed for live mode: an OpenAI key and a Google OAuth client.
