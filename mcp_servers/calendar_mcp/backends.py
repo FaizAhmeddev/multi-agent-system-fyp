@@ -272,9 +272,14 @@ class GoogleCalendar:
             return req.execute(num_retries=READ_RETRIES if read else 0)
         except HttpError as exc:
             code = self._status(exc)
+            body = (getattr(exc, "content", b"") or b"").decode("utf-8", "replace")
+            if code == 403 and ("has not been used" in body or "is disabled" in body):
+                raise CalendarError("The Google Calendar API is not enabled for your Google Cloud project. Enable it "
+                                    "at https://console.cloud.google.com/apis/library/calendar-json.googleapis.com "
+                                    "and try again.") from exc
             if code in (401, 403):
-                raise CalendarError("Google refused the request. Re-run scripts/google_oauth.py to sign in "
-                                    "again.") from exc
+                raise CalendarError("Google refused the request. Sign in to Google again from AgentsMind "
+                                    "(Settings > Connections).") from exc
             if code == 404:
                 raise CalendarError("That event was not found in Google Calendar.") from exc
             raise CalendarError(f"Google Calendar returned HTTP {code}.") from exc

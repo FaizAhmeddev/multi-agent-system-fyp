@@ -287,8 +287,14 @@ def _exec(req, *, read: bool, what: str):
         return req.execute(num_retries=READ_RETRIES if read else 0)
     except HttpError as exc:
         code = int(getattr(getattr(exc, "resp", None), "status", 0) or 0)
+        body = (getattr(exc, "content", b"") or b"").decode("utf-8", "replace")
+        if code == 403 and ("has not been used" in body or "is disabled" in body):
+            api = {"Gmail": "gmail.googleapis.com", "Gmail send": "gmail.googleapis.com"}.get(what, "drive.googleapis.com")
+            raise WorkspaceError(f"The {what} API is not enabled for your Google Cloud project. Enable it at "
+                                 f"https://console.cloud.google.com/apis/library/{api} and try again.") from exc
         if code in (401, 403):
-            raise WorkspaceError(f"Google refused the {what} request. Re-run scripts/google_oauth.py.") from exc
+            raise WorkspaceError(f"Google refused the {what} request. Sign in to Google again from AgentsMind "
+                                 "(Settings > Connections).") from exc
         if code == 404:
             raise WorkspaceError(f"{what}: not found.") from exc
         raise WorkspaceError(f"{what} returned HTTP {code}.") from exc
