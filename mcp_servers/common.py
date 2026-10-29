@@ -78,7 +78,9 @@ def make_server(*, name: str, title: str, instructions: str, prefix: str, defaul
     server = MCPServer(
         name=name, title=title, instructions=instructions, version="1.0.0",
         token_verifier=StaticTokenVerifier(token),
-        auth=AuthSettings(issuer_url=base, resource_server_url=f"{base}/mcp"),
+        # The static verifier accepts exactly one shared token for this server, so the audience
+        # check of resource-bound OAuth tokens does not apply here.
+        auth=AuthSettings(issuer_url=base, resource_server_url=f"{base}/mcp", validate_token_resource=False),
     )
     cfg = {"host": host, "port": port, "base": base}
     return server, cfg

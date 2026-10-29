@@ -21,6 +21,9 @@ param(
     [switch]$Push
 )
 $ErrorActionPreference = "Continue"
+# No web call may hang the gate.
+$PSDefaultParameterValues["Invoke-RestMethod:TimeoutSec"] = 180
+$PSDefaultParameterValues["Invoke-WebRequest:TimeoutSec"] = 60
 $Here = $PSScriptRoot
 $Repo = Join-Path $Here "agentsmind"
 $Bundle = Join-Path $Here "agentsmind.bundle"
@@ -137,10 +140,26 @@ $parts = [ordered]@{
     "core-api"       = @("-m", "uvicorn", "agentsmind.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port", "18000")
     "worker"         = @("-m", "agentsmind.queue.worker")
 }
+$Ports = @(8201, 8202, 8101, 8102, 8103, 8104, 18000)
+function Free-Ports {
+    foreach ($p in $Ports) {
+        $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+        foreach ($x in $c) {
+            if ($x.OwningProcess -gt 0) {
+                Say ("port $p was still in use by process " + $x.OwningProcess + " (left over from an earlier run): stopping it")
+                Stop-Process -Id $x.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    Start-Sleep -Milliseconds 500
+}
+function Quote-Args([string[]]$a) { ($a | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join " " }
+Free-Ports
 $procs = @{}
+try {
 $env:PYTHONPATH = "backend"
 foreach ($k in $parts.Keys) {
-    $procs[$k] = Start-Process -FilePath $vpy -ArgumentList $parts[$k] -PassThru -WindowStyle Hidden -WorkingDirectory $Repo `
+    $procs[$k] = Start-Process -FilePath $vpy -ArgumentList (Quote-Args $parts[$k]) -PassThru -WindowStyle Hidden -WorkingDirectory $Repo `
         -RedirectStandardOutput (Join-Path $LogDir "$k.out.log") -RedirectStandardError (Join-Path $LogDir "$k.err.log")
     Start-Sleep -Milliseconds 800
 }
@@ -221,7 +240,11 @@ if ($FrontendBuilt) {
     Pop-Location
     Say "Playwright HTML report: frontend\playwright-report\index.html"
 }
-foreach ($k in $procs.Keys) { if ($procs[$k] -and -not $procs[$k].HasExited) { Stop-Process -Id $procs[$k].Id -Force } }
+} finally {
+    # Runs on success, on error and on Ctrl+C, so no server is left holding a port.
+    foreach ($k in $procs.Keys) { if ($procs[$k] -and -not $procs[$k].HasExited) { Stop-Process -Id $procs[$k].Id -Force -ErrorAction SilentlyContinue } }
+    Remove-Item Env:\AGENTSMIND_URL -ErrorAction SilentlyContinue
+}
 foreach ($k in $parts.Keys) {
     $errf = Join-Path $LogDir "$k.err.log"
     $lines = Get-Content $errf -ErrorAction SilentlyContinue | Select-String -Pattern "Error|Traceback|refus" | Select-Object -First 6
