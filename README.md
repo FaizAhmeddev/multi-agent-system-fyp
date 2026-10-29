@@ -116,11 +116,11 @@ FYP_FINAL/            the original prototype, kept only for characterization tes
 | Phase | Content | Verified on the Windows laptop |
 |---|---|---|
 | 0 | Audit and characterization tests | yes |
-| 1a, 1b | Foundation, auth, queue, RBAC, gateway | yes (74 backend and 64 characterization tests) |
-| 2 | Portals and MCP servers | pending the next gate run |
-| 3 | Agents, calendar, Gmail, Drive, CV screening | pending the next gate run |
-| 4 | Web app, Playwright, Streamlit removed | pending the next gate run |
-| 5 | Quality tools and documentation | pending the next gate run |
+| 1a, 1b | Foundation, auth, queue, RBAC, gateway | yes |
+| 2 | Portals and MCP servers | yes |
+| 3 | Agents, calendar, Gmail, Drive, CV screening | yes |
+| 4 | Web app, Playwright, Streamlit removed | build, typecheck and contrast yes; e2e re-run pending |
+| 5 | Quality tools and documentation | coverage and bandit yes; pip-audit re-run pending; secrets scan waits for the history purge |
 
+Before publishing: run `scripts\win\finish-agentsmind.ps1` (history purge, see `docs/HISTORY_PURGE.md`).
 Credentials still needed for live mode: an OpenAI key and a Google OAuth client.
-The logo is in place.

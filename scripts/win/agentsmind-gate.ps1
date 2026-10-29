@@ -11,7 +11,7 @@
     1. clone GitHub repo if missing, import commits from agentsmind.bundle, check out the branch
     2. scripts\win\setup.ps1 -Dev   (venv, pinned pip install, .env with random secrets, migrations)
     3. ruff, pytest (backend, portals, MCP servers, assistant, characterization), migrations, seeds
-    4. frontend: npm install, tsc, vite build, WCAG contrast check (needs Node.js 22)
+    4. frontend: npm ci, tsc, vite build, WCAG contrast check (needs Node.js 22)
     5. live system (portals, 4 MCP servers in sandbox mode, core API serving the web app, worker):
        MCP smoke, API checks, assistant prompts, then Playwright end-to-end tests
     6. writes everything to .\gate-logs\gate-<time>.log  (no secrets are written to the log)
@@ -124,7 +124,7 @@ if (-not $node) {
 } else {
     Run "node version" "node" @("--version") | Out-Null
     Push-Location $fe
-    Run "npm install" "npm.cmd" @("install", "--no-audit", "--no-fund") | Out-Null
+    Run "npm ci (exact versions from package-lock.json)" "npm.cmd" @("ci", "--no-audit", "--no-fund") | Out-Null
     Run "typecheck (tsc)" "npm.cmd" @("run", "typecheck") | Out-Null
     $before = $script:Failures.Count
     Run "vite build" "npm.cmd" @("run", "build") | Out-Null

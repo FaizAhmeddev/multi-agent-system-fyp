@@ -52,11 +52,11 @@ if ($LASTEXITCODE -ne 0) { throw "alembic upgrade failed" }
 # Web app: built into frontend\dist and served by the core API (needs Node.js 22).
 if (Get-Command npm.cmd -ErrorAction SilentlyContinue) {
     Push-Location frontend
-    & npm.cmd install --no-audit --no-fund
+    & npm.cmd ci --no-audit --no-fund
     if ($LASTEXITCODE -eq 0) { & npm.cmd run build }
     Pop-Location
     if ($LASTEXITCODE -ne 0) { Write-Warning "Web app build failed; the API still works. See docs\FRONTEND.md." }
 } else {
-    Write-Warning "Node.js not found: install Node.js 22 LTS, then run: cd frontend; npm install; npm run build"
+    Write-Warning "Node.js not found: install Node.js 22 LTS, then run: cd frontend; npm ci; npm run build"
 }
 Write-Host "Setup complete. Start everything with: scripts\win\run_all.ps1"

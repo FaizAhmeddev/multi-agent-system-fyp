@@ -2,6 +2,22 @@
 
 Removes `FYP_FINAL/database/fyp_data.db` and `FYP_FINAL/logs/orchestrator.log` from every commit.
 
+## Recommended: one script
+
+`scripts\win\finish-agentsmind.ps1`, run next to `agentsmind.bundle` after a gate run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\finish-agentsmind.ps1
+```
+
+It backs up GitHub (mirror), makes a fresh clone, adds every phase branch from the bundle, purges
+both files from **all** branches at once, verifies the result and runs the secrets scan. It pushes
+nothing; at the end it prints the push commands for you to run. A dry run of the same steps (with
+`git filter-branch`) on a copy took the files out of all 9 commits that touched them, and the secrets
+scan then reported CLEAN.
+
+## Manual steps (main only)
+
 I ran a dry run of this purge on a throwaway clone, using git's built-in filter-branch because filter-repo isn't available in my workspace. Result: 42 commits rewritten, and 0 commits or files still reference either path afterwards.
 
 Steps 1 to 4 touch nothing on GitHub. **Do not run step 5 until you have checked step 4.**
