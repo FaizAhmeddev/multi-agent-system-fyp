@@ -16,6 +16,16 @@ from ..rbac import STAFF_ROLES
 from . import ported as P
 from .catalog import AGENT_TOOLS, DOC_ROLES
 from .llm import LLM
+from .untrusted import wrap
+
+
+def _u(text: str, source: str, limit: int) -> str:
+    """Untrusted document or CV text, delimited before it goes into a prompt (Phase 3).
+
+    `limit` is the cut-off the ported prompt applies; the text is shortened first so the
+    closing marker always survives that cut-off.
+    """
+    return wrap(text[: limit - 120], source=source).text if text else text
 
 
 @dataclass(frozen=True)
@@ -92,8 +102,8 @@ def _plain(text: str) -> AgentOutput:
 
 
 def _interview(i: InterviewQuestionsIn, _user: str, llm: LLM) -> AgentOutput:
-    return _llm_out(llm, P.hr_interview_questions_prompt(i.job_description, i.candidate_name, i.cv_content),
-                    P.Temperature.HR)
+    return _llm_out(llm, P.hr_interview_questions_prompt(i.job_description, i.candidate_name,
+                                                         _u(i.cv_content, "cv", 1000)), P.Temperature.HR)
 
 
 def _onboarding(i: OnboardingIn, _user: str, llm: LLM) -> AgentOutput:
@@ -104,7 +114,7 @@ def _onboarding(i: OnboardingIn, _user: str, llm: LLM) -> AgentOutput:
 
 
 def _policy(i: PolicyQuestionIn, user: str, llm: LLM) -> AgentOutput:
-    return _llm_out(llm, P.hr_policy_answer_prompt(i.question, user, i.policy_context), P.Temperature.HR,
+    return _llm_out(llm, P.hr_policy_answer_prompt(i.question, user, _u(i.policy_context, "policy", 2000)), P.Temperature.HR,
                     policy_source="provided" if i.policy_context else "none")
 
 
@@ -119,17 +129,18 @@ def _troubleshoot(i: TroubleshootIn, user: str, llm: LLM) -> AgentOutput:
 def _summarize(i: SummarizeIn, user: str, llm: LLM) -> AgentOutput:
     if len(i.document_content.strip()) < 30:
         return _plain(f"'{i.file_name}' is empty or too short to summarize.")
-    return _llm_out(llm, P.doc_summarize_prompt(i.document_content, i.file_name, user), P.Temperature.DOCS)
+    return _llm_out(llm, P.doc_summarize_prompt(_u(i.document_content, "document", 4000), i.file_name, user),
+                    P.Temperature.DOCS)
 
 
 def _extract(i: ExtractIn, _user: str, llm: LLM) -> AgentOutput:
-    return _llm_out(llm, P.doc_extract_prompt(i.document_content, i.extraction_type, i.file_name),
+    return _llm_out(llm, P.doc_extract_prompt(_u(i.document_content, "document", 3500), i.extraction_type, i.file_name),
                     P.Temperature.DOCS)
 
 
 def _compare(i: CompareIn, _user: str, llm: LLM) -> AgentOutput:
-    return _llm_out(llm, P.doc_compare_prompt(i.doc1_content, i.doc2_content, i.doc1_name, i.doc2_name),
-                    P.Temperature.DOCS)
+    return _llm_out(llm, P.doc_compare_prompt(_u(i.doc1_content, "document-1", 2000), _u(i.doc2_content, "document-2", 2000),
+                                              i.doc1_name, i.doc2_name), P.Temperature.DOCS)
 
 
 @dataclass(frozen=True)

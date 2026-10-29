@@ -3,6 +3,33 @@
 All notable changes, by phase. Each phase lives on its own `phase/<n>-<name>` branch
 and is merged into `main` by the project owner after the phase gate.
 
+## Phase 4: Web app, branch `phase/4-ui`
+
+### Added
+- **AgentsMind web app** (`frontend/`, see `docs/FRONTEND.md`): React 19, TypeScript, Vite 8, Tailwind 4 tokens, Radix UI, TanStack Query, Lucide icons and self-hosted IBM Plex Sans.
+  - Screens: sign-in with forgot and reset password, Hub, Assistant, Approvals, HR, IT, Finance, Documents, Communications, Admin, Settings, plus 403 and 404 pages.
+  - Assistant streams progress over Server-Sent Events and renders every card kind. Approval cards show exact details, warnings and conflicts; destructive ones need the typed name; results show read-back and links.
+  - Light and dark themes from one token set; WCAG AA contrast for every pair (`frontend/scripts/contrast.mjs`).
+  - Every data-changing form sends an `Idempotency-Key` and blocks double submits.
+  - Documents: compare two files through the queued Documents agent. Finance: CSV download with spreadsheet-formula neutralising.
+- **Workspace APIs** for the new screens, all through the tool gateway and MCP:
+  - `/api/documents/*`: list, search, read, summarise.
+  - `/api/communications/inbox` (with suspicious-message flags) and `/api/communications/send` (direct approval, idempotent).
+  - `/api/calendar/events`: list, create with read-back, cancel with confirmation; plus `/api/calendar/availability`.
+  - `/api/admin/audit`.
+- The core API serves the built app from `frontend/dist`, so the whole product runs on one port. Responses carry `Content-Security-Policy` (except Swagger UI) and `X-Frame-Options: DENY`.
+- **Playwright end-to-end suites** (`frontend/e2e`): sign-in and RBAC, calendar by prompt, clarification, hostile email, fallback, IT complaint to the confirmation page, Finance add and typed-name delete, HR screening, Documents summary, suspicious inbox mail, and design rules (no emoji, gradients or blur; labelled inputs; named buttons) on every page in both themes.
+- `tests/backend/test_ui_workspace_apis.py`.
+- The gate builds the frontend (npm install, tsc, vite build, contrast), then runs Playwright against the live sandbox system.
+
+### Changed
+- Agent-run actions (summarise, extract, compare, interview questions, policy answers) now delimit document and CV text as untrusted before it enters a prompt. The text is cut to the prompt's limit first, so the closing marker always survives.
+
+### Removed
+- **The Streamlit UI**: `FYP_FINAL/ui/`, `FYP_FINAL/main.py`, `run.bat`, `run.ps1`, `.streamlit/`, the Streamlit devcontainer, `runtime.txt`, and `streamlit` from the requirements.
+  - The root `requirements.txt` now points at the pinned sets in `requirements/`.
+  - Self-registration is intentionally not carried over; admins create accounts.
+
 ## Phase 3: Agents, calendar, Gmail and Drive, branch `phase/3-agents-calendar`
 
 ### Added

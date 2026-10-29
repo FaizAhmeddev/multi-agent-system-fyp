@@ -10,8 +10,11 @@
   What it does, all inside .\agentsmind (a separate clone; nothing else is touched):
     1. clone GitHub repo if missing, import commits from agentsmind.bundle, check out the branch
     2. scripts\win\setup.ps1 -Dev   (venv, pinned pip install, .env with random secrets, migrations)
-    3. ruff, pytest (backend + characterization), seed, live /health and login smoke test
-    4. writes everything to .\gate-logs\gate-<time>.log  (no secrets are written to the log)
+    3. ruff, pytest (backend, portals, MCP servers, assistant, characterization), migrations, seeds
+    4. frontend: npm install, tsc, vite build, WCAG contrast check (needs Node.js 22)
+    5. live system (portals, 4 MCP servers in sandbox mode, core API serving the web app, worker):
+       MCP smoke, API checks, assistant prompts, then Playwright end-to-end tests
+    6. writes everything to .\gate-logs\gate-<time>.log  (no secrets are written to the log)
 #>
 param(
     [string]$Branch = "",
@@ -94,6 +97,26 @@ $env:CALENDAR_MODE = "sandbox"; $env:WORKSPACE_MODE = "sandbox"; $env:CORE_API_U
 Remove-Item -ErrorAction SilentlyContinue (Join-Path $Repo "data\calendar_sandbox.db")
 Run "seed sandbox calendar" $vpy @("-m", "mcp_servers.calendar_mcp.seed") | Out-Null
 
+Step "Frontend (React + TypeScript + Vite)"
+$fe = Join-Path $Repo "frontend"
+$node = Get-Command node -ErrorAction SilentlyContinue
+$FrontendBuilt = $false
+if (-not $node) {
+    Say "Node.js not found: install Node.js 22 LTS (https://nodejs.org) to build the UI and run Playwright."
+    $script:Failures += "node missing"
+} else {
+    Run "node version" "node" @("--version") | Out-Null
+    Push-Location $fe
+    Run "npm install" "npm.cmd" @("install", "--no-audit", "--no-fund") | Out-Null
+    Run "typecheck (tsc)" "npm.cmd" @("run", "typecheck") | Out-Null
+    $before = $script:Failures.Count
+    Run "vite build" "npm.cmd" @("run", "build") | Out-Null
+    $buildOk = ($script:Failures.Count -eq $before)
+    Run "WCAG contrast (both themes)" "node" @("scripts/contrast.mjs") | Out-Null
+    Pop-Location
+    $FrontendBuilt = $buildOk -and (Test-Path (Join-Path $fe "dist\index.html"))
+}
+
 Step "Live system: portals, MCP servers, core API, worker"
 $es = Join-Path $Repo "external_systems"
 $parts = [ordered]@{
@@ -175,8 +198,20 @@ try {
     foreach ($row in $cv.cards[0].data.rows) { Say ("    CV {0,-14} rubric={1} keyword={2} {3} review={4}" -f $row.candidate, $row.rubric_score, $row.keyword_score, $row.recommendation, $row.needs_human_review) }
     $st = Invoke-RestMethod -Uri "$base/api/admin/queue" -Headers $auth
     Say ("queue -> " + ($st.queues | ConvertTo-Json -Compress))
+    $webapp = Invoke-WebRequest -UseBasicParsing -Uri "$base/"
+    Say ("GET / (web app) -> HTTP " + $webapp.StatusCode + ", serves React app: " + ($webapp.Content -match 'id="root"'))
 } catch {
     Say ("live check FAILED: " + $_.Exception.Message); $script:Failures += "live checks"
+}
+if ($FrontendBuilt) {
+    Step "Playwright end-to-end (Chromium, against the live system)"
+    Push-Location $fe
+    Run "playwright install chromium" "npx.cmd" @("playwright", "install", "chromium") | Out-Null
+    $env:AGENTSMIND_URL = $base
+    Run "playwright e2e" "npx.cmd" @("playwright", "test", "--reporter=list") | Out-Null
+    Remove-Item Env:\AGENTSMIND_URL -ErrorAction SilentlyContinue
+    Pop-Location
+    Say "Playwright HTML report: frontend\playwright-report\index.html"
 }
 foreach ($k in $procs.Keys) { if ($procs[$k] -and -not $procs[$k].HasExited) { Stop-Process -Id $procs[$k].Id -Force } }
 foreach ($k in $parts.Keys) {

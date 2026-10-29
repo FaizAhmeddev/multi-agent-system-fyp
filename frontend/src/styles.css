@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+
+/*
+  Design tokens. Light is the default; [data-theme="dark"] on <html> switches to dark.
+  Every text/background pair below meets WCAG AA (4.5:1 for body text, 3:1 for large text
+  and UI borders). Checked by e2e/contrast.spec.ts. No gradients, no blur, no emoji.
+*/
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --border: #d5dae1;
+  --border-strong: #8a94a3;
+  --fg: #151a21;
+  --muted: #58606d;
+  --primary: #1f4fd1;
+  --primary-hover: #183fa8;
+  --primary-fg: #ffffff;
+  --primary-soft: #e6edfc;
+  --success: #17703a;
+  --success-soft: #e3f3e8;
+  --warning: #7d5100;
+  --warning-soft: #fbf0dc;
+  --danger: #b42318;
+  --danger-soft: #fbe7e5;
+  --focus: #1f4fd1;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #161a21;
+  --surface-2: #1d222b;
+  --border: #2c333e;
+  --border-strong: #6b7584;
+  --fg: #e8ebf0;
+  --muted: #a3acba;
+  --primary: #7ea4ff;
+  --primary-hover: #a3bdff;
+  --primary-fg: #0b1020;
+  --primary-soft: #1b2744;
+  --success: #5cc98a;
+  --success-soft: #15291d;
+  --warning: #e5b04e;
+  --warning-soft: #2c2312;
+  --danger: #ff8a7f;
+  --danger-soft: #331816;
+  --focus: #a3bdff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--primary-soft);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

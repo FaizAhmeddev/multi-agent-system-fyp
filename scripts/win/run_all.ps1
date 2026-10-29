@@ -38,6 +38,8 @@ foreach ($p in $parts) {
 New-Item -ItemType Directory -Force -Path "data" | Out-Null
 $pids -join "`n" | Set-Content "data\run_all.pids" -Encoding ascii
 Write-Host ""
+if (Test-Path "frontend\dist\index.html") { Write-Host "AgentsMind    http://127.0.0.1:8000   (web app)" }
+else { Write-Host "Web app not built yet: cd frontend; npm install; npm run build   (needs Node.js 22)" }
 Write-Host "Core API      http://127.0.0.1:8000/api/docs"
 Write-Host "Finance Portal http://127.0.0.1:8201   IT Helpdesk http://127.0.0.1:8202"
 Write-Host "Sign-in details: data\local_credentials.txt"
