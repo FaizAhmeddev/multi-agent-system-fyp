@@ -10,7 +10,9 @@ these as "Simulated". The core never calls a write tool without an approval.
 """
 from __future__ import annotations
 
+import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
@@ -31,6 +33,7 @@ INSTRUCTIONS = (
 server, CFG = make_server(name="calendar-mcp", title="AgentsMind Calendar tools", instructions=INSTRUCTIONS,
                           prefix="CALENDAR", default_port=8103)
 _backend: Backend | None = None
+log = logging.getLogger("calendar-mcp")
 DEFAULT_TZ = os.environ.get("TIMEZONE", "Asia/Karachi")
 MAX_WINDOW = timedelta(days=62)
 
@@ -44,6 +47,7 @@ Mode = Literal["sandbox", "google", "local"]
 
 
 _token_seen: list[float | None] = []
+_fallback_at: list[float] = []  # when Google Calendar was found disabled; tried again after 5 minutes
 
 
 def backend() -> Backend:
@@ -52,7 +56,9 @@ def backend() -> Backend:
     from mcp_servers.google_common import TOKEN_PATH
 
     m = TOKEN_PATH.stat().st_mtime if TOKEN_PATH.is_file() else None
-    if _backend is None or (_backend.mode == "local" and _token_seen and _token_seen[0] != m):
+    retry_google = _fallback_at and time.time() - _fallback_at[0] > 300
+    if _backend is None or (_backend.mode == "local" and (_token_seen and _token_seen[0] != m or retry_google)):
+        _fallback_at.clear()
         _backend = choose_backend()
     _token_seen[:] = [m]
     return _backend
@@ -133,9 +139,23 @@ def _window(a: datetime, b: datetime) -> None:
 
 
 def _guard(fn, *args, **kw):
+    global _backend
     try:
         return fn(*args, **kw)
     except CalendarError as exc:
+        if "is not enabled" in str(exc) and getattr(fn, "__self__", None) is _backend and _backend is not None \
+                and _backend.mode == "google":
+            # Google sign-in works but the Calendar API is off in the Cloud project: keep working on the
+            # local calendar instead of failing every request (and say so in the log).
+            log.warning("%s Using the local calendar (data/calendar_local.db) until it is enabled.", exc)
+            from mcp_servers.calendar_mcp.backends import LocalCalendar
+
+            _backend = LocalCalendar()
+            _fallback_at[:] = [time.time()]
+            try:
+                return getattr(_backend, fn.__name__)(*args, **kw)
+            except CalendarError as exc2:
+                raise ToolError(str(exc2)) from exc2
         raise ToolError(str(exc)) from exc
 
 

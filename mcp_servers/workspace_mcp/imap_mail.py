@@ -32,7 +32,8 @@ from .extract import ExtractError, kind_of, text_of
 log = logging.getLogger("workspace_mcp.imap")
 IMAP_HOST, IMAP_PORT = "imap.gmail.com", 993
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
-TIMEOUT = 20
+TIMEOUT = 30
+PREVIEW_BYTES = 60_000  # inbox lists: headers and text, never the attachments
 MAX_BODY = 100_000
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -135,6 +136,29 @@ class GmailIMAP:
                 "seen": "\\Seen" in head}
         return email.message_from_bytes(data[0][1]), meta
 
+    @staticmethod
+    def _fetch_many(c: imaplib.IMAP4_SSL, uids: list[bytes], limit: int | None = None
+                    ) -> list[tuple[Message, dict[str, str]]]:
+        """One FETCH for several messages (one round trip instead of one per message). With limit, only the
+        first `limit` bytes of each message are downloaded: enough for headers and the text, not attachments."""
+        if not uids:
+            return []
+        part = f"BODY.PEEK[]<0.{limit}>" if limit else "BODY.PEEK[]"
+        typ, data = c.uid("FETCH", b",".join(uids), f"(UID X-GM-MSGID X-GM-THRID FLAGS {part})")
+        if typ != "OK" or not data:
+            return []
+        by_uid: dict[bytes, tuple[Message, dict[str, str]]] = {}
+        for item in data:
+            if not isinstance(item, tuple):
+                continue
+            head = item[0].decode(errors="replace")
+            uid = (re.search(r"UID (\d+)", head) or [None, ""])[1].encode()
+            meta = {"msgid": (re.search(r"X-GM-MSGID (\d+)", head) or [None, ""])[1],
+                    "thrid": (re.search(r"X-GM-THRID (\d+)", head) or [None, ""])[1],
+                    "seen": "\\Seen" in head}
+            by_uid[uid] = (email.message_from_bytes(item[1]), meta)
+        return [by_uid[u] for u in uids if u in by_uid]
+
     def _mail(self, msg: Message, meta: dict):
         from .backends import Mail
 
@@ -158,11 +182,7 @@ class GmailIMAP:
             uids.reverse()  # newest first
             start = int(page_token or 0)
             page = uids[start:start + max_results]
-            out = []
-            for u in page:
-                got = self._fetch(c, u)
-                if got:
-                    out.append(self._mail(*got))
+            out = [self._mail(*got) for got in self._fetch_many(c, page, limit=PREVIEW_BYTES)]
         finally:
             _logout(c)
         nxt = str(start + max_results) if start + max_results < len(uids) else None
@@ -215,11 +235,7 @@ class GmailIMAP:
         try:
             uids = self._search(c, raw)
             uids.reverse()
-            for u in uids[:max_messages]:
-                got = self._fetch(c, u)
-                if not got:
-                    continue
-                msg, meta = got
+            for msg, meta in self._fetch_many(c, uids[:max_messages]):
                 m = self._mail(msg, meta)
                 for idx, name, ctype, data in _attachments(msg):
                     if kind_of(name, ctype) is None:

@@ -24,7 +24,8 @@ server, CFG = make_server(name="it-mcp", title="AgentsMind IT Helpdesk tools", i
 portal = PortalClient(
     name="IT Helpdesk", base_url=setting("IT_PORTAL_URL", "http://127.0.0.1:8202"),
     api_key=setting("IT_PORTAL_API_KEY", required=True, min_len=24),
-    start_hint="Start it with scripts\\win\\run_all.ps1 or: uvicorn it_portal.app:create_app --factory "
+    start_hint="Start AgentsMind with main.py (it starts the portal too) or Start-External-Systems.bat, "
+               "or: uvicorn it_portal.app:create_app --factory "
                "--app-dir external_systems --port 8202",
 )
 

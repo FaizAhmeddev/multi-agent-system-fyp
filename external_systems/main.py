@@ -5,6 +5,7 @@
   AgentsMind Finance Portal   http://127.0.0.1:8201   (payroll system: people and payments)
   AgentsMind IT Helpdesk      http://127.0.0.1:8202   (complaint tickets; public form at /)
 
+AgentsMind's main.py also starts them; use this script to run them on their own.
 AgentsMind reaches them only through finance-mcp and it-mcp. They share the repository's
 .venv and .env with AgentsMind (run main.py once first, or this script sets them up).
 With DEMO_MODE=false their sample records (example.com emails) are removed once;
@@ -36,17 +37,7 @@ PIDS = L.DATA / "external.pids"
 
 def demo_data() -> None:
     """Remove (DEMO_MODE=false) or add (true) the portals' sample records, once."""
-    env = L.read_env()
-    demo = env.get("DEMO_MODE", "false").lower() in ("1", "true", "yes")
-    mark = L.DATA / (".demo_external_seeded" if demo else ".demo_external_purged")
-    if mark.exists():
-        return
-    if demo:
-        for seed in ("finance_portal/seed.py", "it_portal/seed.py"):
-            L.run([str(L.VPY), str(HERE / seed)], check=False)
-    else:
-        L.run([str(L.VPY), str(HERE / "demo_cleanup.py")], check=False)
-    mark.write_text("done\n")
+    L.portal_demo_data(L.read_env())
 
 
 def main() -> int:

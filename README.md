@@ -36,11 +36,12 @@ You need Python 3.11 or 3.12, Node.js 22 LTS and git. Then, in the AgentsMind fo
    - creates the database and builds the web app;
    - opens the Google sign-in once if a Google OAuth client file is configured.
 
-   Every start then runs the MCP servers, the core API and the worker in that one window, opens
+   Every start then runs the external systems (Finance Portal on port 8201 and IT Helpdesk on 8202, each
+   a separate app with its own database), the MCP servers, the core API and the worker in that one window, opens
    **http://127.0.0.1:8000**, restarts any part that crashes, and stops everything when you close the
    window or press Ctrl+C.
-2. Double-click **Start-External-Systems.bat** to run the separate external systems: the Finance Portal
-   (payroll records, port 8201) and the IT Helpdesk (port 8202).
+2. Optional: to run the external systems on their own (for example on another computer), double-click
+   **Start-External-Systems.bat**; main.py then uses the running ones (or pass `--no-portals`).
 3. If something is left running after a crash, double-click **Stop-AgentsMind.bat**.
 
 Sign in with the admin account in `.env` (`AGENTSMIND_ADMIN_EMAIL`, `AGENTSMIND_ADMIN_PASSWORD`; also in
@@ -53,9 +54,9 @@ Then **Run and Debug** (Ctrl+Shift+D), pick a configuration and press **F5**:
 
 | Configuration | What it does |
 |---|---|
-| Run AgentsMind | `main.py`: sets up and starts everything, opens http://127.0.0.1:8000 |
-| Run External Systems | Finance Portal (8201) and IT Helpdesk (8202) |
-| Run everything | both of the above together |
+| Run AgentsMind | `main.py`: sets up and starts everything (including the Finance Portal and IT Helpdesk), opens http://127.0.0.1:8000 |
+| Run AgentsMind without the external systems | the same, without the Finance Portal and IT Helpdesk |
+| Run External Systems | only the Finance Portal (8201) and IT Helpdesk (8202) |
 | Run all tests | every test suite and the frontend type check; report in `logs\test-report.txt` |
 | Stop AgentsMind | stops anything still running |
 
@@ -105,7 +106,7 @@ powershell -ExecutionPolicy Bypass -File scripts\win\setup.ps1 -Dev
 .venv\Scripts\python -m pytest tests\backend tests\portals tests\mcp_servers_tests tests\assistant -q
 .venv\Scripts\python -m pytest tests\characterization -q
 .venv\Scripts\python scripts\quality.py             # coverage, bandit, secrets scan, pip-audit
-cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e needs run_all.ps1 running
+cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e needs AgentsMind running
 ```
 
 `scripts\win\agentsmind-gate.ps1` does all of this on a separate clone and writes one log.
@@ -118,6 +119,8 @@ cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e n
 - **Google Calendar, Drive and Sheets:** set `GOOGLE_OAUTH_CLIENT_FILE` to your OAuth client JSON (Desktop app),
   enable the Calendar, Drive and Sheets APIs in its Google Cloud project, then start AgentsMind: the sign-in opens
   once (or use Settings > Connections). The token is stored encrypted in `data\google_token.enc`.
+  The APIs are enabled at https://console.cloud.google.com/apis/library (Google Calendar API, Google Drive API,
+  Google Sheets API). Until the Calendar API is on, meetings go to AgentsMind's local calendar.
 - **WhatsApp:** the Twilio settings above.
 
 ## Repository layout

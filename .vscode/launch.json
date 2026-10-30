@@ -1,5 +1,6 @@
 {
   // Run and Debug (Ctrl+Shift+D): pick one of these and press F5.
+  // "Run AgentsMind" starts everything, including the Finance Portal and IT Helpdesk.
   "version": "0.2.0",
   "configurations": [
     {
@@ -10,6 +11,15 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true
+    },
+    {
+      "name": "Run AgentsMind without the external systems",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--no-portals"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     },
     {
       "name": "Run External Systems (Finance Portal, IT Helpdesk)",
@@ -35,13 +45,6 @@
       "args": ["--stop"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
-    }
-  ],
-  "compounds": [
-    {
-      "name": "Run everything (AgentsMind + External Systems)",
-      "configurations": ["Run External Systems (Finance Portal, IT Helpdesk)", "Run AgentsMind"],
-      "stopAll": true
     }
   ]
 }

@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     set_local_credentials(ROOT / "data" / "local_credentials.txt", email, a.password)
     (ROOT / "data" / "first_admin.txt").write_text(f"{email}\t{a.password}\n", encoding="utf-8")
     print(f"Admin {email}: {action}. .env and data/local_credentials.txt updated.")
-    print("Start AgentsMind with scripts\\win\\run_all.ps1 and sign in at http://127.0.0.1:8000")
+    print("Start AgentsMind with Start-AgentsMind.bat (or python main.py) and sign in at http://127.0.0.1:8000")
     return 0
 
 

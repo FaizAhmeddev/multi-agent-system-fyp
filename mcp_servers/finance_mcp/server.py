@@ -28,7 +28,8 @@ server, CFG = make_server(name="finance-mcp", title="AgentsMind Finance Portal t
 portal = PortalClient(
     name="Finance Portal", base_url=setting("FINANCE_PORTAL_URL", "http://127.0.0.1:8201"),
     api_key=setting("FINANCE_PORTAL_API_KEY", required=True, min_len=24),
-    start_hint="Start it with scripts\\win\\run_all.ps1 or: uvicorn finance_portal.app:create_app --factory "
+    start_hint="Start AgentsMind with main.py (it starts the portal too) or Start-External-Systems.bat, "
+               "or: uvicorn finance_portal.app:create_app --factory "
                "--app-dir external_systems --port 8201",
 )
 

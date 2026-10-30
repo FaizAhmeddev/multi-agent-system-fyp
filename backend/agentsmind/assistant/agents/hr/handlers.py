@@ -240,8 +240,42 @@ def _jd_for(ctx: Ctx, role: str) -> tuple[str, str]:
             d = ctx.read("hr", "drive_read_file", {"file_id": jds[0]["id"]})
             if d.ok:
                 return d.data["text"], f"Drive file '{jds[0]['name']}'"
-    raise AgentError(f"No job description for '{role}'. Create the opening first, e.g. 'Open a job for {role} in "
-                     "Karachi. Requirements: Python 3 years; Django; SQL; Git', or add a job description file to Drive.")
+    return _auto_job(ctx, role)
+
+
+JD_SYSTEM = ("You write short job requirements for a company in Karachi, Pakistan. Reply with 5 to 8 lines, one "
+             "requirement per line, each starting with '- '. Use concrete skills, tools and years of experience. "
+             "No other text.")
+
+
+def _auto_job(ctx: Ctx, role: str) -> tuple[str, str]:
+    """No opening and no JD file: write the requirements (with the model when one is configured, otherwise from
+    the role's own words), save them as a job opening the HR can edit, and screen against them."""
+    title = " ".join(w if w.isupper() else w.capitalize() for w in role.split())[:200]
+    req = ""
+    llm = getattr(ctx, "llm", None)
+    if llm is not None and not getattr(llm, "simulated", True):
+        try:
+            r = llm.complete(f"Job title: {title}\nWrite the requirements.", system=JD_SYSTEM, temperature=0.2)
+            lines = [x.strip(" -•*\t") for x in r.text.splitlines() if x.strip(" -•*\t")]
+            req = "\n".join(lines[:8])
+        except Exception:  # noqa: BLE001 - fall back to the role's words
+            req = ""
+    words = [w for w in re.findall(r"[A-Za-z+#.]+", title) if w.lower() not in {"senior", "junior", "the", "and", "of"}]
+    if not req:
+        req = "\n".join([f"{title} experience", *words[:3]])
+    description = _jd_text(title, req)
+    db = getattr(ctx, "db", None)
+    if db is not None:
+        from ....db.hr_models import HRJob
+
+        j = HRJob(title=title, department="", location=S.get_policy(db)["recruitment"]["candidate_city"],
+                  employment_type="permanent", description=description, status="open",
+                  created_by_user_id=ctx.user.id)
+        db.add(j)
+        db.commit()
+    return description, (f"new job opening '{title}' (no opening existed, so its requirements were written "
+                         "automatically; edit them in HR > Recruitment and screen again if needed)")
 
 
 def gather_cvs(ctx: Ctx, role: str, sources: set[str], notes: list[str]) -> list[dict[str, Any]]:

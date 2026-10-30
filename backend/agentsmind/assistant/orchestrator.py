@@ -200,6 +200,12 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
         else:
             steps = plan(text)
     else:
+        from .general import quick
+
+        direct = quick(ctx, text, fallback_card(ctx))
+        if direct is not None:
+            ctx.emit({"type": "plan", "steps": []})
+            return TurnResult(cards=[direct], steps=[], planner="general")
         steps = plan(text)
         if not confident(text, steps):
             planned = llm_plan(ctx, text)

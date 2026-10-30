@@ -39,19 +39,51 @@ def _date_time(ctx, text: str) -> Card | None:
                 body=f"It is {now.strftime('%A, %d %B %Y')}, {now.strftime('%I:%M %p').lstrip('0')} ({ctx.tz}).")
 
 
+SMALL_TALK = set("hi hii hello hey there salam assalam assalamu o alaikum aoa good morning afternoon evening how are you "
+                 "doing agentsmind assistant bot sir dear team thanks thank thx shukriya jazakallah a lot so much ok okay "
+                 "what is whats what's the today today's todays date time day now current tell me please and it of "
+                 "week which clock right".split())
+
+
+def _only_small_talk(text: str) -> bool:
+    words = re.findall(r"[a-z']+", text.lower())
+    return bool(words) and all(w in SMALL_TALK for w in words)
+
+
+def quick(ctx, text: str, capabilities: Card) -> Card | None:
+    """Greetings, thanks, help and date/time: answered in code, before any department routing.
+    Only for messages made of nothing else ("Hi, show my emails" still goes to the email agent)."""
+    if HELP.search(text):
+        rest = HELP.sub(" ", text)
+        if not re.findall(r"[a-z]+", rest.lower()) or _only_small_talk(rest):
+            return Card(kind="fallback", agent="orchestrator", title="What I can do", body=capabilities.body,
+                        options=capabilities.options, data=capabilities.data)
+    if not _only_small_talk(text):
+        return None
+    dt = _date_time(ctx, text)
+    if dt is not None:
+        return dt
+    if GREET.search(text):
+        first = (ctx.user.name or "").split()[0] if ctx.user.name else ""
+        return Card(kind="text", agent="orchestrator", title=f"Hello{', ' + first if first else ''}!",
+                    body="I'm AgentsMind, your office assistant. Ask me about HR, finance, IT, email, calendar or "
+                         "documents. For example:", options=capabilities.options)
+    if THANKS.search(text):
+        return Card(kind="text", agent="orchestrator", title="AgentsMind", body="You're welcome.")
+    return None
+
+
 def answer(ctx, text: str, capabilities: Card) -> Card | None:
+    q = quick(ctx, text, capabilities)
+    if q is not None:
+        return q
     dt = _date_time(ctx, text)
     if dt is not None:
         return dt
     if GREET.search(text) and len(text.split()) <= 6:
-        first = (ctx.user.name or "").split()[0] if ctx.user.name else ""
-        return Card(kind="fallback", agent="orchestrator", title=f"Hello{', ' + first if first else ''}",
-                    body="What can I do for you? Some things I can help with:", options=capabilities.options,
-                    data=capabilities.data)
+        return quick(ctx, re.match(r"\W*\w+", text).group(0), capabilities)
     if THANKS.search(text) and len(text.split()) <= 6:
         return Card(kind="text", agent="orchestrator", title="AgentsMind", body="You're welcome.")
-    if HELP.search(text):
-        return capabilities
     llm = ctx.llm
     if getattr(llm, "simulated", True):
         return None

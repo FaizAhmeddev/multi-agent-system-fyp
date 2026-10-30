@@ -126,4 +126,24 @@ def test_general_questions_get_direct_answers(tmp_path):
     r = run_turn(FakeCtx(tmp_path), "Today date and time")
     assert r.planner == "general" and "Wednesday, 28 October 2026, 11:00 AM" in r.cards[0].body
     assert run_turn(FakeCtx(tmp_path), "hello").cards[0].title.startswith("Hello")
+    assert run_turn(FakeCtx(tmp_path), "Hi").cards[0].kind == "text"
+    assert run_turn(FakeCtx(tmp_path), "what can you do?").cards[0].title == "What I can do"
     assert run_turn(FakeCtx(tmp_path), "What is the weather like on Mars?").planner == "fallback"  # no model here
+
+
+def test_screening_without_an_opening_writes_requirements():
+    from types import SimpleNamespace
+
+    from agentsmind.assistant.agents.hr.handlers import _auto_job
+
+    class LLM:
+        simulated = False
+
+        def complete(self, prompt, system, temperature):
+            assert "Python Developer" in prompt
+            return SimpleNamespace(text="- Python 3 years\n- Django or FastAPI\n- SQL\n", simulated=False)
+
+    jd, src = _auto_job(SimpleNamespace(llm=LLM(), db=None), "python developer")
+    assert jd.startswith("Python Developer") and "- Django or FastAPI" in jd and "new job opening" in src
+    jd, _ = _auto_job(SimpleNamespace(llm=SimpleNamespace(simulated=True), db=None), "Data Analyst")
+    assert "- Data Analyst experience" in jd

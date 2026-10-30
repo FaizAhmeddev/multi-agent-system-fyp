@@ -101,6 +101,14 @@ def _unwrap(exc: BaseException) -> BaseException:
     return exc
 
 
+SLOW_PREFIXES = ("gmail_", "cv_folder_", "sheets_", "drive_", "docs_", "whatsapp_", "email_")
+
+
+def _timeout_for(tool: str, default: float) -> float:
+    """Tools that talk to Gmail, Drive or Sheets (or read many CVs) get more time than local portal calls."""
+    return max(default, 60.0) if tool.startswith(SLOW_PREFIXES) else default
+
+
 def call_tool(tool: str, args: dict[str, Any]) -> dict[str, Any]:
     from ..settings import get_settings
 
@@ -114,7 +122,7 @@ def call_tool(tool: str, args: dict[str, Any]) -> dict[str, Any]:
     for i in range(attempts):
         start = time.perf_counter()
         try:
-            out = _run(_call_async(cfg, tool, args, s.mcp_timeout_seconds))
+            out = _run(_call_async(cfg, tool, args, _timeout_for(tool, s.mcp_timeout_seconds)))
             log.info("mcp call", extra={"tool": tool, "server": cfg.name, "status": "ok",
                                         "latency_ms": int((time.perf_counter() - start) * 1000)})
             return out
@@ -126,13 +134,18 @@ def call_tool(tool: str, args: dict[str, Any]) -> dict[str, Any]:
                 raise
             log.warning("mcp call failed", extra={"tool": tool, "server": cfg.name, "attempt": i + 1,
                                                   "error": f"{type(last).__name__}: {last}"})
+            if "Timeout" in type(last).__name__ and tool.startswith(SLOW_PREFIXES):
+                break  # a slow external service: waiting another minute rarely helps
             if i + 1 < attempts:
                 time.sleep(0.4 * (2 ** i))
     if _probe_status(cfg) == 401:
         raise MCPCallError(f"{cfg.name} rejected the token. Check {cfg.name.split('-')[0].upper()}_MCP_TOKEN.",
                            code="unauthorized")
-    raise MCPCallError(f"{cfg.name} is not reachable at {cfg.url} ({type(last).__name__}). Start it with "
-                       "scripts\\win\\run_all.ps1.", code="unreachable")
+    if "Timeout" in type(last).__name__:
+        raise MCPCallError(f"{cfg.name} did not answer {tool} within {int(_timeout_for(tool, s.mcp_timeout_seconds))} "
+                           "seconds (the external service was slow). Try again in a moment.", code="timeout")
+    raise MCPCallError(f"{cfg.name} is not reachable at {cfg.url} ({type(last).__name__}). Start AgentsMind with "
+                       "main.py (Start-AgentsMind.bat), which starts every part.", code="unreachable")
 
 
 def _probe_status(cfg: ServerConfig) -> int | None:

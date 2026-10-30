@@ -10,10 +10,11 @@ Every run: starts the MCP servers, the core API (web app at http://127.0.0.1:800
 worker in this one window, opens the browser, restarts a part that crashes, and stops
 everything when you press Ctrl+C or close the window.
 
-The external systems (Finance Portal, IT Helpdesk) are separate: start them with
-Start-External-Systems.bat (external_systems/main.py).
+The external systems (Finance Portal on 8201, IT Helpdesk on 8202) are separate apps with their own
+databases. main.py starts them too, as separate processes, unless they are already running (for
+example from Start-External-Systems.bat) or you pass --no-portals.
 
-Options:  --no-browser   --no-google   --skip-install   --stop (stop a running AgentsMind)
+Options:  --no-browser   --no-google   --skip-install   --no-portals   --stop (stop a running AgentsMind)
 """
 from __future__ import annotations
 
@@ -48,6 +49,12 @@ PARTS = [
     ("core-api", ["-m", "uvicorn", "agentsmind.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port",
                   "8000"], {}, f"{WEB}/health"),
     ("worker", ["-m", "agentsmind.queue.worker"], {"PYTHONPATH": "backend"}, None),
+]
+PORTALS = [
+    ("finance-portal", ["-m", "uvicorn", "finance_portal.app:create_app", "--factory", "--app-dir", "external_systems",
+                        "--host", "127.0.0.1", "--port", "8201"], {}, "http://127.0.0.1:8201/api/v1/health"),
+    ("it-portal", ["-m", "uvicorn", "it_portal.app:create_app", "--factory", "--app-dir", "external_systems",
+                   "--host", "127.0.0.1", "--port", "8202"], {}, "http://127.0.0.1:8202/api/v1/health"),
 ]
 
 
@@ -107,6 +114,22 @@ def setup(no_google: bool) -> dict[str, str]:
     if not no_google:
         google_signin(env)
     return env
+
+
+def portal_demo_data(env: dict[str, str]) -> None:
+    """Remove (DEMO_MODE=false) or add (true) the external systems' sample records, once."""
+    demo = env.get("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+    mark = DATA / (".demo_external_seeded" if demo else ".demo_external_purged")
+    if mark.exists():
+        return
+    DATA.mkdir(exist_ok=True)
+    ext = ROOT / "external_systems"
+    if demo:
+        for seed in ("finance_portal/seed.py", "it_portal/seed.py"):
+            run([str(VPY), str(ext / seed)], check=False)
+    else:
+        run([str(VPY), str(ext / "demo_cleanup.py")], check=False)
+    mark.write_text("done\n")
 
 
 def read_env() -> dict[str, str]:
@@ -213,12 +236,13 @@ def pids_on_ports(ports: tuple[int, ...]) -> set[int]:
 
 
 def stop_previous(ports: tuple[int, ...] = PORTS) -> None:
-    if PIDS.exists():
-        for line in PIDS.read_text().split():
-            if line.isdigit():
-                kill_tree(int(line))
-        PIDS.unlink(missing_ok=True)
-        time.sleep(1)
+    for f in (PIDS, DATA / "run_all.pids"):  # this launcher's, and the old run_all.ps1 windows
+        if f.exists():
+            for line in f.read_text(errors="replace").split():
+                if line.isdigit():
+                    kill_tree(int(line))
+            f.unlink(missing_ok=True)
+            time.sleep(1)
     left = pids_on_ports(ports)
     if left:
         say(f"Stopping an older AgentsMind still using its ports (process {', '.join(map(str, sorted(left)))}).")
@@ -270,18 +294,31 @@ def status_line(env: dict[str, str]) -> None:
         f"  Sample data: {'on' if env.get('DEMO_MODE', '').lower() in ('1', 'true', 'yes') else 'off'}")
 
 
-def serve(env: dict[str, str], open_browser: bool) -> None:
+def serve(env: dict[str, str], open_browser: bool, portals: bool = True) -> None:
     stop_previous()
+    parts = list(PARTS)
+    if portals:
+        portal_demo_data(env)
+        running = [p for p in PORTALS if port_open(p[3])]
+        for p in running:
+            say(f"  {p[0]:14} already running (started separately)")
+        if not running:  # an old portal process that does not answer is stopped first
+            old = pids_on_ports((8201, 8202))
+            for pid in old:
+                kill_tree(pid)
+            if old:
+                time.sleep(2)
+        parts = [p for p in PORTALS if p not in running] + parts
     step("Starting AgentsMind")
     procs: dict[str, subprocess.Popen] = {}
     restarts: dict[str, int] = {}
-    for name, args, extra, _ in PARTS:
+    for name, args, extra, _ in parts:
         procs[name] = start(name, args, extra)
         time.sleep(0.6)
     DATA.mkdir(exist_ok=True)
     PIDS.write_text("\n".join(str(p.pid) for p in procs.values()))
     deadline = time.time() + 60
-    pending = {n: url for n, _, _, url in PARTS if url}
+    pending = {n: url for n, _, _, url in parts if url}
     while pending and time.time() < deadline:
         for n in list(pending):
             if procs[n].poll() is not None:  # our process exited: never count another program's port as ours
@@ -294,23 +331,24 @@ def serve(env: dict[str, str], open_browser: bool) -> None:
         time.sleep(0.5)
     for n in pending:
         say(f"  {n:14} NOT UP: {last_error(n) or 'see logs'}  (logs\\{n}.log)")
-    for name, _a, _e, _u in PARTS:
+    for name, _a, _e, _u in parts:
         if procs[name].poll() is not None and name not in pending:
             say(f"  {name:14} STOPPED: {last_error(name)}")
     fp = env.get("FINANCE_PORTAL_URL", "http://127.0.0.1:8201")
     if not port_open(f"{fp}/api/v1/health"):
-        say("  Finance Portal and IT Helpdesk are not running: start Start-External-Systems.bat for payroll and "
-            "IT tickets.")
+        say("  Finance Portal and IT Helpdesk are not running: start Start-External-Systems.bat (or run main.py "
+            "without --no-portals) for payroll and IT tickets.")
     say("")
     status_line(env)
-    say(f"\nAgentsMind is running: {WEB}\nSign-in details: data\\local_credentials.txt\n"
+    say(f"\nAgentsMind is running: {WEB}\n  Finance Portal: http://127.0.0.1:8201   IT Helpdesk: "
+        "http://127.0.0.1:8202\nSign-in details: data\\local_credentials.txt\n"
         "Logs: logs\\<part>.log\nPress Ctrl+C (or close this window) to stop everything.")
     if open_browser and "core-api" not in pending:
         webbrowser.open(WEB)
     try:
         while True:
             time.sleep(2)
-            for name, args, extra, _ in PARTS:
+            for name, args, extra, _ in parts:
                 p = procs[name]
                 if p.poll() is not None:
                     restarts[name] = restarts.get(name, 0) + 1
@@ -337,6 +375,7 @@ def main() -> int:
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--no-google", action="store_true")
     ap.add_argument("--skip-install", action="store_true")
+    ap.add_argument("--no-portals", action="store_true", help="do not start the Finance Portal and IT Helpdesk")
     ap.add_argument("--stop", action="store_true", help="stop a running AgentsMind")
     a = ap.parse_args()
     os.chdir(ROOT)
@@ -352,7 +391,7 @@ def main() -> int:
         args = [x for x in sys.argv[1:] if x != "--skip-install"]
         return subprocess.call([str(VPY), str(ROOT / "main.py"), "--skip-install", *args])  # noqa: S603
     env = setup(a.no_google)
-    serve(env, not a.no_browser)
+    serve(env, not a.no_browser, not a.no_portals)
     return 0
 
 
