@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     def _normalise_db_url(cls, v: str) -> str:
         if v.startswith("postgres://"):
             v = "postgresql+psycopg://" + v[len("postgres://"):]
+        elif v.startswith("postgresql://"):  # the form Render and most hosts give
+            v = "postgresql+psycopg://" + v[len("postgresql://"):]
         return v
 
     @property

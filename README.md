@@ -47,6 +47,11 @@ You need Python 3.11 or 3.12, Node.js 22 LTS and git. Then, in the AgentsMind fo
 Sign in with the admin account in `.env` (`AGENTSMIND_ADMIN_EMAIL`, `AGENTSMIND_ADMIN_PASSWORD`; also in
 `data\local_credentials.txt`). To change it later: `.venv\Scripts\python scripts\set_admin.py --email ... --password ...`.
 
+## Deploy on Render
+
+`render.yaml` + `Dockerfile` deploy everything as one service on Render's free plan (one process,
+`deploy/onebox.py`). Steps and the free plan's limits: [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md).
+
 ## Share it with a free public link
 
 Double-click **Start-Public-Link.bat** (or VS Code: "Run AgentsMind with a free public link", or
