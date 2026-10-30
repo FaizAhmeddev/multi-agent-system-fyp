@@ -1,2 +1,2 @@
 -r backend.txt
-psycopg[binary]==3.2.3
+psycopg[binary]==3.2.10

@@ -5,4 +5,4 @@
 #   requirements/postgres.txt  + PostgreSQL driver
 #   requirements/dev.txt       + tests and lint
 -r requirements/servers.txt
-psycopg[binary]==3.2.3
+psycopg[binary]==3.2.10
