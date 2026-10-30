@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--email", required=True)
     ap.add_argument("--password", required=True)
+    ap.add_argument("--allow-weak", action="store_true",
+                    help="accept any password of 8+ characters (the host operator chose it explicitly)")
     ap.add_argument("--if-changed", action="store_true",
                     help="do nothing when that admin already has this password (used at each start on a server)")
     a = ap.parse_args(argv)
@@ -68,6 +70,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Email not accepted: {e}")
         return 2
     problems = password_problems(a.password, email=email, min_length=get_settings().password_min_length)
+    if problems and a.allow_weak and len(a.password) >= 8:
+        print("Warning, the admin password is weak: " + " ".join(problems) + " It is used anyway because it was set "
+              "on the host. Choose a stronger one there.")
+        problems = []
     if problems:
         print("Password not accepted: " + " ".join(problems))
         return 2

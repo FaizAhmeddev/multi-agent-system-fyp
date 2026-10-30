@@ -61,8 +61,10 @@ def migrate() -> None:
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT, check=True)  # noqa: S603
     email, pw = os.environ.get("AGENTSMIND_ADMIN_EMAIL", ""), os.environ.get("AGENTSMIND_ADMIN_PASSWORD", "")
     if email and pw:  # set on the host (Render > Environment): that is the admin sign-in, also after a change
-        subprocess.run([sys.executable, "scripts/set_admin.py", "--email", email, "--password", pw,  # noqa: S603
-                        "--if-changed"], cwd=ROOT, check=False)
+        r = subprocess.run([sys.executable, "scripts/set_admin.py", "--email", email.strip(),  # noqa: S603
+                            "--password", pw.strip(), "--if-changed", "--allow-weak"], cwd=ROOT, check=False)
+        print(f"ADMIN SIGN-IN: {email.strip().lower()} with the password set in AGENTSMIND_ADMIN_PASSWORD"
+              + ("" if r.returncode == 0 else " (NOT applied, see the message above)"), flush=True)
     else:
         print("AGENTSMIND_ADMIN_EMAIL and AGENTSMIND_ADMIN_PASSWORD are not set in the host's environment, so a "
               "random admin password was generated. Set both and redeploy to choose the admin sign-in.", flush=True)
