@@ -315,11 +315,28 @@ def cloudflared() -> Path:
     return exe
 
 
-def public_link(procs: dict[str, subprocess.Popen]) -> str:
-    """Start a Cloudflare Quick Tunnel to the web app and return its https address."""
+def public_link(procs: dict[str, subprocess.Popen], env: dict[str, str] | None = None) -> str:
+    """Start a Cloudflare tunnel to the web app and return its https address.
+
+    With CLOUDFLARE_TUNNEL_TOKEN (and PUBLIC_URL) in .env: your own named tunnel with a fixed address.
+    Without: a Quick Tunnel with a new random https://...trycloudflare.com address each start."""
     import re
 
+    env = env or {}
     exe = cloudflared()
+    token = env.get("CLOUDFLARE_TUNNEL_TOKEN", "").strip()
+    if token:
+        LOGS.mkdir(exist_ok=True)
+        log = open(LOGS / "public-link.log", "w", encoding="utf-8")  # noqa: SIM115 - kept open for the child
+        kw0: dict = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if IS_WIN else {"start_new_session": True}
+        cmd = [str(exe), "tunnel", "--no-autoupdate", "run", "--token", token]
+        procs["public-link"] = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, **kw0)  # noqa: S603
+        time.sleep(5)
+        if procs["public-link"].poll() is not None:
+            return ""
+        url = env.get("PUBLIC_URL", "").strip() or "your tunnel's public hostname (see the Cloudflare dashboard)"
+        PUBLIC_FILE.write_text(url + "\n")
+        return url
     LOGS.mkdir(exist_ok=True)
     logf = LOGS / "public-link.log"
     log = open(logf, "w", encoding="utf-8")  # noqa: SIM115 - kept open for the child's lifetime
@@ -398,12 +415,13 @@ def serve(env: dict[str, str], open_browser: bool, portals: bool = True, public:
         "http://127.0.0.1:8202\nSign-in details: data\\local_credentials.txt\n"
         "Logs: logs\\<part>.log\nPress Ctrl+C (or close this window) to stop everything.")
     if public and "core-api" not in pending:
-        url = public_link(procs)
+        url = public_link(procs, env)
         PIDS.write_text("\n".join(str(p.pid) for p in procs.values()))
         if url:
             say("\n" + "=" * 70 + f"\n  PUBLIC LINK (share it):  {url}\n" + "=" * 70)
-            say("  Anyone with this link sees the AgentsMind sign-in page. It works while this window is open,\n"
-                "  and a new link is made each time you start. Saved in data\\public_url.txt.")
+            say("  Anyone with this link sees the AgentsMind sign-in page. It works while this window is open."
+                + ("" if env.get("CLOUDFLARE_TUNNEL_TOKEN") else "\n  A new link is made each time you start.")
+                + " Saved in data\\public_url.txt.")
             if (env.get("AGENTSMIND_ADMIN_PASSWORD") or "") in ("", "Correct-Horse-Battery-42", "admin", "password"):
                 say("  WARNING: change the admin password first (scripts\\set_admin.py or Settings > Change password).")
         else:
