@@ -47,3 +47,21 @@ def test_inbox_uses_one_fetch_and_newest_first(monkeypatch, tmp_path):
     assert mails[1].id == "92" and not mails[1].unread
     found = g.find_attachments("", 10)
     assert [(f["filename"], f["message_id"]) for f in found] == [("Sara CV.pdf", "93")]
+
+
+def test_search_keeps_phrases(monkeypatch, tmp_path):
+    """'"curriculum vitae"' stays a phrase (dropping the quotes made 'vitae' a required word: no results)."""
+    monkeypatch.setenv("WORKSPACE_DATA_DIR", str(tmp_path))
+    seen = []
+
+    class C(FakeIMAP):
+        def uid(self, cmd, *args):
+            if cmd == "SEARCH":
+                seen.append(args)
+            return super().uid(cmd, *args)
+
+    fake = C({b"1": _raw("CV", "cv", True)})
+    g = imap_mail.GmailIMAP("hr@gmail.com", "abcd efgh ijkl mnop")
+    monkeypatch.setattr(g, "_imap", lambda all_mail=False: fake)
+    g.find_attachments('(cv OR "curriculum vitae") newer_than:90d', 5)
+    assert seen[-1] == ("X-GM-RAW", '"has:attachment (cv OR \\"curriculum vitae\\") newer_than:90d"')

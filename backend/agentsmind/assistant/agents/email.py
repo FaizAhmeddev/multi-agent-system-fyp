@@ -56,6 +56,19 @@ def _about(text: str) -> str:
     return m.group(1).strip()[:150] if m else ""
 
 
+READ_STOP = set("""fetch get show find read open search look for check list give me my the a an all any of in on at
+from to e-mail e-mails email emails mail mails inbox gmail mailbox message messages latest last recent newest new unread
+please can you could i want need about regarding with that which is are was there some today yesterday week this past
+recieved received sent""".split())
+
+
+def _topic(text: str, sender: str = "") -> str:
+    """Words to search for: 'fetch fyp report from email' -> 'fyp report'."""
+    ws = [w for w in re.findall(r"[\w@.\-]+", text.lower()) if w not in READ_STOP and not w.isdigit()
+          and w != sender.lower()]
+    return " ".join(ws[:6])
+
+
 def _to_name(text: str) -> str:
     """'email to Huzaifa', 'send an email to Sara Khan': the recipient's name, when one is written."""
     m = re.search(r"\b(?:e-?mail|mail|write|send|message|inform|tell)\s+(?:an?\s+(?:e-?mail|message)\s+)?(?:to\s+)?"
@@ -194,10 +207,13 @@ class EmailAgent(Agent):
         if intent == "read":
             t = state["text"].lower()
             q = None
-            m = re.search(r"\bfrom\s+(?!(?:my|the|last|latest|recent|inbox|gmail|today|yesterday|this|past)\b)"
-                          r"([\w.@\-]+)", state["text"], re.I)
+            m = re.search(r"\bfrom\s+(?!(?:my|the|last|latest|recent|inbox|gmail|today|yesterday|this|past|e-?mails?|"
+                          r"mails?|mailbox|messages?)\b)([\w.@\-]+)", state["text"], re.I)
             if m:
                 q = f"from:{m.group(1)}"
+            topic = _topic(state["text"], m.group(1) if m else "")
+            if topic:
+                q = f"{q} {topic}".strip() if q else topic
             n = re.search(r"\b(?:last|latest|recent|top|first)\s+(\d{1,3})\b|\b(\d{1,3})\s+(?:e-?mails?|messages)\b", t)
             count = min(int(n.group(1) or n.group(2)), 50) if n else 10
             d = self._inbox(ctx, unread_only=has_any(t, "unread", "new"), query=q, max_results=count)

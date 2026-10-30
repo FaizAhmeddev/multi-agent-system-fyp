@@ -128,12 +128,19 @@ class GmailIMAP:
 
     @staticmethod
     def _search(c: imaplib.IMAP4_SSL, raw: str) -> list[bytes]:
-        if raw:
-            typ, data = c.uid("SEARCH", "X-GM-RAW", '"' + raw.replace("\\", " ").replace('"', " ") + '"')
-        else:
+        """UIDs matching a Gmail search (the same syntax as the Gmail search box), oldest first."""
+        from .backends import WorkspaceError
+
+        if not raw:
             typ, data = c.uid("SEARCH", "ALL")
+        else:
+            try:
+                typ, data = c.uid("SEARCH", "X-GM-RAW", gm_raw(raw))
+            except imaplib.IMAP4.error as exc:
+                raise WorkspaceError(f"Gmail did not accept the search '{raw}': {exc}") from exc
         if typ != "OK":
-            return []
+            log.warning("gmail search failed", extra={"query": raw, "answer": str(data)[:300]})
+            raise WorkspaceError(f"Gmail did not accept the search '{raw}' ({str(data)[:200]}).")
         return (data[0] or b"").split()
 
     @staticmethod
@@ -196,7 +203,7 @@ class GmailIMAP:
     # ------------------------------------------------------------------ MailBackend
     def inbox(self, max_results, unread_only, query, page_token):
         raw = " ".join(x for x in ("is:unread" if unread_only else "", query or "") if x)
-        c = self._imap()
+        c = self._imap(all_mail=bool(query))  # a search looks everywhere, like the Gmail search box
         try:
             uids = self._search(c, raw)
             uids.reverse()  # newest first
@@ -311,6 +318,13 @@ def _keep_copy(message_id: str, name: str, blob: bytes) -> str:
         return str(p.resolve())
     except OSError:
         return ""
+
+
+def gm_raw(query: str) -> str:
+    """A Gmail search as one IMAP quoted string. Quotes inside it (phrases such as "curriculum vitae") are
+    escaped, not dropped: dropping them turned a phrase inside an OR group into required words."""
+    q = re.sub(r"[\r\n]+", " ", query).strip()
+    return '"' + q.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _all_mail_box(c: imaplib.IMAP4_SSL) -> str | None:
