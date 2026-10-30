@@ -278,14 +278,32 @@ def _auto_job(ctx: Ctx, role: str) -> tuple[str, str]:
                          "automatically; edit them in HR > Recruitment and screen again if needed)")
 
 
-def gather_cvs(ctx: Ctx, role: str, sources: set[str], notes: list[str]) -> list[dict[str, Any]]:
+def _recent_count(txt: str) -> int | None:
+    """'from my last 20 emails': only the newest N emails, whatever their subject."""
+    m = re.search(r"\b(?:last|latest|recent|newest)\s+(\d{1,3})\s+(?:e-?mails?|messages|mails)\b", txt, re.I)
+    return min(int(m.group(1)), 100) if m else None
+
+
+def _top_count(txt: str) -> int | None:
+    """'1 best Python developer', 'top 3 candidates', 'give me 2 Java developers'."""
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+    m = re.search(r"\b(?:top|best)\s+(\d{1,2}|one|two|three|four|five)\b|\b(\d{1,2}|one|two|three|four|five)\s+"
+                  r"(?:best|top|strongest|suitable|good)?\s*[a-z+#. ]{0,30}?" + P.ROLE_NOUNS, txt, re.I)
+    if not m:
+        return None
+    v = (m.group(1) or m.group(2)).lower()
+    return words.get(v) or int(v)
+
+
+def gather_cvs(ctx: Ctx, role: str, sources: set[str], notes: list[str],
+               recent: int | None = None) -> list[dict[str, Any]]:
     """CV texts from Gmail attachments, the CV folders and Drive. Each source is optional."""
     pol = policy_of(ctx)
     out: list[dict[str, Any]] = []
     for src in ("gmail", "folder", "drive"):
         if src in sources:
             try:
-                out += _from_source(ctx, src, role, pol, notes)
+                out += _from_source(ctx, src, role, pol, notes, recent)
             except AgentError as exc:
                 notes.append(f"{src}: {exc}")
             except Exception as exc:  # noqa: BLE001 - one source failing must not stop the others
@@ -299,16 +317,19 @@ def gather_cvs(ctx: Ctx, role: str, sources: set[str], notes: list[str]) -> list
     return uniq
 
 
-def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list[str]) -> list[dict[str, Any]]:
+def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list[str],
+                 recent: int | None = None) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     sources = {src}
     if "gmail" in sources:
-        r = ctx.read("hr", "gmail_find_attachments", {"query": _gmail_cv_query(pol, role), "max_messages": 40})
+        query = "newer_than:365d" if recent else _gmail_cv_query(pol, role)
+        r = ctx.read("hr", "gmail_find_attachments", {"query": query, "max_messages": recent or 40})
         if r.ok:
-            items = r.data["items"][:40]
+            items = r.data["items"][:60]
             if not items:
-                notes.append("Gmail: no email with a PDF or Word attachment matched the search "
-                             f"'{_gmail_cv_query(pol, role)}' (all mail, last 90 days).")
+                notes.append(f"Gmail: no email with a PDF or Word attachment matched the search '{query}' "
+                             f"({'the newest ' + str(recent) + ' emails with attachments' if recent else 'all mail'}"
+                             f"; {r.data.get('searched', 'unknown')} email(s) with attachments looked at).")
             for a in items:
                 hint = re.search(r"\b(cv|resume|curriculum|profile|application|candidate)\b|"
                                  + re.escape(role.split()[0].lower()), f"{a['filename']} {a['subject']}".lower())
@@ -367,7 +388,10 @@ def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
     sources = sources or {"gmail", "folder", "drive"}
     jd_text, jd_src = _jd_for(ctx, role)
     notes: list[str] = []
-    cvs = gather_cvs(ctx, role, sources, notes)
+    recent, top = _recent_count(txt), _top_count(txt)
+    if recent:
+        sources = {"gmail"}
+    cvs = gather_cvs(ctx, role, sources, notes, recent)
     if not cvs:
         raise AgentError("No CVs found (looked in " + ", ".join(sorted(sources)) + "). " + " ".join(notes) +
                          " CVs are read from PDF or Word attachments in Gmail, from the CV folders (data\\cvs or "
@@ -406,10 +430,16 @@ def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
                         "a location' in HR > Settings to screen them too.")
     warnings += notes
     sim = any(x["simulated"] for x in rows)
+    best = ""
+    if top and rows:
+        pick = [x for x in rows if not x["needs_human_review"]][:top] or rows[:top]
+        best = "Best match" + ("es" if len(pick) > 1 else "") + ": " + "; ".join(
+            f"{x['candidate']} ({x['file']}, score {x['rubric_score']})" for x in pick) + ". "
+        rows = pick + [x for x in rows if x not in pick]
     if sim:
         warnings.append("Simulated rubric: no language model is configured, so a deterministic stand-in rated the "
                         "criteria.")
-    body = (f"Found {len(cvs)} CV(s) in {', '.join(sorted(sources))}; screened {len(rows)} {city} candidate(s) against "
+    body = (f"{best}Found {len(cvs)} CV(s) in {', '.join(sorted(sources))}; screened {len(rows)} {city} candidate(s) against "
             f"the {jd_src}. {sum(1 for x in rows if x['needs_human_review'])} need human review. Scores rank skills "
             "and experience only; protected details were removed first. Next: 'Issue an offer letter to <name>'.")
     return {"cards": [Card(kind="result", agent="hr", title=f"CV screening: {role}", body=body, simulated=sim,
@@ -422,7 +452,11 @@ def _role(txt: str) -> str:
     m = re.search(r"\bfor (?:the |a |an )?([A-Za-z][A-Za-z +#/\-]{2,60}?)(?: role| position| job| vacancy| opening|"
                   r"[.?,]|$)", txt, re.I)
     if not m:
-        return ""
+        r = P.ROLE_RE.search(re.sub(r"\b(best|top|suitable|strongest|good|one|two|three|five|\d+|my|last|from|"
+                                    r"give|me|fetch|find|get|show|list|the|a|an|e-?mails?|inbox|gmail|cvs?|resumes?|in|of|om|for|"
+                                    r"out)\b", " ", txt,
+                                    flags=re.I))
+        return re.sub(r"\s+", " ", r.group(1)).strip().title() if r else ""
     r = m.group(1).strip()
     return re.sub(r"^(?:cvs?|resumes?)\s+", "", r, flags=re.I)
 

@@ -31,6 +31,9 @@ HR_ONLY = {"screen", "create_job", "job_description", "interview_questions", "of
            "payroll_run", "compliance", "task_update", "report", "sheet_where", "sheet_query", "sheet_register",
            "employee_lookup"}
 
+ROLE_NOUNS = (r"(?:developer|engineer|designer|analyst|manager|accountant|officer|executive|intern|specialist|"
+              r"consultant|programmer|architect|administrator|assistant|associate|lead|tester|scientist)")
+ROLE_RE = re.compile(r"\b([A-Za-z+#.]+(?:\s+[A-Za-z+#.]+)?\s+" + ROLE_NOUNS + r")s?\b", re.I)
 RULES: list[tuple[str, str]] = [
     ("sheet_register", r"\b(register|connect|link|add|use)\b.{0,60}\b(sheet|spreadsheet|excel|workbook|tracker)\b"
                        r".{0,200}(docs\.google\.com|\.xlsx|\.xlsm|\bpurpose\b|\bfor (?:the |my )?\w+ records?\b)"),
@@ -73,7 +76,11 @@ RULES: list[tuple[str, str]] = [
                     r"documents?|cnic|degrees?|bank details|nda|eobi|sessi|handover|assets?|laptop)\b"),
     ("create_job", r"\b(open|create|add|post|new)\b.{0,30}\b(job|vacancy|position|opening|requisition)\b"),
     ("screen", r"\b(screen|rank|shortlist|score|evaluate|assess|gather|collect|find|get|fetch)\b.{0,50}\b(cvs?|resumes?|"
-               r"candidates?|applicants?|profiles?)\b|\brecruit\w*\b"),
+               r"candidates?|applicants?|profiles?)\b|\brecruit\w*\b|"
+               r"\b(best|top|suitable|strongest|\d+|one|two|three|five)\s+(?:best\s+)?[a-z+#./ ]{0,30}?\b" + ROLE_NOUNS +
+               r"s?\b.{0,40}\b(e-?mails?|inbox|gmail|cvs?|resumes?|applications?)\b|"
+               r"\b(e-?mails?|inbox|gmail|cvs?|resumes?|applications?)\b.{0,60}\b(best|top|suitable|\d+|one|two|three|five)"
+               r"\s+(?:best\s+)?[a-z+#./ ]{0,30}?\b" + ROLE_NOUNS + r"s?\b"),
     ("job_description", r"\b(job description|\bjd\b|job posting|job ad)\b"),
     ("interview_questions", r"\binterview questions?\b"),
     ("employee_lookup", r"\b(employee|record|profile|details of|who is|show me)\b"),

@@ -34,7 +34,7 @@ DEFAULTS: dict[str, Any] = {
                   "federal b area", "fb area", "gulberg", "orangi", "lyari", "kemari", "shah faisal", "surjani",
                   "scheme 33", "bahria town karachi", "tariq road", "garden", "lines area", "jamshed road",
                   "model colony", "malir cantt", "saadi town", "buffer zone", "new karachi", "baldia", "site area"],
-        "include_unknown_location": False,
+        "include_unknown_location": True,  # CVs without a city are screened and marked "not stated"
         "gmail_query": "(cv OR resume OR \"curriculum vitae\" OR application) newer_than:90d",
     },
     "work": {

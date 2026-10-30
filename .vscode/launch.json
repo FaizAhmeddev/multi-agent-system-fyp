@@ -38,6 +38,14 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Check Gmail connection (report in logs/gmail-check.txt)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/check_gmail.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Stop AgentsMind",
       "type": "debugpy",
       "request": "launch",

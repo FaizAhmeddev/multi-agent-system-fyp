@@ -33,6 +33,10 @@ class HRAgent(Agent):
         s = sum(1.5 for w in P.HR_WORDS if re.search(rf"\b{re.escape(w)}\b", t))
         if re.search(r"\bEMP-\d{4,}\b", text, re.I):
             s += 2.0
+        if P.ROLE_RE.search(text) and re.search(r"\b(best|top|strongest|suitable|cvs?|resumes?|applications?|"
+                                                r"candidates?|applicants?|hire|shortlist)\b", t) or re.search(
+                r"\b(\d+|one|two|three|five)\s+(?:best\s+)?[a-z+#.]+(?:\s+[a-z+#.]+)?\s+" + P.ROLE_NOUNS + r"s?\b", t):
+            s += 3.0  # "from my last 20 emails give me the best Python developer" is recruitment, not reading mail
         return s
 
     def understand(self, ctx: Ctx, state: State) -> State:

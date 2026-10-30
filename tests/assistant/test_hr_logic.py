@@ -147,3 +147,21 @@ def test_screening_without_an_opening_writes_requirements():
     assert jd.startswith("Python Developer") and "- Django or FastAPI" in jd and "new job opening" in src
     jd, _ = _auto_job(SimpleNamespace(llm=SimpleNamespace(simulated=True), db=None), "Data Analyst")
     assert "- Data Analyst experience" in jd
+
+
+@pytest.mark.parametrize("text,agent", [
+    ("From my last 20 emails fetch 1 best python developer", "hr"),
+    ("from last 20 emails give me 1 Java Developer", "hr"),
+    ("Show me the top 3 data analyst CVs", "hr"),
+    ("Email the developer team about the release", "email"),
+    ("Show my last 5 emails", "email"),
+])
+def test_recruiting_from_email_goes_to_hr(text, agent):
+    assert [s.agent for s in plan(text)] == [agent]
+
+
+def test_screening_counts():
+    from agentsmind.assistant.agents.hr.handlers import _recent_count, _role, _top_count
+
+    t = "From my last 20 emails fetch 1 best python developer"
+    assert (_recent_count(t), _top_count(t), _role(t)) == (20, 1, "Python Developer")

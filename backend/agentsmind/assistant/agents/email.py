@@ -166,10 +166,13 @@ class EmailAgent(Agent):
         if intent == "read":
             t = state["text"].lower()
             q = None
-            m = re.search(r"\bfrom\s+([\w.@\-]+(?:\s+[A-Z][a-z]+)?)", state["text"])
+            m = re.search(r"\bfrom\s+(?!(?:my|the|last|latest|recent|inbox|gmail|today|yesterday|this|past)\b)"
+                          r"([\w.@\-]+)", state["text"], re.I)
             if m:
-                q = f"from:{m.group(1).split()[0]}"
-            d = self._inbox(ctx, unread_only=has_any(t, "unread", "new"), query=q)
+                q = f"from:{m.group(1)}"
+            n = re.search(r"\b(?:last|latest|recent|top|first)\s+(\d{1,3})\b|\b(\d{1,3})\s+(?:e-?mails?|messages)\b", t)
+            count = min(int(n.group(1) or n.group(2)), 50) if n else 10
+            d = self._inbox(ctx, unread_only=has_any(t, "unread", "new"), query=q, max_results=count)
             rows, warn = [], []
             for msg in d["items"]:
                 sus = bool(injection_signals(msg["body"]))

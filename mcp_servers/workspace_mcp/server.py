@@ -246,6 +246,7 @@ class AttachmentRef(BaseModel):
 
 class AttachmentList(BaseModel):
     items: list[AttachmentRef]
+    searched: int | None = None  # emails with attachments that matched the search (before the type filter)
     untrusted: bool = True
     mode: Mode
     simulated: bool
@@ -271,7 +272,8 @@ def gmail_find_attachments(
 ) -> AttachmentList:
     """List PDF, Word and text attachments in matching emails (used to gather CVs). Read-only."""
     items = _guard(mail().find_attachments, query, max_messages)
-    return AttachmentList(items=[AttachmentRef(**i) for i in items], **_m(mail()))
+    return AttachmentList(items=[AttachmentRef(**i) for i in items], searched=getattr(mail(), "last_searched", None),
+                          **_m(mail()))
 
 
 @server.tool(annotations=READ_EXT)

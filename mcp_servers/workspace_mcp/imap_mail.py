@@ -150,15 +150,24 @@ class GmailIMAP:
         if typ != "OK" or not data:
             return []
         by_uid: dict[bytes, tuple[Message, dict[str, str]]] = {}
-        for item in data:
+        in_order: list[tuple[Message, dict[str, str]]] = []
+        for i, item in enumerate(data):
             if not isinstance(item, tuple):
                 continue
             head = item[0].decode(errors="replace")
-            uid = (re.search(r"UID (\d+)", head) or [None, ""])[1].encode()
+            nxt = data[i + 1] if i + 1 < len(data) else b""
+            if isinstance(nxt, bytes):  # some servers send UID/FLAGS after the message text
+                head += " " + nxt.decode(errors="replace")
             meta = {"msgid": (re.search(r"X-GM-MSGID (\d+)", head) or [None, ""])[1],
                     "thrid": (re.search(r"X-GM-THRID (\d+)", head) or [None, ""])[1],
                     "seen": "\\Seen" in head}
-            by_uid[uid] = (email.message_from_bytes(item[1]), meta)
+            got = (email.message_from_bytes(item[1]), meta)
+            in_order.append(got)
+            uid = (re.search(r"\bUID (\d+)", head) or [None, ""])[1].encode()
+            if uid:
+                by_uid[uid] = got
+        if not by_uid:
+            return in_order  # no UID in the answer: keep the server's order
         return [by_uid[u] for u in uids if u in by_uid]
 
     def _mail(self, msg: Message, meta: dict):
@@ -237,6 +246,7 @@ class GmailIMAP:
         try:
             uids = self._search(c, raw)
             uids.reverse()
+            self.last_searched = len(uids)
             for msg, meta in self._fetch_many(c, uids[:max_messages]):
                 m = self._mail(msg, meta)
                 for idx, name, ctype, data in _attachments(msg):
