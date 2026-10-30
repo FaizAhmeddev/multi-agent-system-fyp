@@ -47,6 +47,14 @@ You need Python 3.11 or 3.12, Node.js 22 LTS and git. Then, in the AgentsMind fo
 Sign in with the admin account in `.env` (`AGENTSMIND_ADMIN_EMAIL`, `AGENTSMIND_ADMIN_PASSWORD`; also in
 `data\local_credentials.txt`). To change it later: `.venv\Scripts\python scripts\set_admin.py --email ... --password ...`.
 
+## Share it with a free public link
+
+Double-click **Start-Public-Link.bat** (or VS Code: "Run AgentsMind with a free public link", or
+`python main.py --public`). AgentsMind starts as usual and Cloudflare's free Quick Tunnel gives it a public
+`https://...trycloudflare.com` address, shown in the window and saved in `data\public_url.txt`. No account,
+card or router setting is needed; `cloudflared` is downloaded once into `tools\`. The link works while this
+computer and window are on, and changes at every start. Change the admin password before sharing it.
+
 ## Run it from VS Code
 
 Open the `agentsmind` folder in VS Code (File > Open Folder). Install the recommended Python extension when asked.

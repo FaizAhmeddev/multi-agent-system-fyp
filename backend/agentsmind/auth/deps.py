@@ -21,7 +21,14 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def client_ip(request: Request) -> str:
-    return request.client.host if request.client else ""
+    """The caller's address. Behind the public link (Cloudflare's tunnel program on this computer) every request
+    comes from 127.0.0.1, so the visitor's address is taken from Cloudflare's header, but only then."""
+    host = request.client.host if request.client else ""
+    if host in ("127.0.0.1", "::1"):
+        cf = (request.headers.get("cf-connecting-ip") or "").strip()
+        if cf and len(cf) <= 45 and all(ch in "0123456789abcdefABCDEF.:" for ch in cf):
+            return cf
+    return host
 
 
 def get_current_user(

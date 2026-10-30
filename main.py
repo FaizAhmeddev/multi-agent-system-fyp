@@ -15,6 +15,8 @@ databases. main.py starts them too, as separate processes, unless they are alrea
 example from Start-External-Systems.bat) or you pass --no-portals.
 
 Options:  --no-browser   --no-google   --skip-install   --no-portals   --stop (stop a running AgentsMind)
+          --public   also give a free public https link (Cloudflare Quick Tunnel; no account needed), so
+                     others can open AgentsMind while this computer runs it
 """
 from __future__ import annotations
 
@@ -284,6 +286,58 @@ def last_error(name: str) -> str:
     return lines[-1][:300] if lines else ""
 
 
+# ---------------------------------------------------------------------------- free public link
+
+TOOLS = ROOT / "tools"
+CLOUDFLARED_URL = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + (
+    "cloudflared-windows-amd64.exe" if IS_WIN else "cloudflared-linux-amd64")
+PUBLIC_FILE = DATA / "public_url.txt"
+
+
+def cloudflared() -> Path:
+    """Cloudflare's tunnel program (downloaded once into tools/)."""
+    found = shutil.which("cloudflared")
+    if found:
+        return Path(found)
+    exe = TOOLS / ("cloudflared.exe" if IS_WIN else "cloudflared")
+    if not exe.exists():
+        step("Downloading Cloudflare's tunnel program (once, about 40 MB)")
+        TOOLS.mkdir(exist_ok=True)
+        tmp = exe.with_suffix(".part")
+        try:
+            urllib.request.urlretrieve(CLOUDFLARED_URL, tmp)  # noqa: S310 - fixed official release URL
+        except Exception as exc:  # noqa: BLE001 - explained to the user
+            raise SystemExit(f"Could not download cloudflared ({exc}). Download it from {CLOUDFLARED_URL}, save it as "
+                             f"{exe} and start again.") from exc
+        tmp.replace(exe)
+        if not IS_WIN:
+            exe.chmod(0o755)
+    return exe
+
+
+def public_link(procs: dict[str, subprocess.Popen]) -> str:
+    """Start a Cloudflare Quick Tunnel to the web app and return its https address."""
+    import re
+
+    exe = cloudflared()
+    LOGS.mkdir(exist_ok=True)
+    logf = LOGS / "public-link.log"
+    log = open(logf, "w", encoding="utf-8")  # noqa: SIM115 - kept open for the child's lifetime
+    kw: dict = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if IS_WIN else {"start_new_session": True}
+    procs["public-link"] = subprocess.Popen([str(exe), "tunnel", "--no-autoupdate", "--url", WEB],  # noqa: S603
+                                            cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, **kw)
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        time.sleep(1)
+        m = re.search(r"https://[a-z0-9-]+\.trycloudflare\.com", logf.read_text(encoding="utf-8", errors="replace"))
+        if m:
+            PUBLIC_FILE.write_text(m.group(0) + "\n")
+            return m.group(0)
+        if procs["public-link"].poll() is not None:
+            break
+    return ""
+
+
 def status_line(env: dict[str, str]) -> None:
     llm = "connected" if env.get("OPENAI_API_KEY") else "not set (answers are labeled Simulated)"
     mail = f"{env.get('GMAIL_EMAIL')} (app password)" if env.get("GMAIL_EMAIL") and env.get("GMAIL_APP_PASSWORD") \
@@ -294,7 +348,7 @@ def status_line(env: dict[str, str]) -> None:
         f"  Sample data: {'on' if env.get('DEMO_MODE', '').lower() in ('1', 'true', 'yes') else 'off'}")
 
 
-def serve(env: dict[str, str], open_browser: bool, portals: bool = True) -> None:
+def serve(env: dict[str, str], open_browser: bool, portals: bool = True, public: bool = False) -> None:
     stop_previous()
     parts = list(PARTS)
     if portals:
@@ -343,6 +397,17 @@ def serve(env: dict[str, str], open_browser: bool, portals: bool = True) -> None
     say(f"\nAgentsMind is running: {WEB}\n  Finance Portal: http://127.0.0.1:8201   IT Helpdesk: "
         "http://127.0.0.1:8202\nSign-in details: data\\local_credentials.txt\n"
         "Logs: logs\\<part>.log\nPress Ctrl+C (or close this window) to stop everything.")
+    if public and "core-api" not in pending:
+        url = public_link(procs)
+        PIDS.write_text("\n".join(str(p.pid) for p in procs.values()))
+        if url:
+            say("\n" + "=" * 70 + f"\n  PUBLIC LINK (share it):  {url}\n" + "=" * 70)
+            say("  Anyone with this link sees the AgentsMind sign-in page. It works while this window is open,\n"
+                "  and a new link is made each time you start. Saved in data\\public_url.txt.")
+            if (env.get("AGENTSMIND_ADMIN_PASSWORD") or "") in ("", "Correct-Horse-Battery-42", "admin", "password"):
+                say("  WARNING: change the admin password first (scripts\\set_admin.py or Settings > Change password).")
+        else:
+            say(f"  Public link: could not start. See logs\\public-link.log. AgentsMind still runs at {WEB}")
     if open_browser and "core-api" not in pending:
         webbrowser.open(WEB)
     try:
@@ -376,6 +441,7 @@ def main() -> int:
     ap.add_argument("--no-google", action="store_true")
     ap.add_argument("--skip-install", action="store_true")
     ap.add_argument("--no-portals", action="store_true", help="do not start the Finance Portal and IT Helpdesk")
+    ap.add_argument("--public", action="store_true", help="also make a free public https link (Cloudflare)")
     ap.add_argument("--stop", action="store_true", help="stop a running AgentsMind")
     a = ap.parse_args()
     os.chdir(ROOT)
@@ -393,7 +459,7 @@ def main() -> int:
         args = [x for x in sys.argv[1:] if x != "--skip-install"]
         return subprocess.call([str(VPY), str(ROOT / "main.py"), "--skip-install", *args])  # noqa: S603
     env = setup(a.no_google)
-    serve(env, not a.no_browser, not a.no_portals)
+    serve(env, not a.no_browser, not a.no_portals, a.public)
     return 0
 
 

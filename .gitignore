@@ -33,3 +33,6 @@ gate-logs/
 # Node / frontend (Phase 4)
 node_modules/
 dist/
+
+# Downloaded tools (cloudflared for the public link)
+tools/
