@@ -20,6 +20,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from .agents.calendar import CalendarAgent
+from .agents.connectors import ConnectorsAgent
 from .agents.documents import DocumentsAgent
 from .agents.email import EmailAgent
 from .agents.finance import FinanceAgent
@@ -28,10 +29,11 @@ from .agents.it import ITAgent
 from .base import Agent, Ctx, run_agent
 from .cards import Card
 
-AGENT_LIST: list[Agent] = [HRAgent(), FinanceAgent(), ITAgent(), CalendarAgent(), EmailAgent(), DocumentsAgent()]
+AGENT_LIST: list[Agent] = [HRAgent(), FinanceAgent(), ITAgent(), CalendarAgent(), EmailAgent(), DocumentsAgent(),
+                           ConnectorsAgent()]
 AGENTS: dict[str, Agent] = {a.name: a for a in AGENT_LIST}
 DEPARTMENT_OF = {"hr": "HR", "finance": "Finance", "it": "IT", "calendar": "Communications",
-                 "email": "Communications", "documents": "Documents"}
+                 "email": "Communications", "documents": "Documents", "connectors": "Connected apps"}
 VERB_BOOST = [
     (r"^(?:please\s+)?(?:schedule|book|reschedule|move|set up a (?:meeting|call)|am i free|cancel (?:my|the|\w+'s)?\s*"
      r"(?:\w+\s)?(?:meeting|call|event|review|sync))", "calendar"),
@@ -106,11 +108,11 @@ def plan(text: str) -> list[Step]:
 
 
 class RouteOut(BaseModel):
-    agent: Literal["hr", "finance", "it", "calendar", "email", "documents", "none"]
+    agent: Literal["hr", "finance", "it", "calendar", "email", "documents", "connectors", "none"]
     reason: str = Field(default="", max_length=200)
 
 
-AgentName = Literal["hr", "finance", "it", "calendar", "email", "documents"]
+AgentName = Literal["hr", "finance", "it", "calendar", "email", "documents", "connectors"]
 
 
 class PlanStep(BaseModel):
@@ -136,6 +138,12 @@ AGENT_SCOPE = {
 }
 
 
+def _scope(a: Agent) -> str:
+    """What an agent is for (the connected-apps agent describes the apps configured right now)."""
+    scope = getattr(a, "scope", None)
+    return scope() if callable(scope) else AGENT_SCOPE.get(a.name, "")
+
+
 def confident(text: str, steps: list[Step]) -> bool:
     if len(steps) != 1:
         return False
@@ -147,7 +155,8 @@ def llm_plan(ctx: Ctx, text: str) -> list[Step] | None:
     llm = ctx.llm
     if getattr(llm, "simulated", True):
         return None
-    menu = "\n".join(f"- {a.name}: {AGENT_SCOPE[a.name]}. Examples: {'; '.join(a.examples[:3])}" for a in AGENT_LIST)
+    menu = "\n".join(f"- {a.name}: {_scope(a)}. Examples: {'; '.join(a.examples[:3])}" for a in AGENT_LIST
+                     if _scope(a))
     try:
         out = llm.complete_json(
             system="You plan office requests. Split the request into the fewest steps, each for exactly one agent, "
@@ -168,7 +177,8 @@ def llm_route(ctx: Ctx, text: str) -> str | None:
     llm = ctx.llm
     if getattr(llm, "simulated", True):
         return None
-    menu = "\n".join(f"- {a.name}: {a.title}. Examples: {'; '.join(a.examples[:3])}" for a in AGENT_LIST)
+    menu = "\n".join(f"- {a.name}: {a.title}. Examples: {'; '.join(a.examples[:3])}" for a in AGENT_LIST
+                     if _scope(a))
     try:
         out = llm.complete_json(system="Route an office request to one agent, or 'none' if no agent fits.",
                                 user=f"Agents:\n{menu}\n\nRequest:\n{text[:2000]}", schema=RouteOut)
@@ -186,7 +196,7 @@ def allowed(ctx: Ctx, agent: Agent) -> bool:
 
 
 def fallback_card(ctx: Ctx) -> Card:
-    usable = [a for a in AGENT_LIST if allowed(ctx, a)]
+    usable = [a for a in AGENT_LIST if allowed(ctx, a) and a.examples]
     lines = [f"{a.title}: {'; '.join(a.examples[:2])}" for a in usable]
     return Card(kind="fallback", agent="orchestrator", title="I am not sure which department this is for",
                 body="I can help with these. Try one of the examples, or rephrase your request.",

@@ -105,7 +105,7 @@ def mcp_health(_: User = Depends(require_roles("admin"))) -> dict:
 
     configured = server_configs()
     out = []
-    for name in sorted({t.server for t in TOOLS.values()}):
+    for name in sorted({t.server for t in TOOLS.values() if not t.server.startswith("connector:")}):
         expected = sorted(t for t, spec in TOOLS.items() if spec.server == name)
         row = {"server": name, "configured": name in configured, "expected_tools": expected}
         if name in configured:

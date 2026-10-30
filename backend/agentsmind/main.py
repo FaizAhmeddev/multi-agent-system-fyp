@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI):
         from .assistant.autoreply import start_background
 
         start_background()  # does nothing until auto-reply is switched on in Settings
+        from .mcp.connectors import start_background_discovery
+
+        start_background_discovery()  # connects to the MCP servers added in Settings > Connectors
     log.info("startup complete", extra={"env": s.app_env, "db": s.database_url.split("://", 1)[0]})
     yield
 
@@ -115,6 +118,9 @@ def create_app() -> FastAPI:
     app.include_router(assistant_router)
     app.include_router(comms_docs_router)
     app.include_router(hr_router)
+    from .mcp.router import router as connectors_router
+
+    app.include_router(connectors_router)
     _mount_frontend(app)
     return app
 

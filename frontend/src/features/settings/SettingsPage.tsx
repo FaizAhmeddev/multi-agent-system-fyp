@@ -8,6 +8,7 @@ import { useRouter } from "../../lib/router";
 import { useTheme, type ThemeChoice } from "../../lib/theme";
 import { AutoReplyPanel } from "./AutoReply";
 import { ConnectionsPanel } from "./Connections";
+import { ConnectorsHubPanel } from "./ConnectorsHub";
 
 export function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -62,6 +63,7 @@ export function SettingsPage() {
         </Panel>
         <ConnectionsPanel />
         <AutoReplyPanel />
+        <ConnectorsHubPanel />
         <Panel title="Appearance">
           <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-2">
             {themes.map((t) => (

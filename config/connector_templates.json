@@ -1,0 +1,50 @@
+{
+  "_about": "Starting points shown in Settings > Connectors > Add connector. Each is an MCP server published by its vendor or the community; check its own documentation for the exact command and the settings it needs. Secrets are written as ${NAME} and stored in .env, never here.",
+  "templates": [
+    {
+      "name": "slack", "title": "Slack", "transport": "stdio",
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {"SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"},
+      "keywords": ["slack", "channel", "channels"],
+      "description": "Read channels and messages, post messages and replies in Slack",
+      "secrets_help": "SLACK_BOT_TOKEN: a Slack app bot token (xoxb-...); SLACK_TEAM_ID: your workspace ID (T...)."
+    },
+    {
+      "name": "whatsapp", "title": "WhatsApp", "transport": "stdio",
+      "command": "uvx", "args": ["your-whatsapp-mcp-server"],
+      "env": {"WHATSAPP_TOKEN": "${WHATSAPP_TOKEN}"},
+      "keywords": ["whatsapp"],
+      "description": "Send and read WhatsApp messages",
+      "secrets_help": "Pick a WhatsApp MCP server (for example one built on the WhatsApp Business Cloud API or Twilio) and use its command and settings."
+    },
+    {
+      "name": "github", "title": "GitHub", "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {"Authorization": "Bearer ${GITHUB_MCP_TOKEN}"},
+      "keywords": ["github", "repository", "repo", "pull request", "issue"],
+      "description": "Issues, pull requests and repositories on GitHub",
+      "secrets_help": "GITHUB_MCP_TOKEN: a GitHub personal access token."
+    },
+    {
+      "name": "files", "title": "Shared folder", "transport": "stdio",
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "${SHARED_FOLDER}"],
+      "keywords": ["shared folder", "shared drive"],
+      "description": "Read files in a folder on this computer",
+      "secrets_help": "SHARED_FOLDER: the folder path, for example C:\\Company\\Shared."
+    },
+    {
+      "name": "jobs", "title": "Job board", "transport": "http",
+      "url": "https://your-job-board.example/mcp",
+      "headers": {"Authorization": "Bearer ${JOBS_MCP_TOKEN}"},
+      "keywords": ["job board", "job post", "job posting", "applicants", "indeed"],
+      "description": "Post jobs and read applicants on a job board that offers an MCP server",
+      "secrets_help": "Use the MCP URL and token from your job board (for example Indeed, if your account offers MCP access)."
+    },
+    {
+      "name": "custom", "title": "Any MCP server", "transport": "http",
+      "url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${CUSTOM_MCP_TOKEN}"},
+      "keywords": [], "description": "",
+      "secrets_help": "Any server that speaks MCP over Streamable HTTP (a URL) or stdio (a command)."
+    }
+  ]
+}

@@ -105,6 +105,11 @@ def call_tool(db: Session, *, agent: str, tool: str, args: dict[str, Any], user:
     the first result instead of running again.
     """
     spec = TOOLS.get(tool)
+    if spec is None and "." in tool:  # a connector tool before its app was (re)discovered, e.g. right after a restart
+        from ..mcp.connectors import ensure_tool
+
+        ensure_tool(tool)
+        spec = TOOLS.get(tool)
     if spec is None:
         return _deny(db, agent=agent, tool=tool, user=user, args=args, code="unknown_tool",
                      message=f"There is no tool named '{tool}'.", ip=ip)

@@ -119,6 +119,12 @@ cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e n
 
 `scripts\win\agentsmind-gate.ps1` does all of this on a separate clone and writes one log.
 
+## Connect any app (MCP connectors)
+
+Settings > **Connectors (MCP)** lets an administrator plug in any MCP server (Slack, WhatsApp, GitHub, a job
+board, ...) without code changes: its tools are discovered automatically, read tools run directly and every
+other action needs approval. See [docs/CONNECTORS.md](docs/CONNECTORS.md).
+
 ## Attach files in the chat
 
 Click the paperclip next to the message box to attach up to 5 files (PDF, Word, Excel, CSV or text, 15 MB each),
