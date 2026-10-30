@@ -644,6 +644,38 @@ def connections(user: User = Depends(get_current_user), db: Session = Depends(ge
             "google_signin": dict(_signin)}
 
 
+class AutoReplyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: str | None = Field(default=None, pattern="^(off|draft|send)$")
+    interval_minutes: int | None = Field(default=None, ge=1, le=240)
+    instructions: str | None = Field(default=None, max_length=1000)
+    max_per_run: int | None = Field(default=None, ge=1, le=200)
+    max_per_day: int | None = Field(default=None, ge=1, le=200)
+
+
+@router.get("/settings/auto-reply")
+def auto_reply_get(user: User = Depends(require_roles("admin", "hr")), db: Session = Depends(get_db)) -> dict:
+    from ..assistant import autoreply
+
+    return autoreply.get_config(db)
+
+
+@router.put("/settings/auto-reply")
+def auto_reply_put(body: AutoReplyIn, user: User = Depends(require_roles("admin", "hr")),
+                   db: Session = Depends(get_db)) -> dict:
+    from ..assistant import autoreply
+
+    return autoreply.save_config(db, user, body.model_dump(exclude_none=True))
+
+
+@router.post("/settings/auto-reply/run")
+def auto_reply_run(user: User = Depends(require_roles("admin", "hr")), db: Session = Depends(get_db)) -> dict:
+    """Check the inbox now (uses the saved mode; with auto-reply off nothing is done)."""
+    from ..assistant import autoreply
+
+    return autoreply.run_once(db) | {"config": autoreply.get_config(db)}
+
+
 @router.post("/connections/google")
 def google_signin(user: User = Depends(require_roles("admin", "hr"))) -> dict:
     """Open the one-time Google consent in a browser on THIS computer (the one running AgentsMind)."""

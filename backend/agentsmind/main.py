@@ -53,6 +53,10 @@ async def lifespan(app: FastAPI):
     tools = register_mcp_executors()
     register_core_executors()
     log.info("mcp tools connected", extra={"count": len(tools)})
+    if s.app_env != "test":
+        from .assistant.autoreply import start_background
+
+        start_background()  # does nothing until auto-reply is switched on in Settings
     log.info("startup complete", extra={"env": s.app_env, "db": s.database_url.split("://", 1)[0]})
     yield
 

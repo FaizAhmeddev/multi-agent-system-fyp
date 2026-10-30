@@ -122,6 +122,10 @@ cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e n
   The APIs are enabled at https://console.cloud.google.com/apis/library (Google Calendar API, Google Drive API,
   Google Sheets API). Until the Calendar API is on, meetings go to AgentsMind's local calendar.
 - **WhatsApp:** the Twilio settings above.
+- **Email auto-reply:** Settings > Email auto-reply (admin or HR). *Draft replies for approval* puts a drafted reply
+  for each new email in Approvals; *Send replies automatically* sends them from Gmail. Only emails that arrive after
+  you switch it on are answered, each once; your own, no-reply and newsletter emails are skipped, emails with text
+  addressed to an AI always wait for approval, and at most 40 are sent per day. "Check the inbox now" runs it at once.
 
 ## Repository layout
 

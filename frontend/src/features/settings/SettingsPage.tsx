@@ -6,6 +6,7 @@ import { useAuth } from "../../lib/auth";
 import { fmtDateTime } from "../../lib/format";
 import { useRouter } from "../../lib/router";
 import { useTheme, type ThemeChoice } from "../../lib/theme";
+import { AutoReplyPanel } from "./AutoReply";
 import { ConnectionsPanel } from "./Connections";
 
 export function SettingsPage() {
@@ -60,6 +61,7 @@ export function SettingsPage() {
           )}
         </Panel>
         <ConnectionsPanel />
+        <AutoReplyPanel />
         <Panel title="Appearance">
           <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-2">
             {themes.map((t) => (
