@@ -28,7 +28,7 @@ from agentsmind.audit import audit  # noqa: E402
 from agentsmind.auth.service import ensure_roles, normalise_email, revoke_all_sessions  # noqa: E402
 from agentsmind.db.models import User  # noqa: E402
 from agentsmind.db.session import SessionLocal  # noqa: E402
-from agentsmind.security.passwords import hash_password, password_problems  # noqa: E402
+from agentsmind.security.passwords import hash_password, password_problems, verify_password  # noqa: E402
 from agentsmind.settings import get_settings  # noqa: E402
 
 
@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--email", required=True)
     ap.add_argument("--password", required=True)
+    ap.add_argument("--if-changed", action="store_true",
+                    help="do nothing when that admin already has this password (used at each start on a server)")
     a = ap.parse_args(argv)
 
     try:
@@ -73,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
     with SessionLocal() as db:
         roles = ensure_roles(db)
         user = db.scalar(select(User).where(User.email == email))
+        if a.if_changed and user is not None and "admin" in user.role_names and user.is_active and \
+                verify_password(a.password, user.password_hash):
+            print(f"Admin {email}: already set.")
+            return 0
         action = "updated"
         if user is None:
             admins = [u for u in db.scalars(select(User)) if "admin" in u.role_names]

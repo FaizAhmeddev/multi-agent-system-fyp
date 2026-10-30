@@ -59,6 +59,13 @@ def prepare_env() -> None:
 
 def migrate() -> None:
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT, check=True)  # noqa: S603
+    email, pw = os.environ.get("AGENTSMIND_ADMIN_EMAIL", ""), os.environ.get("AGENTSMIND_ADMIN_PASSWORD", "")
+    if email and pw:  # set on the host (Render > Environment): that is the admin sign-in, also after a change
+        subprocess.run([sys.executable, "scripts/set_admin.py", "--email", email, "--password", pw,  # noqa: S603
+                        "--if-changed"], cwd=ROOT, check=False)
+    else:
+        print("AGENTSMIND_ADMIN_EMAIL and AGENTSMIND_ADMIN_PASSWORD are not set in the host's environment, so a "
+              "random admin password was generated. Set both and redeploy to choose the admin sign-in.", flush=True)
     subprocess.run([sys.executable, "scripts/demo_data.py", "--auto"], cwd=ROOT, check=False)  # noqa: S603
     subprocess.run([sys.executable, "external_systems/demo_cleanup.py"], cwd=ROOT, check=False,  # noqa: S603
                    stdout=subprocess.DEVNULL)
