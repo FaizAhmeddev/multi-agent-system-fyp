@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Bot, LoaderCircle, Plus, Send } from "../../components/icons";
+import { Bot, LoaderCircle, Paperclip, Plus, Send, X } from "../../components/icons";
 import { Badge, Button, ErrorBox, Notice, SimulatedBadge, Textarea, cx } from "../../components/ui/primitives";
-import { api, ApiError, streamEvents } from "../../lib/api";
+import { api, ApiError, streamEvents, uploadFile } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { fmtDateTime } from "../../lib/format";
 import { Link, useRouter } from "../../lib/router";
@@ -20,6 +20,14 @@ interface Turn {
   role: "user" | "assistant";
   text: string;
   cards: Card[];
+  files?: string[];
+}
+
+interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  chars: number;
 }
 
 const NODE_LABEL: Record<string, string> = {
@@ -51,6 +59,26 @@ export function AssistantPage({ conversationId }: { conversationId?: number }) {
   const [meta, setMeta] = useState<{ llm: string; planner: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const attach = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setError(null);
+    setUploading(true);
+    try {
+      for (const f of Array.from(list).slice(0, 5 - files.length)) {
+        const a = await uploadFile<Attachment>("/api/assistant/attachments", f);
+        setFiles((cur) => [...cur, a]);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const convs = useQuery({ queryKey: ["conversations"], queryFn: () => api<{ items: ConvSummary[] }>("/api/assistant/conversations?page_size=30") });
   const history = useQuery({
@@ -86,14 +114,16 @@ export function AssistantPage({ conversationId }: { conversationId?: number }) {
     setBusy(true);
     setProgress(["Planning"]);
     setText("");
-    setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg, cards: [] }]);
+    const sent = files;
+    setFiles([]);
+    setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg, cards: [], files: sent.map((f) => f.name) }]);
     const ctl = new AbortController();
     abortRef.current = ctl;
     let result: TurnResult | null = null;
     try {
       await streamEvents(
         "/api/assistant/messages/stream",
-        { text: msg, conversation_id: convId ?? null },
+        { text: msg, conversation_id: convId ?? null, attachments: sent.map((f) => f.id) },
         (ev, data) => {
           const d = data as Record<string, unknown>;
           if (ev === "plan") {
@@ -208,6 +238,13 @@ export function AssistantPage({ conversationId }: { conversationId?: number }) {
               t.role === "user" ? (
                 <li key={t.id} className="self-end rounded-lg bg-primary-soft px-3 py-2 text-sm" data-testid="user-message">
                   {t.text}
+                  {t.files?.length ? (
+                    <span className="mt-1 flex flex-wrap gap-1 text-xs text-muted">
+                      {t.files.map((n) => (
+                        <span key={n} className="inline-flex items-center gap-1"><Paperclip aria-hidden className="size-3" />{n}</span>
+                      ))}
+                    </span>
+                  ) : null}
                 </li>
               ) : (
                 <li key={t.id} className="flex flex-col gap-3" data-testid="assistant-message">
@@ -234,7 +271,32 @@ export function AssistantPage({ conversationId }: { conversationId?: number }) {
             <Notice tone="danger">{error}</Notice>
           </div>
         )}
+        {files.length > 0 && (
+          <ul className="flex flex-wrap gap-2 border-t border-border px-3 pt-2" aria-label="Attached files">
+            {files.map((f) => (
+              <li key={f.id} className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-xs">
+                <Paperclip aria-hidden className="size-3" />
+                <span className="max-w-48 truncate">{f.name}</span>
+                <button type="button" className="rounded p-0.5 text-muted hover:text-fg" aria-label={`Remove ${f.name}`} onClick={() => setFiles((c) => c.filter((x) => x.id !== f.id))}>
+                  <X aria-hidden className="size-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-border p-3">
+          <input
+            ref={fileRef}
+            type="file"
+            className="sr-only"
+            multiple
+            accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.tsv"
+            aria-label="Attach files"
+            onChange={(e) => void attach(e.target.files)}
+          />
+          <Button type="button" busy={uploading} disabled={busy || files.length >= 5} onClick={() => fileRef.current?.click()} icon={<Paperclip aria-hidden className="size-4" />} aria-label="Attach a file">
+            <span className="sr-only">Attach</span>
+          </Button>
           <label htmlFor="assistant-input" className="sr-only">
             Message
           </label>

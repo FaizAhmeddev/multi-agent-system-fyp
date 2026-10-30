@@ -383,7 +383,9 @@ def main() -> int:
         stop_previous()
         say("Stopped.")
         return 0
-    if not in_venv():
+    if in_venv():
+        ensure_venv(a.skip_install)  # started with the .venv Python (e.g. VS Code): still install new packages
+    else:
         ensure_venv(a.skip_install)
         # Continue inside .venv so every import uses the pinned packages. Ctrl+C reaches both processes;
         # this one ignores it and waits, so the inner one can stop every part cleanly.

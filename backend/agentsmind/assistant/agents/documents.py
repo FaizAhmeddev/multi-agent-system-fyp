@@ -17,6 +17,14 @@ from .common import STOP, has_any, quoted, words
 
 DOC_WORDS = ("document", "documents", "doc", "docs", "file", "files", "policy", "policies", "guide", "drive",
              "summarize", "summarise", "summary", "pdf", "handbook", "contract", "folder")
+ATTACHED = re.compile(r"\b(attach(?:ed|ment|ments)?|uploaded|this (?:file|document|report|cv|sheet|spreadsheet|pdf)|"
+                      r"these (?:files|documents|reports|expenses|invoices|figures|numbers))\b", re.I)
+ANALYSIS = re.compile(r"\b(expenses?|costs?|budget|actuals?|invoices?|unpaid|spend(?:ing)?|campaign|management summary|"
+                      r"key dates|action items|compare|differences|highlight|analy[sz]e|analysis|extract|review)\b", re.I)
+ANALYST = ("You are a careful business analyst at a company in Karachi, Pakistan. Do exactly the task asked, using "
+           "only the attached file(s). Show figures exactly as they appear and do arithmetic carefully (state totals "
+           "you computed as computed). If the files do not contain what is needed, say what is missing. Use short "
+           "headings and bullet points; plain text, no markdown tables wider than 5 columns.")
 EXTRA_STOP = STOP | {"summarize", "summarise", "summary", "find", "file", "files", "document", "documents", "doc", "show",
                      "search", "read", "open", "what", "does", "say", "about", "tell", "give", "list", "drive", "folder",
                      "please", "from", "our", "company", "how", "many", "much", "do", "we", "get", "are"}
@@ -69,12 +77,28 @@ class DocumentsAgent(Agent):
 
     def score(self, text: str) -> float:
         t = text.lower()
-        return sum(1.0 for w in DOC_WORDS if re.search(rf"\b{re.escape(w)}\b", t))
+        s = sum(1.0 for w in DOC_WORDS if re.search(rf"\b{re.escape(w)}\b", t))
+        if ATTACHED.search(text):
+            s += 4.0  # "the attached CV/report" is about the file in the chat, not recruitment or finance records
+        if re.search(r"\b(expenses?|budget vs|budget versus|actuals?|campaign reports?|management summary|key dates|"
+                     r"action items|highlight differences)\b", t):
+            s += 2.5
+        return s
 
     def understand(self, ctx: Ctx, state: State) -> State:
         text = state["text"]
         intent = _intent(text.lower())
         slots: dict[str, Any] = dict(state.get("slots") or {}, intent=intent)
+        files = list(getattr(ctx, "attachments", None) or [])
+        if files and (ATTACHED.search(text) or ANALYSIS.search(text) or intent in ("summarize", "ask")):
+            slots["intent"] = "attached"
+            return {"intent": "attached", "slots": slots}
+        if ATTACHED.search(text) or (not re.search(r"\bpolic(?:y|ies)\b", text, re.I) and re.search(
+                r"\b(expenses?|budget|actuals?|invoices?|campaign)\b", text, re.I) and re.search(
+                r"\b(analy[sz]e|analysis|highlight|vs|versus|top \d+|totals?|unpaid|report|summari[sz]e)\b", text, re.I)):
+            return {"intent": intent, "slots": slots,
+                    "question": "Attach the file first: click the paperclip next to the message box, choose the file "
+                                "(PDF, Word, Excel, CSV or text), then send the request again."}
         if intent == "list":
             m = re.search(r"\bfiles in (?:the )?([\w/ \-]+?)(?: folder)?(?:[.?]|$)", text, re.I)
             slots["folder"] = m.group(1).strip() if m else None
@@ -96,9 +120,43 @@ class DocumentsAgent(Agent):
         q = words(query)
         return max(d["items"], key=lambda f: len(q & words(f["name"].replace("_", " "))))
 
+    def _attached(self, ctx: Ctx, text: str) -> State:
+        files = list(getattr(ctx, "attachments", None) or [])
+        names = ", ".join(f["name"] for f in files)
+        wrapped = [wrap(f["text"][:60_000], source=f"attachment:{f['id']}") for f in files]
+        warnings = (["An attached file contains text addressed to an AI assistant. It was treated as data and "
+                     "ignored."] if any(w.injection_suspected for w in wrapped) else [])
+        if any(len(f["text"]) > 60_000 for f in files):
+            warnings.append("A file is long; only its first part was read.")
+        llm = ctx.llm
+        if not getattr(llm, "simulated", True):
+            parts = [f"Task from {ctx.user.name}: {text}"]
+            parts += [f"File {i}: {f['name']}\n{w.text}" for i, (f, w) in enumerate(zip(files, wrapped, strict=True), 1)]
+            r = llm.complete("\n\n".join(parts), system=ANALYST, temperature=0.2)
+            body, sim = r.text.strip(), False
+        else:
+            body = "[Simulated] Main points (no language model configured):\n\n" + "\n\n".join(
+                f"{f['name']}:\n{extractive_summary(f['text'])}" for f in files)
+            sim = True
+        title = ("Comparison of " if re.search(r"\bcompare|differences?\b", text, re.I) and len(files) > 1
+                 else "Summary of " if re.search(r"summar", text, re.I) else "Analysis of ") + names
+        links = [{"label": f"Open {f['name']}", "url": f"/api/assistant/attachments/{f['id']}"} for f in files]
+        out_paths = [f["path"] for f in files if f.get("kind") != "output"]
+        if re.search(r"\b(pdf|export|download|report)\b", text, re.I) and re.search(r"\b(pdf|export)\b", text, re.I):
+            save_pdf = getattr(ctx, "save_pdf", None)
+            if save_pdf is not None:
+                pdf = save_pdf(title[:100], body)
+                links.insert(0, {"label": f"Download {pdf['name']}", "url": f"/api/assistant/attachments/{pdf['id']}"})
+                out_paths = [pdf["path"]]
+        return {"cards": [Card(kind="text", agent=self.name, title=title[:200], body=body, simulated=sim,
+                               untrusted=True, warnings=warnings, links=links,
+                               data={"handoff": {"summary": body, "attachments": out_paths, "about": title[:150]}})]}
+
     def gather(self, ctx: Ctx, state: State) -> State:
         s, text = state["slots"], state["text"]
         intent = s["intent"]
+        if intent == "attached":
+            return self._attached(ctx, text)
         if intent == "list":
             d = self.read_or_raise(ctx, "drive_list_files", {"folder": s["folder"], "page_size": 50} if s["folder"]
                                    else {"page_size": 50})

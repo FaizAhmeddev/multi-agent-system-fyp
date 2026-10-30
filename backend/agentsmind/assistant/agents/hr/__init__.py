@@ -80,6 +80,12 @@ class HRAgent(Agent):
     def _dispatch(ctx: Ctx, intent: str, text: str, s: dict[str, Any]) -> dict[str, Any]:
         if intent == "screen":
             return H.h_screen(ctx, text, s)
+        if intent == "cv_find":
+            return H.h_cv_find(ctx, text, s)
+        if intent == "candidate_emails":
+            return H.h_candidate_emails(ctx, text, s)
+        if intent == "email_candidates":
+            return H.h_email_candidates(ctx, text, s)
         if intent == "create_job":
             return H.h_create_job(ctx, text, s)
         if intent in ("job_description", "interview_questions"):

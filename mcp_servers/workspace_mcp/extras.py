@@ -56,7 +56,7 @@ def local_list(max_files: int = 200) -> list[dict[str, Any]]:
         for p in sorted(root.rglob("*")):
             if p.is_file() and p.suffix.lower() in DOC_TYPES and not p.name.startswith("~$"):
                 st = p.stat()
-                out.append({"id": _file_id(p), "name": p.name, "folder": str(root), "size": st.st_size,
+                out.append({"id": _file_id(p), "name": p.name, "folder": str(root), "path": str(p), "size": st.st_size,
                             "modified": datetime.fromtimestamp(st.st_mtime, UTC).isoformat(timespec="seconds")})
                 if len(out) >= max_files:
                     return out

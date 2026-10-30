@@ -262,6 +262,7 @@ class AttachmentText(BaseModel):
     sender: str
     subject: str
     date: str
+    saved_path: str = ""  # local copy (data/hr_documents/cvs) that can be attached to an email
     untrusted: bool = True
 
 
@@ -287,6 +288,7 @@ class LocalFile(BaseModel):
     id: str
     name: str
     folder: str
+    path: str = ""
     size: int
     modified: str
 

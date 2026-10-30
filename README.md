@@ -111,6 +111,13 @@ cd frontend; npm run typecheck; node scripts\contrast.mjs; npm run e2e   # e2e n
 
 `scripts\win\agentsmind-gate.ps1` does all of this on a separate clone and writes one log.
 
+## Attach files in the chat
+
+Click the paperclip next to the message box to attach up to 5 files (PDF, Word, Excel, CSV or text, 15 MB each),
+then ask, for example: "Analyze the attached campaign report and prepare a management summary", "Compare the two
+attached documents", "Analyze these expenses and export it as PDF", or "Find the attached CV, summarize it, and
+email it to Huzaifa". Files stay on this computer (`data\chat_uploads`) and only you can open them.
+
 ## Connect real services
 
 - **OpenAI:** put `OPENAI_API_KEY` in `.env` and start again.

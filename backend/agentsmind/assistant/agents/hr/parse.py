@@ -23,17 +23,32 @@ Intent = Literal[
     "check_in", "attendance_mark", "attendance_import", "leave_apply", "leave_decide", "leave_balance",
     "payroll_run", "compliance", "task_update", "report",
     "sheet_where", "sheet_query", "sheet_register",
-    "employee_lookup", "policy",
+    "employee_lookup", "policy", "cv_find", "candidate_emails", "email_candidates",
 ]
 HR_ONLY = {"screen", "create_job", "job_description", "interview_questions", "offer_letter", "contract",
            "welcome_letter", "conduct_letter", "experience_letter", "resignation_acceptance", "onboard",
            "induction_plan", "separation", "final_settlement", "attendance_mark", "attendance_import", "leave_decide",
            "payroll_run", "compliance", "task_update", "report", "sheet_where", "sheet_query", "sheet_register",
-           "employee_lookup"}
+           "employee_lookup", "cv_find", "candidate_emails", "email_candidates"}
 
 ROLE_NOUNS = (r"(?:developer|engineer|designer|analyst|manager|accountant|officer|executive|intern|specialist|"
               r"consultant|programmer|architect|administrator|assistant|associate|lead|tester|scientist)")
 ROLE_RE = re.compile(r"\b([A-Za-z+#.]+(?:\s+[A-Za-z+#.]+)?\s+" + ROLE_NOUNS + r")s?\b", re.I)
+# Checked before the model: requests whose wording leaves no doubt.
+STRONG: list[tuple[str, str]] = [
+    ("cv_find", r"\b(find|get|show|open|fetch|locate|pull|search|look for)\b.{0,20}\b[a-z]+'s\s+(cv|resume)\b|"
+                r"\b(find|get|show|open|fetch|locate|pull|search for)\b.{0,10}\b(the\s+)?(cv|resume)\s+of\s+[a-z]+"),
+    ("candidate_emails", r"\b(fetch|show|list|get|read|open)\b.{0,25}\b(candidates?|applicants?|job applications?|cvs?)"
+                         r"\s*(e-?mails?|messages)\b|\b(latest|recent|last|newest)\s+\d*\s*(candidate|applicant|cv)"
+                         r"\s*(e-?mails?|messages)\b"),
+    ("email_candidates", r"\b(email|e-mail|mail|send (?:an )?email to|write to|invite|contact)\b.{0,12}\b(the\s+)?"
+                         r"(top|best|shortlisted|selected|strongest)\b.{0,20}\bcandidates?\b"),
+    ("onboard", r"\b(full onboarding|complete (?:the )?(?:full )?onboarding|onboarding process|employee profile)\b|"
+                r"\bnew (?:employee|joiner|hire)\b.{0,60}\b(join\w*|start\w*)\b"),
+    ("screen", r"\b(select|pick|choose|shortlist|hire|find me|give me)\s+(?:the\s+)?(?:top\s+|best\s+)?"
+               r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:best\s+|good\s+|strong\s+)?"
+               r"[a-z+#./ ]{0,30}?\b" + ROLE_NOUNS + r"s?\b"),
+]
 RULES: list[tuple[str, str]] = [
     ("sheet_register", r"\b(register|connect|link|add|use)\b.{0,60}\b(sheet|spreadsheet|excel|workbook|tracker)\b"
                        r".{0,200}(docs\.google\.com|\.xlsx|\.xlsm|\bpurpose\b|\bfor (?:the |my )?\w+ records?\b)"),
@@ -121,9 +136,14 @@ class HRParse(BaseModel):
     item: str = Field(default="", max_length=120, description="checklist item mentioned")
 
 
+def strong_intent(text: str) -> str | None:
+    t = text.lower()
+    return next((i for i, rx in STRONG if re.search(rx, t)), None)
+
+
 def rule_intent(text: str) -> str:
     t = text.lower()
-    for intent, rx in RULES:
+    for intent, rx in STRONG + RULES:
         if re.search(rx, t):
             return intent
     return "policy"
@@ -132,7 +152,9 @@ def rule_intent(text: str) -> str:
 LLM_SYSTEM = (
     "You read requests to an HR assistant in a Pakistani company (Karachi). Pick the single intent that fits best and "
     "copy the details exactly as written (never invent names, dates or amounts; leave unknown fields empty). Intents: "
-    "screen (find/rank CVs), create_job, job_description, interview_questions, offer_letter, contract, welcome_letter, "
+    "screen (find/rank/select CVs), cv_find (one named person's CV), candidate_emails (list emails from "
+    "applicants), email_candidates (email the top screened candidates), create_job, job_description, "
+    "interview_questions, offer_letter, contract, welcome_letter, "
     "conduct_letter, experience_letter, resignation_acceptance, onboard (new joiner: record, IT, payroll, induction), "
     "induction_plan, separation (resignation/termination/exit), final_settlement, check_in (the user checks in or "
     "out), attendance_mark (HR marks someone present/absent/late), attendance_import (from a sheet), leave_apply, "
@@ -182,6 +204,8 @@ def rule_slots(text: str, intent: str) -> dict[str, str]:
     if ph:
         s["phone"] = ph.group(0)
     jt = _after(text, r"as an?|as the|as|position of|role of|for the role of|designation")
+    jt = re.split(r"\s+[-–—]\s+|\s*\(|\s+(?:and|to)\s+(?:complete|start|do|run)\b|\s+complete\b", jt or "", maxsplit=1)[0]
+    jt = jt.strip(" .,;:-")
     if jt and len(jt) <= 80:
         s["job_title"] = jt
     for d in DEPARTMENTS:
@@ -260,6 +284,9 @@ def _clean_dates(slots: dict[str, str], today: date) -> dict[str, str]:
 def parse(llm: Any, text: str, today: date | None = None) -> tuple[str, dict[str, str], str]:
     """(intent, slots, how). Slots from the model are merged over rule slots."""
     today = today or date.today()
+    sure = strong_intent(text)
+    if sure:
+        return sure, _clean_dates(rule_slots(text, sure), today), "rules"
     got = llm_parse(llm, text)
     if got is not None:
         rules = rule_slots(text, got.intent)

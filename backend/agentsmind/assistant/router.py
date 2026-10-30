@@ -6,8 +6,8 @@ import queue
 import threading
 from collections.abc import Iterator
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -24,13 +24,41 @@ router = APIRouter(prefix="/api", tags=["assistant"])
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     conversation_id: int | None = None
+    attachments: list[str] = Field(default_factory=list, max_length=5)
+
+
+@router.post("/assistant/attachments", status_code=201)
+async def upload_attachment(file: UploadFile = File(...), user: User = Depends(get_current_user),
+                            db: Session = Depends(get_db)) -> dict:
+    """Attach a file to the next message (PDF, Word, Excel, CSV or text; at most 15 MB)."""
+    from .attachments import MAX_BYTES, AttachmentError, save
+
+    data = await file.read(MAX_BYTES + 1)
+    try:
+        meta = save(user.id, file.filename or "file", data)
+    except AttachmentError as exc:
+        raise HTTPException(422, detail={"code": "bad_attachment", "message": str(exc)}) from None
+    audit(db, "assistant.attachment", actor_user_id=user.id, actor_email=user.email, target_type="attachment",
+          target_id=meta["id"], detail={"name": meta["name"], "size": meta["size"]})
+    return meta
+
+
+@router.get("/assistant/attachments/{aid}")
+def download_attachment(aid: str, user: User = Depends(get_current_user)) -> FileResponse:
+    from .attachments import load
+
+    a = load(user.id, aid)
+    if a is None:
+        raise HTTPException(404, detail={"code": "not_found", "message": "No such file."})
+    return FileResponse(a["path"], filename=a["name"])
 
 
 @router.post("/assistant/messages")
 def send_message(body: MessageIn, request: Request, user: User = Depends(get_current_user),
                  db: Session = Depends(get_db)) -> dict:
     try:
-        return handle_message(db, user, body.text, conversation_id=body.conversation_id, ip=client_ip(request))
+        return handle_message(db, user, body.text, conversation_id=body.conversation_id, ip=client_ip(request),
+                              attachments=body.attachments)
     except LookupError as exc:
         raise HTTPException(404, detail={"code": "not_found", "message": str(exc)}) from None
 
@@ -50,7 +78,7 @@ def stream_message(body: MessageIn, request: Request, user: User = Depends(get_c
             u = db.get(User, user_id)
             try:
                 res = handle_message(db, u, body.text, conversation_id=body.conversation_id, ip=ip,
-                                     on_event=lambda e: q.put(("progress", e)))
+                                     on_event=lambda e: q.put(("progress", e)), attachments=body.attachments)
                 q.put(("result", res))
             except LookupError as exc:
                 q.put(("error", {"code": "not_found", "message": str(exc)}))

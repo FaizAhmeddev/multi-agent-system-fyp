@@ -27,6 +27,7 @@ export {
   Menu,
   Monitor,
   Moon,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,

@@ -178,6 +178,10 @@ def llm_route(ctx: Ctx, text: str) -> str | None:
 
 
 def allowed(ctx: Ctx, agent: Agent) -> bool:
+    if agent.name == "documents" and getattr(ctx, "attachments", None):
+        from ..rbac import STAFF_ROLES
+
+        return ctx.user.has(*STAFF_ROLES)  # anyone may work on files they attached; Drive stays role-limited
     return ctx.user.has(*agent.roles)
 
 
@@ -235,6 +239,7 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
     cards: list[Card] = []
     new_pending = None
     done: list[str] = []
+    handoff: dict[str, Any] | None = None
     for st in steps:
         agent = AGENTS[st.agent]
         if not allowed(ctx, agent):
@@ -249,7 +254,13 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
         slots = answer_slots if answer_slots is not None else {}
         if done and agent.name == "email" and "context" not in slots:  # "schedule a meeting ... and email X"
             slots = {**slots, "context": "; ".join(done)}
+        if handoff and agent.name == "email" and "handoff" not in slots:  # "summarize the CV and email it to X"
+            slots = {**slots, "handoff": handoff}
         out = run_agent(agent, ctx, st.text, slots)
+        for c in out:
+            h = (c.data or {}).pop("handoff", None) if isinstance(c.data, dict) else None
+            if h:
+                handoff = h
         cards.extend(out)
         done.append(st.text)
         if new_pending is None and out and out[-1].kind == "clarify":

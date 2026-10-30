@@ -284,10 +284,33 @@ def _recent_count(txt: str) -> int | None:
     return min(int(m.group(1)), 100) if m else None
 
 
+NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+             "ten": 10}
+
+
+def _criteria(txt: str) -> list[str]:
+    """'... developers with good understanding of agile methodologies and git experience' -> the requirements."""
+    m = re.search(r"\b(?:with|having|who (?:have|know)|skilled in|experienced in)\s+(.+)$", txt, re.I | re.S)
+    if not m:
+        return []
+    c = re.sub(r"\s+(?:from|in)\s+(?:my\s+|the\s+)?(?:last|latest|recent)\s+\d+\s+e-?mails?.*$", "", m.group(1), flags=re.I)
+    c = re.sub(r"\b(?:a\s+)?(?:good|strong|solid|excellent|deep|sound)\s+(?:understanding|knowledge|command)\s+of\s+",
+               "", c, flags=re.I)
+    c = re.sub(r"\b(?:strong|good|solid|excellent|hands-on)\s+", "", c, flags=re.I)
+    items = [x.strip(" .,;") for x in re.split(r",|;|\band\b|\bas well as\b|\bplus\b", c, flags=re.I)]
+    out = []
+    for x in items:
+        x = re.sub(r"\s+(?:experience|skills?|knowledge)$", "", x, flags=re.I).strip()
+        if len(x) >= 2:
+            out.append(x[0].upper() + x[1:])
+    return out[:10]
+
+
 def _top_count(txt: str) -> int | None:
-    """'1 best Python developer', 'top 3 candidates', 'give me 2 Java developers'."""
-    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
-    m = re.search(r"\b(?:top|best)\s+(\d{1,2}|one|two|three|four|five)\b|\b(\d{1,2}|one|two|three|four|five)\s+"
+    """'1 best Python developer', 'top 3 candidates', 'select 6 software developers'."""
+    words = NUM_WORDS
+    m = re.search(r"\b(?:top|best)\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b|"
+                  r"\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
                   r"(?:best|top|strongest|suitable|good)?\s*[a-z+#. ]{0,30}?" + P.ROLE_NOUNS, txt, re.I)
     if not m:
         return None
@@ -300,6 +323,10 @@ def gather_cvs(ctx: Ctx, role: str, sources: set[str], notes: list[str],
     """CV texts from Gmail attachments, the CV folders and Drive. Each source is optional."""
     pol = policy_of(ctx)
     out: list[dict[str, Any]] = []
+    for f in getattr(ctx, "attachments", None) or []:  # CVs attached in the chat
+        if f.get("kind") != "output":
+            out.append({"source": "chat", "ref": f"chat:{f['id']}", "name": f["name"], "text": f["text"],
+                        "from": "attached in the chat", "path": f["path"]})
     for src in ("gmail", "folder", "drive"):
         if src in sources:
             try:
@@ -339,7 +366,8 @@ def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list
                                                              "attachment": a["attachment"]})
                 if d.ok:
                     out.append({"source": "gmail", "ref": f"gmail:{a['message_id']}:{a['attachment']}",
-                                "name": a["filename"], "text": d.data["text"], "from": a["sender"]})
+                                "name": a["filename"], "text": d.data["text"], "from": a["sender"],
+                                "subject": a.get("subject", ""), "path": d.data.get("saved_path", "")})
         else:
             notes.append(f"Gmail: {r.error}")
     if "folder" in sources:
@@ -349,7 +377,7 @@ def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list
                 d = ctx.read("hr", "cv_folder_read", {"file_id": f["id"]})
                 if d.ok:
                     out.append({"source": "folder", "ref": f["id"], "name": f["name"], "text": d.data["text"],
-                                "from": f["folder"]})
+                                "from": f["folder"], "path": f.get("path", "")})
         else:
             notes.append(f"CV folder: {r.error}")
     if "drive" in sources:
@@ -379,14 +407,18 @@ def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
     from ...screening import screen
 
     pol = policy_of(ctx)
-    role = slots.get("job_title") or _role(txt)
+    role = slots.get("job_title") or _role_only(txt)
     if not role:
         return {"question": "For which role? (for example: Screen CVs for the Python Developer role)"}
     t = txt.lower()
     sources = {s for s, w in (("gmail", ("gmail", "email", "inbox", "mail")), ("drive", ("drive",)),
                               ("folder", ("folder", "computer", "local", "disk"))) if any(x in t for x in w)}
     sources = sources or {"gmail", "folder", "drive"}
-    jd_text, jd_src = _jd_for(ctx, role)
+    criteria = _criteria(txt)
+    if criteria:
+        jd_text, jd_src = _jd_text(role, "\n".join(criteria)), "requirements in your request"
+    else:
+        jd_text, jd_src = _jd_for(ctx, role)
     notes: list[str] = []
     recent, top = _recent_count(txt), _top_count(txt)
     if recent:
@@ -448,12 +480,160 @@ def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
                                              "recommendation"], "rows": rows})]}
 
 
+def _role_only(txt: str) -> str:
+    """The role, without 'with ...' requirements ('Select 6 software developers with git' -> Software Developer)."""
+    return _role(re.split(r"\b(?:with|having|who (?:have|know)|skilled in|experienced in)\b", txt, maxsplit=1,
+                          flags=re.I)[0])
+
+
+def h_cv_find(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
+    """'Find Uzair's CV, summarize it' -> the CV (Gmail, CV folders, Drive or the chat), a summary, and the file
+    handed to a following 'email it to ...' step."""
+    m = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'s\s+(?i:cv|resume)\b", txt) or \
+        re.search(r"\b(?i:cv|resume)\s+of\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", txt) or \
+        re.search(r"\b([a-z]+)'s\s+(?:cv|resume)\b", txt, re.I) or re.search(r"\b(?:cv|resume)\s+of\s+([a-z]+)", txt, re.I)
+    name = m.group(1).strip() if m else ""
+    name = re.sub(r"^(?:Find|Get|Show|Open|Fetch|Locate|Pull|Search)\s+", "", name).strip()
+    name = " ".join(w.capitalize() for w in name.split())
+    if not name:
+        return {"question": "Whose CV should I look for? Give the person's name."}
+    notes: list[str] = []
+    want = [w.lower() for w in name.split()]
+
+    def hit(c: dict[str, Any]) -> bool:
+        head = " ".join([c.get("name", ""), c.get("from", ""), c.get("subject", ""), c["text"][:600]]).lower()
+        return all(re.search(rf"\b{re.escape(w)}\b", head) for w in want)
+
+    found: list[dict[str, Any]] = []
+    for f in getattr(ctx, "attachments", None) or []:
+        c = {"source": "chat", "name": f["name"], "text": f["text"], "from": "attached in the chat", "path": f["path"]}
+        if hit(c):
+            found.append(c)
+    if not found:
+        q = f'"{name}" has:attachment'
+        r = ctx.read("hr", "gmail_find_attachments", {"query": q, "max_messages": 15})
+        if r.ok:
+            for a in r.data["items"][:10]:
+                d = ctx.read("hr", "gmail_read_attachment", {"message_id": a["message_id"], "attachment": a["attachment"]})
+                if d.ok:
+                    c = {"source": "gmail", "name": a["filename"], "text": d.data["text"], "from": a["sender"],
+                         "subject": a.get("subject", ""), "path": d.data.get("saved_path", "")}
+                    if hit(c):
+                        found.append(c)
+                        break
+        else:
+            notes.append(f"Gmail: {r.error}")
+        if not found:
+            for c in gather_cvs(ctx, name, {"folder", "drive"}, notes):
+                if hit(c):
+                    found.append(c)
+                    break
+    if not found:
+        raise AgentError(f"I could not find a CV for {name} in Gmail, the CV folders or Drive. " + " ".join(notes))
+    cv = found[0]
+    from ....agents.untrusted import wrap
+
+    w = wrap(cv["text"][:30_000], source=f"cv:{cv['name']}")
+    llm = ctx.llm
+    if not getattr(llm, "simulated", True):
+        r = llm.complete(f"Summarise this CV for a hiring manager in 6 to 10 bullet points: current role, total "
+                         f"experience, key skills, education, notable projects, location, notice period if stated. "
+                         f"Use only the CV.\n\nCV of {name} (file {cv['name']}):\n{w.text}", temperature=0.2)
+        summary, sim = r.text.strip(), False
+    else:
+        lines = [ln.strip(" -*•\t") for ln in cv["text"].splitlines() if len(ln.strip()) > 3][:10]
+        summary, sim = "[Simulated] First lines of the CV (no language model configured):\n" + "\n".join(
+            f"- {ln}" for ln in lines), True
+    where = {"chat": "attached in the chat", "gmail": f"Gmail ({cv['from']})", "folder": "the CV folder",
+             "drive": "Google Drive"}[cv["source"]]
+    warn = [] if cv.get("path") else ["This CV is on Google Drive: the summary can be emailed, but not the file."]
+    if w.injection_suspected:
+        warn.append("The CV contains text addressed to an AI assistant. It was treated as data and ignored.")
+    return {"cards": [Card(kind="text", agent="hr", title=f"CV of {name}: {cv['name']}",
+                           body=f"Found in {where}.\n\n{summary}", simulated=sim, untrusted=True, warnings=warn,
+                           data={"handoff": {"summary": summary, "attachments": [cv["path"]] if cv.get("path") else [],
+                                             "about": f"CV of {name}"}})]}
+
+
+def h_candidate_emails(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
+    """'Fetch the latest 10 candidate emails': applicants' emails with a CV attached, newest first."""
+    m = re.search(r"\b(\d{1,3})\b", txt)
+    n = min(int(m.group(1)), 50) if m else 10
+    pol = policy_of(ctx)
+    r = ctx.read("hr", "gmail_find_attachments", {"query": pol["recruitment"]["gmail_query"], "max_messages": n})
+    if not r.ok:
+        raise AgentError(f"Gmail: {r.error}")
+    rows, seen = [], set()
+    for a in r.data["items"]:
+        if a["message_id"] in seen:
+            continue
+        seen.add(a["message_id"])
+        rows.append({"from": a["sender"], "subject": a["subject"], "date": a["date"], "file": a["filename"]})
+    body = (f"{len(rows)} email(s) with a CV attached (newest first). Next: 'Shortlist 3 Python developers from the "
+            f"last {n} emails'.") if rows else (f"No applicant email with a PDF or Word CV was found (search: "
+                                               f"{pol['recruitment']['gmail_query']}).")
+    return {"cards": [table("Candidate emails", rows, ["from", "subject", "date", "file"], body, untrusted=True)]}
+
+
+def h_email_candidates(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
+    """'Email the top 2 candidates for the Python developer role': one approval card per candidate, from the last
+    screening."""
+    role = slots.get("job_title") or _role_only(txt)
+    n = _top_count(txt) or 3
+    m = re.search(r"\b(?:top|best)\s+(\d{1,2})\b", txt, re.I)
+    if m:
+        n = int(m.group(1))
+    db = getattr(ctx, "db", None)
+    if db is None:
+        raise AgentError("Screening results are kept in the database; this needs the running AgentsMind.")
+    from sqlalchemy import func, select
+
+    from ....db.models import Candidate, CVRecord
+
+    q = select(Candidate, func.max(CVRecord.rubric_score)).join(CVRecord, CVRecord.candidate_id == Candidate.id)
+    if role:
+        q = q.where(func.lower(Candidate.job_title).like(f"%{role.lower()}%"))
+    q = q.group_by(Candidate.id).order_by(func.max(CVRecord.rubric_score).desc().nulls_last())
+    rows = list(db.execute(q.limit(50)))
+    if not rows:
+        raise AgentError(f"No screened candidates{' for ' + role if role else ''} yet. First say for example: "
+                         f"'Shortlist 3 {role or 'Python developers'} from the last 20 emails'.")
+    with_mail = [(c, sc) for c, sc in rows if c.email][:n]
+    if not with_mail:
+        raise AgentError("The top candidates have no email address in their CVs.")
+    sign = ctx.user.name
+    instr = re.sub(r"^.*?\bcandidates?\b(?:\s+for\s+the\s+[^,.]+?role)?[\s,:-]*", "", txt, flags=re.I).strip()
+    props = []
+    for c, sc in with_mail:
+        subject = f"Interview invitation: {c.job_title or role}"
+        llm = ctx.llm
+        body = ""
+        if not getattr(llm, "simulated", True):
+            r = llm.complete(f"Write a short, warm email from {sign} (HR) to {c.full_name}, who applied for "
+                             f"{c.job_title or role}, inviting them to an interview and asking for two time slots "
+                             f"that suit them this week. {('Also: ' + instr) if instr else ''} Plain text, sign as "
+                             f"{sign}. No placeholders, no invented dates or salary.", temperature=0.3)
+            body = r.text.strip()
+        if not body:
+            body = (f"Dear {c.full_name},\n\nThank you for applying for the {c.job_title or role} position. We were "
+                    "impressed by your profile and would like to invite you to an interview. Please reply with two "
+                    f"time slots this week that suit you.\n\nBest regards,\n{sign}")
+        props.append(Proposal(tool="gmail_send_email", args={"to": [c.email], "subject": subject, "body": body},
+                              summary=f"Email {c.full_name} ({c.email}): {subject}",
+                              details=[Detail("To", f"{c.full_name} <{c.email}>"), Detail("Score", str(sc)),
+                                       Detail("Subject", subject), Detail("Message", body)]))
+    skipped = len([1 for c, _ in rows[:n] if not c.email])
+    note = f" {skipped} of the top {n} had no email address." if skipped else ""
+    return {"cards": [text("Email the top candidates", f"{len(props)} email(s) ready; each is sent only if you "
+                           f"approve it.{note}")], "proposals": props}
+
+
 def _role(txt: str) -> str:
     m = re.search(r"\bfor (?:the |a |an )?([A-Za-z][A-Za-z +#/\-]{2,60}?)(?: role| position| job| vacancy| opening|"
                   r"[.?,]|$)", txt, re.I)
     if not m:
         r = P.ROLE_RE.search(re.sub(r"\b(best|top|suitable|strongest|good|one|two|three|five|\d+|my|last|from|"
-                                    r"give|me|fetch|find|get|show|list|the|a|an|e-?mails?|inbox|gmail|cvs?|resumes?|in|of|om|for|"
+                                    r"give|me|fetch|find|get|show|list|select|pick|choose|shortlist|hire|the|a|an|e-?mails?|inbox|gmail|cvs?|resumes?|in|of|om|for|"
                                     r"out)\b", " ", txt,
                                     flags=re.I))
         return re.sub(r"\s+", " ", r.group(1)).strip().title() if r else ""
@@ -544,7 +724,12 @@ def h_onboard(ctx: Ctx, txt: str, slots: dict[str, str], induction_only: bool = 
     elif pkind == "candidate":
         base = {"full_name": rec.full_name, "email": rec.email, "phone": rec.phone, "job_title": rec.job_title}
     emp = employee_fields(ctx, slots, name, base)
-    miss = missing_of(emp, ("full_name", "joining_date", "job_title"))
+    need = ["full_name", "joining_date", "job_title"]
+    if not induction_only and re.search(r"\bwelcome e-?mail\b", txt, re.I):
+        need.append("email")
+    if not induction_only and re.search(r"\bpayroll\b", txt, re.I):
+        need.append("monthly_salary")
+    miss = missing_of(emp, tuple(need))
     if miss:
         return {"question": f"To onboard I need the {', '.join(miss)}. For example: 'Onboard Sara Khan as Python "
                             "Developer in Engineering joining 1 December, salary 150,000, email sara@example.com, "
@@ -571,6 +756,10 @@ def h_onboard(ctx: Ctx, txt: str, slots: dict[str, str], induction_only: bool = 
     else:
         steps = workflows.onboarding_steps(db, emp, tz=ctx.tz, options=options,
                                            existing_id=rec.id if pkind == "employee" else None, requester=requester)
+        if re.search(r"\boffer letter\b", txt, re.I):
+            steps.insert(2, workflows.step("core", "Generate the offer letter (Word and PDF)",
+                                           "Offer letter with salary, joining date and probation", op="letter",
+                                           params={"kind": "offer"}))
         title = f"Onboard {emp['full_name']} ({emp.get('job_title', '')}, joining {emp.get('joining_date')})"
     p = workflow_proposal(ctx, workflow="induction" if induction_only else "onboarding", title=title, steps=steps,
                           employee_id=rec.id if pkind == "employee" else None,

@@ -61,7 +61,9 @@ def _to_name(text: str) -> str:
     m = re.search(r"\b(?:e-?mail|mail|write|send|message|inform|tell)\s+(?:an?\s+(?:e-?mail|message)\s+)?(?:to\s+)?"
                   r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", text)
     if not m or m.group(1).lower() in {"email", "mail", "the", "my", "him", "her", "them", "about"}:
-        return ""
+        m = re.search(r"\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", text)
+        if not m or m.group(1).lower() in {"the", "my", "our", "all", "everyone"}:
+            return ""
     return m.group(1)
 
 
@@ -87,11 +89,21 @@ class EmailAgent(Agent):
     def understand(self, ctx: Ctx, state: State) -> State:
         text = state["text"]
         intent = _intent(text.lower())
-        slots: dict[str, Any] = dict(state.get("slots") or {}, intent=intent)
+        given = state.get("slots") or {}
+        if intent == "read" and (given.get("handoff") or given.get("context")) and re.search(
+                r"\b(send|forward|share|email|mail)\b", text, re.I):
+            intent = "send"  # "... and send the summary to Huzaifa"
+        slots: dict[str, Any] = dict(given, intent=intent)
         if intent == "send":
             given_to = slots.get("to")
             to = emails(text) or (emails(given_to) if isinstance(given_to, str) else list(given_to or []))
             name = _to_name(text)
+            if not to and name:
+                look = getattr(ctx, "find_contact", None)
+                found = look(name) if look is not None else None
+                if found:
+                    to = [found]
+                    slots["to_found"] = f"{name} <{found}> (from AgentsMind's records)"
             if not to:
                 slots.pop("to", None)
                 who = f"{name}'s email address" if name else "the email address"
@@ -99,9 +111,18 @@ class EmailAgent(Agent):
                         "question": f"Who should receive it? Give {who}."}
             given_msg = slots.get("message")
             context = _context_about(str(slots.get("context") or ""))
+            ho = slots.get("handoff") or {}
+            files: list[str] = []
+            if ho:
+                if not re.search(r"\bsummary\b", text, re.I) or re.search(r"\b(it|cv|resume|file|document|report|"
+                                                                          r"version|attachment|pdf)\b", text, re.I):
+                    files = list(ho.get("attachments") or [])[:5]
+                if re.search(r"\bsummary\b", text, re.I) and not re.search(r"\b(cv|resume|it|version)\b", text, re.I):
+                    files = []
             slots.update(to=to, to_name=name, message=_message_text(text) or (given_msg or "").strip(),
-                         about=_about(text) or context)
-            if not slots["message"] and not slots["about"]:
+                         about=_about(text) or (ho.get("about") or "") or context, attachments=files,
+                         share=(ho.get("summary") or "")[:6000])
+            if not slots["message"] and not slots["about"] and not slots["share"]:
                 return {"intent": intent, "slots": slots, "ask": "message", "question": "What should the email say?"}
         if intent == "reply":
             m = re.search(r"\b(?:reply|respond|answer)\s+(?:to\s+)?(?:the\s+)?(?:email\s+from\s+)?([^,.:]+?)(?=\s+(?:saying|"
@@ -145,11 +166,18 @@ class EmailAgent(Agent):
         return Draft(subject=subject[:300], body=f"Hi {first},\n\n{core}\n\nBest regards,\n{sign}"), True
 
     def _proposal(self, ctx: Ctx, *, to: list[str], draft: Draft, simulated_draft: bool, mode_sim: bool,
-                  thread_id: str | None = None, warnings: list[str] | None = None, reply_to: str = "") -> Proposal:
-        args = {"to": to, "subject": draft.subject, "body": draft.body}
+                  thread_id: str | None = None, warnings: list[str] | None = None, reply_to: str = "",
+                  attachments: list[str] | None = None) -> Proposal:
+        args: dict[str, Any] = {"to": to, "subject": draft.subject, "body": draft.body}
         if thread_id:
             args["thread_id"] = thread_id
+        if attachments:
+            args["attachments"] = list(attachments)
         det = [Detail("To", ", ".join(to)), Detail("Subject", draft.subject), Detail("Message", draft.body)]
+        if attachments:
+            from pathlib import Path
+
+            det.append(Detail("Attachments", ", ".join(Path(a).name for a in attachments)))
         if reply_to:
             det.insert(0, Detail("In reply to", reply_to))
         det.append(Detail("Sent from", "Simulated mailbox (nothing is delivered)" if mode_sim else "Your Gmail account"))
@@ -185,10 +213,24 @@ class EmailAgent(Agent):
                                    body=f"{len(rows)} message(s).", warnings=warn, simulated=d["simulated"],
                                    data={"columns": ["from", "subject", "date", "snippet"], "rows": rows})]}
         if intent == "send":
-            draft, sim = self._draft(ctx, original=None, instruction=s["message"], about=s["about"],
+            share, files = s.get("share") or "", list(s.get("attachments") or [])
+            instruction = s["message"]
+            if share:
+                instruction = (instruction + "\n\n" if instruction else "") + (
+                    "Share this summary in the email (keep its facts exactly):\n" + share)
+                if files:
+                    instruction += "\nSay that the file is attached."
+            draft, sim = self._draft(ctx, original=None, instruction=instruction, about=s["about"],
                                      to_name=s.get("to_name", ""))
+            if share and sim:  # template draft: put the summary itself in the body
+                first = (s.get("to_name") or "there").split()[0]
+                draft = Draft(subject=draft.subject, body=f"Hi {first},\n\n" + (s["message"] + "\n\n" if s["message"]
+                              else "") + share + ("\n\nThe file is attached." if files else "") +
+                              f"\n\nBest regards,\n{ctx.user.name}")
             mode_sim = bool(self._inbox(ctx, max_results=1).get("simulated", True))
-            return {"proposals": [self._proposal(ctx, to=s["to"], draft=draft, simulated_draft=sim, mode_sim=mode_sim)]}
+            warn = [f"Recipient found by name: {s['to_found']}. Check it before approving."] if s.get("to_found") else []
+            return {"proposals": [self._proposal(ctx, to=s["to"], draft=draft, simulated_draft=sim, mode_sim=mode_sim,
+                                                 attachments=files, warnings=warn)]}
         if intent == "reply":
             who = s["who"]
             q = f"from:{who}" if "@" in who else f'from:"{who}"'

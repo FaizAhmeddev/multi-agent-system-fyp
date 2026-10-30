@@ -39,8 +39,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def attachment_roots() -> list[Path]:
+    """Folders whose files may be attached to an email: AgentsMind's HR letters and reports, files attached in
+    the chat, and the CV folders (so a CV can be forwarded)."""
     data = Path(os.environ.get("WORKSPACE_DATA_DIR") or REPO_ROOT / "data")
-    return [(data / "hr_documents").resolve(), (data / "hr_reports").resolve()]
+    roots = [(data / "hr_documents").resolve(), (data / "hr_reports").resolve(), (data / "chat_uploads").resolve()]
+    try:
+        from .extras import cv_dirs
+
+        roots += cv_dirs()
+    except Exception:  # noqa: BLE001,S110 - CV folders are optional
+        pass
+    return roots
 
 
 def safe_attachment(path: str) -> Path:
@@ -286,7 +295,22 @@ class GmailIMAP:
         m = self._mail(msg, meta)
         return {"message_id": m.id, "filename": name, "mime_type": ctype, "text": text[:MAX_BODY],
                 "truncated": len(text) > MAX_BODY, "extracted_from": how, "sender": m.sender, "subject": m.subject,
-                "date": m.date}
+                "date": m.date, "saved_path": _keep_copy(m.id, name, blob)}
+
+
+def _keep_copy(message_id: str, name: str, blob: bytes) -> str:
+    """A local copy of a CV read from Gmail (data/hr_documents/cvs), so it can be forwarded by email."""
+    data = Path(os.environ.get("WORKSPACE_DATA_DIR") or REPO_ROOT / "data")
+    d = data / "hr_documents" / "cvs"
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        safe = re.sub(r"[^\w.\- ()]+", "_", Path(name).name).strip(" .") or "attachment"
+        p = d / f"{message_id}_{safe[:100]}"
+        if not p.exists():
+            p.write_bytes(blob)
+        return str(p.resolve())
+    except OSError:
+        return ""
 
 
 def _all_mail_box(c: imaplib.IMAP4_SSL) -> str | None:

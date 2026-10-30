@@ -38,6 +38,7 @@ class DBCtx:
         self._on_event = on_event
         self.run: AgentRun | None = None
         self.runs: list[AgentRun] = []
+        self.attachments: list[dict[str, Any]] = []
 
     # ---------------------------------------------------------------- tools
     def _call(self, agent: str, tool: str, args: dict[str, Any], summary: str = "") -> ToolResult:
@@ -51,6 +52,29 @@ class DBCtx:
 
     def read(self, agent: str, tool: str, args: dict[str, Any]) -> ToolResult:
         return self._call(agent, tool, args)
+
+    def save_pdf(self, title: str, body: str) -> dict[str, Any]:
+        from .attachments import save_pdf
+
+        return save_pdf(self.user.id, title, body)
+
+    def find_contact(self, name: str) -> str | None:
+        """An email address for a first or full name, when exactly one person matches: AgentsMind users, HR
+        employee records and screened candidates."""
+        from sqlalchemy import func, or_
+
+        from ..db.hr_models import Employee
+
+        n = name.strip().lower()
+        if len(n) < 3:
+            return None
+        found: set[str] = set()
+        for model, col in ((User, User.full_name), (Employee, Employee.full_name), (Candidate, Candidate.full_name)):
+            rows = self.db.scalars(select(model).where(or_(func.lower(col) == n, func.lower(col).like(f"{n} %"))))
+            for r in rows:
+                if getattr(r, "email", ""):
+                    found.add(r.email.lower())
+        return found.pop() if len(found) == 1 else None
 
     def propose(self, agent: str, tool: str, args: dict[str, Any], summary: str) -> ToolResult:
         return self._call(agent, tool, args, summary)
@@ -151,14 +175,24 @@ def get_conversation(db: Session, user: User, conversation_id: int | None, first
 
 
 def handle_message(db: Session, user: User, text: str, *, conversation_id: int | None = None, ip: str = "",
-                   on_event: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
+                   on_event: Callable[[dict[str, Any]], None] | None = None,
+                   attachments: list[str] | None = None) -> dict[str, Any]:
+    from .attachments import load_many
+
     conv = get_conversation(db, user, conversation_id, text)
     last = db.scalar(select(Message).where(Message.conversation_id == conv.id, Message.role == "assistant")
                      .order_by(Message.id.desc()).limit(1))
     pending = (last.meta or {}).get("pending") if last is not None else None
-    db.add(Message(conversation_id=conv.id, role="user", content=text[:20000], meta={}))
+    files = load_many(user.id, list(attachments or []))
+    if not files:  # "email it to Huzaifa" after attaching a file earlier in the same conversation
+        prev = db.scalar(select(Message).where(Message.conversation_id == conv.id, Message.role == "user")
+                         .order_by(Message.id.desc()).limit(1))
+        files = load_many(user.id, list((prev.meta or {}).get("attachments") or [])) if prev is not None else []
+    db.add(Message(conversation_id=conv.id, role="user", content=text[:20000],
+                   meta={"attachments": [f["id"] for f in files], "attachment_names": [f["name"] for f in files]}))
     db.commit()
     ctx = DBCtx(db, user, conversation_id=conv.id, ip=ip, on_event=on_event)
+    ctx.attachments = files
     result = run_turn(ctx, text, pending=pending)
     ctx.finish_runs(result.cards)
     cards = [c.to_dict() for c in result.cards]
