@@ -1,0 +1,47 @@
+{
+  // Run and Debug (Ctrl+Shift+D): pick one of these and press F5.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run AgentsMind",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Run External Systems (Finance Portal, IT Helpdesk)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/external_systems/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run all tests (report in logs/test-report.txt)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/run_tests.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Stop AgentsMind",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--stop"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run everything (AgentsMind + External Systems)",
+      "configurations": ["Run External Systems (Finance Portal, IT Helpdesk)", "Run AgentsMind"],
+      "stopAll": true
+    }
+  ]
+}

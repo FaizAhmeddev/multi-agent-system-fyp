@@ -46,6 +46,21 @@ You need Python 3.11 or 3.12, Node.js 22 LTS and git. Then, in the AgentsMind fo
 Sign in with the admin account in `.env` (`AGENTSMIND_ADMIN_EMAIL`, `AGENTSMIND_ADMIN_PASSWORD`; also in
 `data\local_credentials.txt`). To change it later: `.venv\Scripts\python scripts\set_admin.py --email ... --password ...`.
 
+## Run it from VS Code
+
+Open the `agentsmind` folder in VS Code (File > Open Folder). Install the recommended Python extension when asked.
+Then **Run and Debug** (Ctrl+Shift+D), pick a configuration and press **F5**:
+
+| Configuration | What it does |
+|---|---|
+| Run AgentsMind | `main.py`: sets up and starts everything, opens http://127.0.0.1:8000 |
+| Run External Systems | Finance Portal (8201) and IT Helpdesk (8202) |
+| Run everything | both of the above together |
+| Run all tests | every test suite and the frontend type check; report in `logs\test-report.txt` |
+| Stop AgentsMind | stops anything still running |
+
+Press the red Stop button (Shift+F5) to stop. Or open `main.py` and press the Run button at the top right.
+
 ## Configure (`.env`)
 
 | Setting | What it connects |

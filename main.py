@@ -248,6 +248,18 @@ def start(name: str, args: list[str], extra: dict[str, str]) -> subprocess.Popen
     return subprocess.Popen([str(VPY), *args], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, **kw)  # noqa: S603
 
 
+def last_error(name: str) -> str:
+    """The most useful line from the end of a part's log (the error, not the shutdown chatter)."""
+    f = LOGS / f"{name}.log"
+    if not f.is_file():
+        return ""
+    lines = [x.strip() for x in f.read_text(encoding="utf-8", errors="replace").splitlines()[-60:] if x.strip()]
+    for x in reversed(lines):
+        if any(k in x for k in ("Error", "error", "Refusing", "Traceback", "Exception", "refused")):
+            return x[:300]
+    return lines[-1][:300] if lines else ""
+
+
 def status_line(env: dict[str, str]) -> None:
     llm = "connected" if env.get("OPENAI_API_KEY") else "not set (answers are labeled Simulated)"
     mail = f"{env.get('GMAIL_EMAIL')} (app password)" if env.get("GMAIL_EMAIL") and env.get("GMAIL_APP_PASSWORD") \
@@ -272,12 +284,19 @@ def serve(env: dict[str, str], open_browser: bool) -> None:
     pending = {n: url for n, _, _, url in PARTS if url}
     while pending and time.time() < deadline:
         for n in list(pending):
+            if procs[n].poll() is not None:  # our process exited: never count another program's port as ours
+                break
             if port_open(pending[n]):
                 say(f"  {n:14} up")
                 pending.pop(n)
+        if any(procs[n].poll() is not None for n in pending):
+            break
         time.sleep(0.5)
     for n in pending:
-        say(f"  {n:14} NOT UP: see logs\\{n}.log")
+        say(f"  {n:14} NOT UP: {last_error(n) or 'see logs'}  (logs\\{n}.log)")
+    for name, _a, _e, _u in PARTS:
+        if procs[name].poll() is not None and name not in pending:
+            say(f"  {name:14} STOPPED: {last_error(name)}")
     fp = env.get("FINANCE_PORTAL_URL", "http://127.0.0.1:8201")
     if not port_open(f"{fp}/api/v1/health"):
         say("  Finance Portal and IT Helpdesk are not running: start Start-External-Systems.bat for payroll and "
@@ -296,9 +315,11 @@ def serve(env: dict[str, str], open_browser: bool) -> None:
                 if p.poll() is not None:
                     restarts[name] = restarts.get(name, 0) + 1
                     if restarts[name] > 3:
+                        if restarts[name] == 4:
+                            say(f"  {name} keeps stopping; not restarting it again. Reason: {last_error(name)}")
                         continue
-                    say(f"  {name} stopped (exit {p.returncode}); restarting ({restarts[name]} of 3). "
-                        f"See logs\\{name}.log")
+                    say(f"  {name} stopped (exit {p.returncode}): {last_error(name)}  Restarting ({restarts[name]} "
+                        "of 3).")
                     procs[name] = start(name, args, extra)
                     PIDS.write_text("\n".join(str(x.pid) for x in procs.values()))
     except KeyboardInterrupt:
