@@ -1,6 +1,8 @@
-# AgentsMind core API. The full, pinned sets live in requirements/:
+# Everything a server deployment needs (Render's Python runtime installs this file):
 #   requirements/backend.txt   core API, agents, queue worker
 #   requirements/portals.txt   + Finance Portal and IT Helpdesk
 #   requirements/servers.txt   + MCP servers (Google libraries)
-#   requirements/dev.txt       + tests and lint (what scripts\win\setup.ps1 -Dev installs)
--r requirements/backend.txt
+#   requirements/postgres.txt  + PostgreSQL driver
+#   requirements/dev.txt       + tests and lint
+-r requirements/servers.txt
+psycopg[binary]==3.2.3

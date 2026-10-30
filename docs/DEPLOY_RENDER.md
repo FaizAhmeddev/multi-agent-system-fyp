@@ -18,6 +18,15 @@ and REST on 127.0.0.1 with their tokens.
 4. Click **Apply**. The first build takes about 10 minutes. The address is shown at the top, for example
    `https://agentsmind.onrender.com`. Sign in with the admin email and password from step 3.
 
+### Without the Blueprint (New > Web Service)
+
+Either choose **Language: Docker** (nothing else to fill in), or keep **Python 3** and set:
+
+- Build Command: `pip install -r requirements.txt && cd frontend && npm ci && npx vite build`
+- Start Command: `python deploy/onebox.py`
+- Health Check Path: `/health`
+- Environment: `PYTHON_VERSION=3.11.9` plus the values from step 3, and `JWT_SECRET` (Generate)
+
 To try the same one-process setup on your computer first: VS Code > "Run in one process (the Render setup)",
 then open http://127.0.0.1:10000.
 
