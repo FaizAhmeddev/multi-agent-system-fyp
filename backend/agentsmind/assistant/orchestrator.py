@@ -211,7 +211,13 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
             steps, planner = [Step(routed, text, 0.0)], "llm"
     if not steps:
         ctx.emit({"type": "plan", "steps": []})
-        return TurnResult(cards=[fallback_card(ctx)], steps=[], planner="fallback")
+        from .general import answer
+
+        fb = fallback_card(ctx)
+        direct = answer(ctx, text, fb)
+        if direct is not None and direct is not fb:
+            return TurnResult(cards=[direct], steps=[], planner="general")
+        return TurnResult(cards=[fb], steps=[], planner="fallback")
     ctx.emit({"type": "plan", "steps": [{"agent": s.agent, "text": s.text} for s in steps]})
     cards: list[Card] = []
     new_pending = None

@@ -189,13 +189,49 @@ def kill_tree(pid: int) -> None:
             pass
 
 
-def stop_previous() -> None:
+PORTS = (8000, 8101, 8102, 8103, 8104)
+
+
+def pids_on_ports(ports: tuple[int, ...]) -> set[int]:
+    """Processes listening on AgentsMind ports (for example an older version still running)."""
+    out: set[int] = set()
+    try:
+        if IS_WIN:
+            r = subprocess.run(["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=15)  # noqa: S603,S607
+            for line in r.stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 5 and parts[3].upper() == "LISTENING" and parts[1].rsplit(":", 1)[-1].isdigit():
+                    if int(parts[1].rsplit(":", 1)[-1]) in ports and parts[4].isdigit() and int(parts[4]) > 0:
+                        out.add(int(parts[4]))
+        else:
+            for port in ports:
+                r = subprocess.run(["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True)  # noqa: S603,S607
+                out |= {int(x) for x in r.stdout.split() if x.isdigit()}
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return out - {os.getpid()}
+
+
+def stop_previous(ports: tuple[int, ...] = PORTS) -> None:
     if PIDS.exists():
         for line in PIDS.read_text().split():
             if line.isdigit():
                 kill_tree(int(line))
         PIDS.unlink(missing_ok=True)
         time.sleep(1)
+    left = pids_on_ports(ports)
+    if left:
+        say(f"Stopping an older AgentsMind still using its ports (process {', '.join(map(str, sorted(left)))}).")
+        for pid in left:
+            kill_tree(pid)
+        for _ in range(20):
+            if not pids_on_ports(ports):
+                break
+            time.sleep(0.5)
+        still = pids_on_ports(ports)
+        if still:
+            raise SystemExit(f"Ports {', '.join(map(str, ports))} are still in use by process(es) {sorted(still)}. "
+                             "Close the other AgentsMind windows (or restart the computer) and start again.")
 
 
 def start(name: str, args: list[str], extra: dict[str, str]) -> subprocess.Popen:

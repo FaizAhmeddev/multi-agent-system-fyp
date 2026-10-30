@@ -62,6 +62,11 @@ def main() -> int:
             if line.isdigit():
                 L.kill_tree(int(line))
         PIDS.unlink(missing_ok=True)
+    old = L.pids_on_ports((8201, 8202))
+    for pid in old:
+        L.kill_tree(pid)
+    if old:
+        time.sleep(2)
     L.step("Starting the external systems")
     procs = {}
     for name, app, port, _title in PORTALS:

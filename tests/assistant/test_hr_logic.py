@@ -116,3 +116,14 @@ def test_karachi_filter():
     assert calc.location_match("Ali\nDHA Phase 6\nPython", rec)[0] is True  # area only
     assert calc.location_match("Usman\nLahore, Pakistan\nPython", rec) == (False, "Lahore")
     assert calc.location_match("Bilal\nskills: python", rec) == (None, "")
+
+
+def test_general_questions_get_direct_answers(tmp_path):
+    from fakectx import FakeCtx
+
+    from agentsmind.assistant.orchestrator import run_turn
+
+    r = run_turn(FakeCtx(tmp_path), "Today date and time")
+    assert r.planner == "general" and "Wednesday, 28 October 2026, 11:00 AM" in r.cards[0].body
+    assert run_turn(FakeCtx(tmp_path), "hello").cards[0].title.startswith("Hello")
+    assert run_turn(FakeCtx(tmp_path), "What is the weather like on Mars?").planner == "fallback"  # no model here
