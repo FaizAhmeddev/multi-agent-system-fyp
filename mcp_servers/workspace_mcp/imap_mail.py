@@ -101,7 +101,8 @@ class GmailIMAP:
         self.ledger = _ledger("workspace_imap_sent.db")
 
     # ------------------------------------------------------------------ connection
-    def _imap(self) -> imaplib.IMAP4_SSL:
+    def _imap(self, all_mail: bool = False) -> imaplib.IMAP4_SSL:
+        """all_mail: open Gmail's "All Mail" (every label, archived and sent mail too), used to find CVs."""
         from .backends import WorkspaceError
 
         try:
@@ -112,7 +113,8 @@ class GmailIMAP:
                                  "(an app password from Google Account > Security > App passwords).") from exc
         except OSError as exc:
             raise WorkspaceError(f"Could not reach Gmail ({type(exc).__name__}). Check the internet connection.") from exc
-        c.select("INBOX", readonly=True)
+        box = _all_mail_box(c) if all_mail else None
+        c.select(box or "INBOX", readonly=True)
         return c
 
     @staticmethod
@@ -230,7 +232,7 @@ class GmailIMAP:
     # ------------------------------------------------------------------ attachments (CV gathering)
     def find_attachments(self, query: str, max_messages: int) -> list[dict]:
         raw = " ".join(x for x in ("has:attachment", query) if x)
-        c = self._imap()
+        c = self._imap(all_mail=True)
         out = []
         try:
             uids = self._search(c, raw)
@@ -251,7 +253,7 @@ class GmailIMAP:
 
         if not message_id.isdigit():
             raise WorkspaceError("Unknown message id.")
-        c = self._imap()
+        c = self._imap(all_mail=True)
         try:
             typ, data = c.uid("SEARCH", "X-GM-MSGID", message_id)
             uids = (data[0] or b"").split() if typ == "OK" else []
@@ -275,6 +277,21 @@ class GmailIMAP:
         return {"message_id": m.id, "filename": name, "mime_type": ctype, "text": text[:MAX_BODY],
                 "truncated": len(text) > MAX_BODY, "extracted_from": how, "sender": m.sender, "subject": m.subject,
                 "date": m.date}
+
+
+def _all_mail_box(c: imaplib.IMAP4_SSL) -> str | None:
+    """The quoted name of the mailbox flagged \\All ("[Gmail]/All Mail", localized in some accounts)."""
+    try:
+        typ, data = c.list()
+    except imaplib.IMAP4.error:
+        return None
+    for line in data or []:
+        t = line.decode(errors="replace") if isinstance(line, bytes) else str(line)
+        if "\\All" in t:
+            m = re.search(r'"((?:[^"\\]|\\.)*)"\s*$', t) or re.search(r"(\S+)\s*$", t)
+            if m:
+                return '"' + m.group(1) + '"'
+    return None
 
 
 def _logout(c: imaplib.IMAP4_SSL) -> None:

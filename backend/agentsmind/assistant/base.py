@@ -138,6 +138,16 @@ def _safe(fn: Callable[[State], State], name: str, agent: str) -> Callable[[Stat
     return node
 
 
+def _jsonable(slots: dict[str, Any]) -> dict[str, Any]:
+    """Slots kept with a clarifying question (stored as JSON until the user answers)."""
+    import json
+
+    try:
+        return json.loads(json.dumps(slots, default=str))
+    except (TypeError, ValueError):
+        return {}
+
+
 def build_graph(agent: Agent, ctx: Ctx):
     from langgraph.graph import END, START, StateGraph
 
@@ -177,7 +187,8 @@ def build_graph(agent: Agent, ctx: Ctx):
     def clarify(s: State) -> State:
         cards = list(s.get("cards", []))
         cards.append(Card(kind="clarify", agent=agent.name, title="I need one more detail", body=s["question"],
-                          options=list(s.get("options", []))))
+                          options=list(s.get("options", [])),
+                          data={"ask": s.get("ask", ""), "slots": _jsonable(s.get("slots") or {})}))
         return {"cards": cards}
 
     def error(s: State) -> State:

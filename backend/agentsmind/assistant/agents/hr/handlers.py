@@ -303,12 +303,17 @@ def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list
     out: list[dict[str, Any]] = []
     sources = {src}
     if "gmail" in sources:
-        r = ctx.read("hr", "gmail_find_attachments", {"query": pol["recruitment"]["gmail_query"], "max_messages": 40})
+        r = ctx.read("hr", "gmail_find_attachments", {"query": _gmail_cv_query(pol, role), "max_messages": 40})
         if r.ok:
-            for a in r.data["items"][:40]:
-                if not re.search(r"\b(cv|resume|curriculum|profile|application)\b|" + re.escape(role.split()[0].lower()),
-                                 f"{a['filename']} {a['subject']}".lower()):
-                    continue
+            items = r.data["items"][:40]
+            if not items:
+                notes.append("Gmail: no email with a PDF or Word attachment matched the search "
+                             f"'{_gmail_cv_query(pol, role)}' (all mail, last 90 days).")
+            for a in items:
+                hint = re.search(r"\b(cv|resume|curriculum|profile|application|candidate)\b|"
+                                 + re.escape(role.split()[0].lower()), f"{a['filename']} {a['subject']}".lower())
+                if not hint and not re.search(r"\.(pdf|docx)$", a["filename"].lower()):
+                    continue  # plain-text attachments only when the email says it is a CV
                 d = ctx.read("hr", "gmail_read_attachment", {"message_id": a["message_id"],
                                                              "attachment": a["attachment"]})
                 if d.ok:
@@ -340,6 +345,15 @@ def _from_source(ctx: Ctx, src: str, role: str, pol: dict[str, Any], notes: list
     return out
 
 
+def _gmail_cv_query(pol: dict[str, Any], role: str) -> str:
+    """The HR's Gmail search, widened with the role ("Python Developer" CVs often say only that)."""
+    q = pol["recruitment"]["gmail_query"]
+    role = re.sub(r"[\"()]", " ", role).strip()
+    if role and role.lower() not in q.lower() and q.startswith("("):
+        q = q.replace(")", f' OR "{role}")', 1)
+    return q
+
+
 def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
     from ...screening import screen
 
@@ -355,7 +369,9 @@ def h_screen(ctx: Ctx, txt: str, slots: dict[str, str]) -> dict[str, Any]:
     notes: list[str] = []
     cvs = gather_cvs(ctx, role, sources, notes)
     if not cvs:
-        raise AgentError("No CVs found (looked in " + ", ".join(sorted(sources)) + "). " + " ".join(notes))
+        raise AgentError("No CVs found (looked in " + ", ".join(sorted(sources)) + "). " + " ".join(notes) +
+                         " CVs are read from PDF or Word attachments in Gmail, from the CV folders (data\\cvs or "
+                         "HR_CV_DIRS) and from Drive files named CV or resume.")
     rec = pol["recruitment"]
     city = rec["candidate_city"]
     rows, out_city, no_city = [], [], []

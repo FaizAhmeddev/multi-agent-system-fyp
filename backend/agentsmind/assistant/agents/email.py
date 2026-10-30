@@ -56,6 +56,22 @@ def _about(text: str) -> str:
     return m.group(1).strip()[:150] if m else ""
 
 
+def _to_name(text: str) -> str:
+    """'email to Huzaifa', 'send an email to Sara Khan': the recipient's name, when one is written."""
+    m = re.search(r"\b(?:e-?mail|mail|write|send|message|inform|tell)\s+(?:an?\s+(?:e-?mail|message)\s+)?(?:to\s+)?"
+                  r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b", text)
+    if not m or m.group(1).lower() in {"email", "mail", "the", "my", "him", "her", "them", "about"}:
+        return ""
+    return m.group(1)
+
+
+def _context_about(context: str) -> str:
+    """The earlier request in the same message ("Schedule a meeting on 1 Nov at 11am") as the email's topic."""
+    c = re.sub(r"^\s*(?:please\s+)?(?:schedule|set up|book|arrange|create)\s+(?:a|an|the)?\s*", "", context, flags=re.I)
+    c = c.strip(" .;")
+    return c[:200] if c else ""
+
+
 class EmailAgent(Agent):
     name = "email"
     title = "Email agent"
@@ -73,13 +89,20 @@ class EmailAgent(Agent):
         intent = _intent(text.lower())
         slots: dict[str, Any] = dict(state.get("slots") or {}, intent=intent)
         if intent == "send":
-            to = emails(text)
+            given_to = slots.get("to")
+            to = emails(text) or (emails(given_to) if isinstance(given_to, str) else list(given_to or []))
+            name = _to_name(text)
             if not to:
-                return {"intent": intent, "slots": slots,
-                        "question": "Who should receive it? Give the email address."}
-            slots.update(to=to, message=_message_text(text), about=_about(text))
+                slots.pop("to", None)
+                who = f"{name}'s email address" if name else "the email address"
+                return {"intent": intent, "slots": slots, "ask": "to",
+                        "question": f"Who should receive it? Give {who}."}
+            given_msg = slots.get("message")
+            context = _context_about(str(slots.get("context") or ""))
+            slots.update(to=to, to_name=name, message=_message_text(text) or (given_msg or "").strip(),
+                         about=_about(text) or context)
             if not slots["message"] and not slots["about"]:
-                return {"intent": intent, "slots": slots, "question": "What should the email say?"}
+                return {"intent": intent, "slots": slots, "ask": "message", "question": "What should the email say?"}
         if intent == "reply":
             m = re.search(r"\b(?:reply|respond|answer)\s+(?:to\s+)?(?:the\s+)?(?:email\s+from\s+)?([^,.:]+?)(?=\s+(?:saying|"
                           r"that|telling|with|and)\b|[,.:]|$)", text, re.I)
@@ -100,7 +123,7 @@ class EmailAgent(Agent):
         if original is not None:
             subject = original["subject"] if original["subject"].lower().startswith("re:") else f"Re: {original['subject']}"
         else:
-            subject = about.capitalize() if about else "Message from " + sign
+            subject = (about[0].upper() + about[1:]) if about else "Message from " + sign
         llm = ctx.llm
         if not getattr(llm, "simulated", True):
             parts = [f"Write a short, polite business email from {sign} to {to_name or 'the recipient'}.",
@@ -159,7 +182,8 @@ class EmailAgent(Agent):
                                    body=f"{len(rows)} message(s).", warnings=warn, simulated=d["simulated"],
                                    data={"columns": ["from", "subject", "date", "snippet"], "rows": rows})]}
         if intent == "send":
-            draft, sim = self._draft(ctx, original=None, instruction=s["message"], about=s["about"], to_name="")
+            draft, sim = self._draft(ctx, original=None, instruction=s["message"], about=s["about"],
+                                     to_name=s.get("to_name", ""))
             mode_sim = bool(self._inbox(ctx, max_results=1).get("simulated", True))
             return {"proposals": [self._proposal(ctx, to=s["to"], draft=draft, simulated_draft=sim, mode_sim=mode_sim)]}
         if intent == "reply":

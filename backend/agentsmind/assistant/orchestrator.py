@@ -192,10 +192,17 @@ def fallback_card(ctx: Ctx) -> Card:
 def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> TurnResult:
     text = text.strip()
     planner = "rules"
+    answer_slots: dict[str, Any] | None = None
     if pending and pending.get("agent") in AGENTS:
         other, sc = _best(text)
         if other in (None, pending["agent"]) or sc < 2:
-            steps = [Step(pending["agent"], f"{pending['text']} {text}", 0.0)]
+            if pending.get("ask"):  # the answer fills the one detail that was asked for
+                steps = [Step(pending["agent"], pending["text"], 0.0)]
+                answer_slots = {**(pending.get("slots") or {}), pending["ask"]: text}
+            else:
+                steps = [Step(pending["agent"], f"{pending['text']} {text}", 0.0)]
+                ctx_slot = (pending.get("slots") or {}).get("context")
+                answer_slots = {"context": ctx_slot} if ctx_slot else None
             planner = "clarification"
         else:
             steps = plan(text)
@@ -227,6 +234,7 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
     ctx.emit({"type": "plan", "steps": [{"agent": s.agent, "text": s.text} for s in steps]})
     cards: list[Card] = []
     new_pending = None
+    done: list[str] = []
     for st in steps:
         agent = AGENTS[st.agent]
         if not allowed(ctx, agent):
@@ -238,8 +246,13 @@ def run_turn(ctx: Ctx, text: str, pending: dict[str, Any] | None = None) -> Turn
                               body=f"Your role cannot use the {agent.title}. Ask an administrator if you need access."))
             continue
         ctx.emit({"type": "agent", "agent": agent.name, "text": st.text})
-        out = run_agent(agent, ctx, st.text)
+        slots = answer_slots if answer_slots is not None else {}
+        if done and agent.name == "email" and "context" not in slots:  # "schedule a meeting ... and email X"
+            slots = {**slots, "context": "; ".join(done)}
+        out = run_agent(agent, ctx, st.text, slots)
         cards.extend(out)
+        done.append(st.text)
         if new_pending is None and out and out[-1].kind == "clarify":
-            new_pending = {"agent": agent.name, "text": st.text}
+            d = out[-1].data or {}
+            new_pending = {"agent": agent.name, "text": st.text, "ask": d.pop("ask", ""), "slots": d.pop("slots", {})}
     return TurnResult(cards=cards, steps=steps, pending=new_pending, planner=planner)

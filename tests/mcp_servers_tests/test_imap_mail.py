@@ -40,7 +40,7 @@ def test_inbox_uses_one_fetch_and_newest_first(monkeypatch, tmp_path):
     monkeypatch.setenv("WORKSPACE_DATA_DIR", str(tmp_path))
     fake = FakeIMAP({b"1": _raw("Old", "first"), b"2": _raw("New", "second"), b"3": _raw("CV", "cv", True)})
     g = imap_mail.GmailIMAP("hr@gmail.com", "abcd efgh ijkl mnop")
-    monkeypatch.setattr(g, "_imap", lambda: fake)
+    monkeypatch.setattr(g, "_imap", lambda all_mail=False: fake)
     mails, nxt = g.inbox(2, False, "", None)
     assert [m.subject for m in mails] == ["CV", "New"] and nxt == "2"
     assert len(fake.fetches) == 1 and "<0." in fake.fetches[0][1]  # partial bodies, one round trip

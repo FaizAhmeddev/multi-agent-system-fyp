@@ -94,14 +94,16 @@ class ITAgent(Agent):
         if m:
             slots["number"] = m.group(0).upper()
         if intent == "create":
-            dept = next((d for d in DEPARTMENTS if re.search(rf"\b{d}\b", text, re.I)), None) or slots.get("department")
+            given = str(slots.get("department") or "")
+            dept = next((d for d in DEPARTMENTS if re.search(rf"\b{d}\b", given, re.I)), None) if given else None
+            dept = dept or next((d for d in DEPARTMENTS if re.search(rf"\b{d}\b", text, re.I)), None)
             dept = dept or next((ROLE_DEPT[r] for r in ctx.user.roles if r in ROLE_DEPT), None)
             if len(re.sub(r"\s+", " ", text).strip()) < 15:
                 return {"intent": intent, "slots": slots,
                         "question": "What is the problem? A sentence or two helps IT fix it faster."}
             if not dept:
                 return {"intent": intent, "slots": slots, "question": "Which department are you in?",
-                        "options": list(DEPARTMENTS)}
+                        "options": list(DEPARTMENTS), "ask": "department"}
             slots.update(department=dept, category=category_of(text), priority=priority_of(text))
         if intent == "status_change":
             t = text.lower()
